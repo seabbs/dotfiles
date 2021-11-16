@@ -1,0 +1,35 @@
+XAuthLocation /opt/X11/bin/xauth
+TCPKeepAlive yes
+ServerAliveInterval 30
+
+Host lshtm
+        User lshsa2
+        HostName pryor.lshtm.ac.uk
+        Compression yes
+
+Host macmini
+        HostName macd0040.lshtm.ac.uk
+        User lshsa2
+        Compression yes
+        ProxyJump lshtm
+
+Host macmini-tunnel
+        HostName macd0040.lshtm.ac.uk
+        User lshsa2
+        Compression yes
+        LocalForward 9787 localhost:8787
+        LocalForward 9888 localhost:8888
+        LocalForward 9989 localhost:8989
+        ProxyJump lshtm
+
+Host pascal
+       User seabbs
+       HostName pascal.lshtm.ac.uk
+       ForwardX11 yes
+       ProxyJump lshtm
+
+Host epiforecasts
+       HostName 51.143.164.146
+       User epiforecasts
+       Compression yes
+       IdentityFile ~/.ssh/epiforecasts-general-use.pem
