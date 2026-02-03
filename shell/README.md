@@ -1,0 +1,38 @@
+# Shell configuration
+
+## claude-aliases.zsh
+
+Tmux workflow functions for Claude Code development.
+
+**Session management:**
+- `agent [project] [worktree]` - Start agent session (just happy)
+- `proj <name>` - Start full project session (nvim + happy + repl)
+- `agent-to-proj` - Convert agent session to full project layout
+
+**Worktree management:**
+- `agent-feat <branch> [base]` - Add worktree window to agent session
+- `agent-feat-done <branch>` - Clean up worktree window
+- `feat <branch> [base]` - Add worktree window to project session
+- `feat-done <branch>` - Clean up worktree
+- `feat-list` - List worktrees
+
+**Session listing:**
+- `mtmux` - List all sessions
+- `projects` - List project sessions
+- `agents` - List agent sessions
+- `lsproj [filter]` - List available projects in ~/code
+
+**Claude shortcuts:**
+- `tc [command]` - Smart tmux-claude launcher
+- `commit`, `review`, `lint`, `test`, `pr`, etc.
+
+## Setup
+
+```bash
+ln -sf ~/code/dotfiles/shell/claude-aliases.zsh ~/.config/zsh/claude-aliases.zsh
+```
+
+Add to `.zshrc`:
+```bash
+source ~/.config/zsh/claude-aliases.zsh
+```
