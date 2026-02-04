@@ -269,11 +269,11 @@ _find_project() {
     return 0
   fi
 
-  # Find partial matches (case-insensitive)
+  # Find partial matches (case-insensitive, anchored to start)
   local -a matches
   while IFS= read -r match; do
     [[ -n "$match" ]] && matches+=("$match")
-  done < <(ls -1 "$code_dir" 2>/dev/null | grep -i "$partial")
+  done < <(ls -1 "$code_dir" 2>/dev/null | grep -i "^$partial")
 
   if [[ ${#matches[@]} -eq 0 ]]; then
     echo "Error: No project matching '$partial'" >&2
