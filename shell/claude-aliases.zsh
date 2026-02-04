@@ -121,10 +121,18 @@ alias spaceship='cd ~/spaceship'
 
 # Start a project session with tmuxinator
 # Usage: proj <project-name>
+# Supports partial name matching (e.g., proj epi -> epinowcast)
 proj() {
-  local project="$1"
-  if [[ -z "$project" ]]; then
+  local input="$1"
+  if [[ -z "$input" ]]; then
     echo "Usage: proj <project-name>"
+    return 1
+  fi
+
+  # Resolve partial name to full project name
+  local project
+  project=$(_find_project "$input")
+  if [[ $? -ne 0 ]]; then
     return 1
   fi
 
@@ -243,6 +251,43 @@ feat-list() {
 # Project discovery
 # =============================================================================
 
+# Find a project by partial name match
+# Returns the full project name if found, empty string if not
+# Usage: _find_project <partial-name>
+_find_project() {
+  local partial="$1"
+  local code_dir="$HOME/code"
+
+  # Empty input
+  if [[ -z "$partial" ]]; then
+    return 1
+  fi
+
+  # Exact match first
+  if [[ -d "$code_dir/$partial" ]]; then
+    echo "$partial"
+    return 0
+  fi
+
+  # Find partial matches (case-insensitive)
+  local -a matches
+  while IFS= read -r match; do
+    [[ -n "$match" ]] && matches+=("$match")
+  done < <(ls -1 "$code_dir" 2>/dev/null | grep -i "$partial")
+
+  if [[ ${#matches[@]} -eq 0 ]]; then
+    echo "Error: No project matching '$partial'" >&2
+    return 1
+  elif [[ ${#matches[@]} -eq 1 ]]; then
+    echo "${matches[1]}"
+    return 0
+  else
+    echo "Error: Multiple projects match '$partial':" >&2
+    printf "  %s\n" "${matches[@]}" >&2
+    return 1
+  fi
+}
+
 # List available projects (directories in ~/code), ordered by last modified
 # Usage: lsproj [filter]
 lsproj() {
@@ -268,20 +313,22 @@ lsproj() {
 #   agent                    - use current project
 #   agent <name>             - worktree in current repo OR ~/code/<name>
 #   agent <project> <wt>     - create/use worktree in ~/code/<project>
+# Supports partial name matching (e.g., agent epi -> epinowcast)
 agent() {
-  local project="$1"
+  local input="$1"
   local worktree="$2"
   local work_dir=""
   local session_name=""
+  local project=""
 
-  if [[ -n "$project" && -n "$worktree" ]]; then
+  if [[ -n "$input" && -n "$worktree" ]]; then
     # agent <project> <worktree> - go to project and create/use worktree
-    local project_dir="$HOME/code/$project"
-    if [[ ! -d "$project_dir" ]]; then
-      echo "Error: Project not found: $project_dir"
+    project=$(_find_project "$input")
+    if [[ $? -ne 0 ]]; then
       return 1
     fi
 
+    local project_dir="$HOME/code/$project"
     local worktree_path="$project_dir/worktrees/$worktree"
     if [[ ! -d "$worktree_path" ]]; then
       echo "Creating worktree: $worktree"
@@ -292,21 +339,24 @@ agent() {
 
     session_name="agent-${project}-${worktree}"
     work_dir="$worktree_path"
-  elif [[ -n "$project" ]]; then
+  elif [[ -n "$input" ]]; then
     # agent <name> - check for worktree in current repo, else project
     local git_root
     git_root=$(git rev-parse --show-toplevel 2>/dev/null)
 
-    if [[ -n "$git_root" && -d "$git_root/worktrees/$project" ]]; then
+    if [[ -n "$git_root" && -d "$git_root/worktrees/$input" ]]; then
+      # Exact worktree match in current repo
       local repo_name=$(basename "$git_root")
-      session_name="agent-${repo_name}-${project}"
-      work_dir="$git_root/worktrees/$project"
-    elif [[ -d "$HOME/code/$project" ]]; then
+      session_name="agent-${repo_name}-${input}"
+      work_dir="$git_root/worktrees/$input"
+    else
+      # Try to find project by partial name
+      project=$(_find_project "$input")
+      if [[ $? -ne 0 ]]; then
+        return 1
+      fi
       session_name="agent-${project}"
       work_dir="$HOME/code/$project"
-    else
-      echo "Error: Not found as worktree or project: $project"
-      return 1
     fi
   else
     # agent - use current project

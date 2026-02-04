@@ -9,6 +9,11 @@ Tmux workflow functions for Claude Code development.
 - `proj <name>` - Start full project session (nvim + happy + repl)
 - `agent-to-proj` - Convert agent session to full project layout
 
+Both `agent` and `proj` support partial name matching:
+- `agent epi` matches `epinowcast` if unique
+- `proj dots` matches `dotfiles` if unique
+- Shows options if multiple matches found
+
 **Worktree management:**
 - `agent-feat <branch> [base]` - Add worktree window to agent session
 - `agent-feat-done <branch>` - Clean up worktree window
