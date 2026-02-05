@@ -1,3 +1,12 @@
+# AI CLI Tool Configuration
+# Set AGENT_CLI_PRIMARY_TOOL to your preferred primary AI CLI (e.g., 'claude', 'gemini')
+# Defaults to 'claude' if not set.
+: ${AGENT_CLI_PRIMARY_TOOL:=claude}
+
+# Set AGENT_CLI_DEV_TOOL to your preferred development-focused AI CLI (e.g., 'happy', 'gemini')
+# Defaults to 'happy' if not set.
+: ${AGENT_CLI_DEV_TOOL:=happy}
+
 # Smart tmux-claude launcher
 tc() {
   local command_name="$1"
@@ -50,9 +59,9 @@ tc() {
     local session_name="${session_prefix}"
     echo "Creating new session: ${session_name}"
     if [[ -n "$command_name" ]]; then
-      tmux new-session -s "$session_name" claude "$command_name" "$@"
+      tmux new-session -s "$session_name" "${AGENT_CLI_PRIMARY_TOOL}" "$command_name" "$@"
     else
-      tmux new-session -s "$session_name" claude
+      tmux new-session -s "$session_name" "${AGENT_CLI_PRIMARY_TOOL}"
     fi
   else
     # Multiple sessions exist, find next available number
@@ -70,17 +79,17 @@ tc() {
     local session_name="${session_prefix}-${new_num}"
     echo "Creating new session: ${session_name}"
     if [[ -n "$command_name" ]]; then
-      tmux new-session -s "$session_name" claude "$command_name" "$@"
+      tmux new-session -s "$session_name" "${AGENT_CLI_PRIMARY_TOOL}" "$command_name" "$@"
     else
-      tmux new-session -s "$session_name" claude
+      tmux new-session -s "$session_name" "${AGENT_CLI_PRIMARY_TOOL}"
     fi
   fi
 }
 
 # Claude Code custom command aliases
 # General model aliases
-alias haiku='claude --model haiku'
-alias sonnet='claude --model sonnet'
+alias haiku='${AGENT_CLI_PRIMARY_TOOL} --model haiku'
+alias sonnet='${AGENT_CLI_PRIMARY_TOOL} --model sonnet'
 
 # Specialized command aliases (using tmux)
 alias commit='tc commit --model haiku commit'
@@ -98,13 +107,13 @@ alias test='tc test --model sonnet test'
 alias uk-news='tc uk-news uk-news'
 alias update-deps='tc update-deps --model sonnet update-deps'
 alias docs='tc docs --model sonnet docs'
-alias list-claude='alias | grep claude | sort'
+alias list-ai-cli-aliases='alias | grep "${AGENT_CLI_PRIMARY_TOOL}" | sort'
 
 # Aliases with common arguments
-alias pr-here='claude pr $(gh issue list --limit 1 --json number --jq ".[0].number")'
-alias review-last='claude review $(git diff --name-only HEAD~1)'
-alias scan-current='claude scan-issues .'
-alias summarise-last='claude issue-summary $(gh issue list --limit 1 --json number --jq ".[0].number")'
+alias pr-here='${AGENT_CLI_PRIMARY_TOOL} pr $(gh issue list --limit 1 --json number --jq ".[0].number")'
+alias review-last='${AGENT_CLI_PRIMARY_TOOL} review $(git diff --name-only HEAD~1)'
+alias scan-current='${AGENT_CLI_PRIMARY_TOOL} scan-issues .'
+alias summarise-last='${AGENT_CLI_PRIMARY_TOOL} issue-summary $(gh issue list --limit 1 --json number --jq ".[0].number")'
 
 # Daily work preparation system
 alias daily='~/spaceship/daily-work-prep/view-daily-summary.sh'
@@ -112,8 +121,30 @@ alias daily-all='~/spaceship/daily-work-prep/view-daily-summary.sh all'
 alias daily-run='~/spaceship/daily-work-prep/run-all-daily.sh'
 
 # Claude workspace aliases
-alias claude-spaceship='cd ~/spaceship && claude'
+alias claude-spaceship='cd ~/spaceship && ${AGENT_CLI_PRIMARY_TOOL}'
 alias spaceship='cd ~/spaceship'
+
+# =============================================================================
+# Gemini specific functions
+# =============================================================================
+
+# Start a gemini project session with tmuxinator
+# Usage: gproj <project-name>
+gproj() {
+  AGENT_CLI_DEV_TOOL="gemini" proj "$@"
+}
+
+# Start a gemini agent session
+# Usage: gagent [project] [worktree]
+gagent() {
+  AGENT_CLI_DEV_TOOL="gemini" agent "$@"
+}
+
+# Create a new worktree window for gemini agent session
+# Usage: gagent-feat <branch-name> [base-branch]
+gagent-feat() {
+  AGENT_CLI_DEV_TOOL="gemini" agent-feat "$@"
+}
 
 # =============================================================================
 # tmux workflow functions
@@ -195,7 +226,7 @@ feat() {
   # Pane 1: happy (top-right)
   tmux split-window -h -c "$worktree_path"
   tmux select-pane -T "happy:$branch"
-  tmux send-keys "happy" Enter
+  tmux send-keys "${AGENT_CLI_DEV_TOOL}" Enter
 
   # Pane 2: REPL (bottom-right)
   tmux split-window -v -c "$worktree_path"
@@ -379,7 +410,7 @@ agent() {
   else
     echo "Creating agent session: $session_name"
     echo "Working directory: $work_dir"
-    tmux new-session -s "$session_name" -c "$work_dir" happy
+    tmux new-session -s "$session_name" -c "$work_dir" "${AGENT_CLI_DEV_TOOL}"
   fi
 }
 
@@ -419,12 +450,12 @@ agent-feat() {
     # Not in tmux - create session if needed, add window, attach
     if ! tmux has-session -t "$session_name" 2>/dev/null; then
       echo "Creating agent session: $session_name"
-      tmux new-session -d -s "$session_name" -c "$root" happy
+      tmux new-session -d -s "$session_name" -c "$root" "${AGENT_CLI_DEV_TOOL}"
     fi
 
     # Add worktree window
     tmux new-window -t "$session_name" -n "$branch" -c "$worktree_path"
-    tmux send-keys -t "$session_name:$branch" "happy" Enter
+    tmux send-keys -t "$session_name:$branch" "${AGENT_CLI_DEV_TOOL}" Enter
 
     # Attach to session
     tmux attach -t "$session_name:$branch"
@@ -432,7 +463,7 @@ agent-feat() {
     # In tmux - just add window to current session
     tmux new-window -n "$branch" -c "$worktree_path"
     tmux select-pane -T "happy:$branch"
-    tmux send-keys "happy" Enter
+    tmux send-keys "${AGENT_CLI_DEV_TOOL}" Enter
     echo "Created agent window: $branch"
   fi
 }
