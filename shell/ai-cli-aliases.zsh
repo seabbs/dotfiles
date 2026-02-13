@@ -155,8 +155,9 @@ gagent-feat() {
 # Supports partial name matching (e.g., proj epi -> epinowcast)
 proj() {
   local input="$1"
+  local branch="$2"
   if [[ -z "$input" ]]; then
-    echo "Usage: proj <project-name>"
+    echo "Usage: proj <project-name> [branch]"
     return 1
   fi
 
@@ -167,11 +168,53 @@ proj() {
     return 1
   fi
 
-  # Check if session already exists
+  # Start session if it doesn't exist
+  local needs_attach=false
   if tmux has-session -t "$project" 2>/dev/null; then
-    tmux attach -t "$project"
+    needs_attach=true
+  elif [[ -n "$branch" ]]; then
+    # Start detached so we can add feature window first
+    tmuxinator start project "$project" --no-attach
+    needs_attach=true
   else
     tmuxinator start project "$project"
+    return
+  fi
+
+  # Create feature worktree window if branch specified
+  if [[ -n "$branch" ]]; then
+    local root="$HOME/code/$project"
+    local wt="$root/worktrees/$branch"
+    if [[ ! -d "$wt" ]]; then
+      mkdir -p "$root/worktrees"
+      git -C "$root" worktree add \
+        "worktrees/$branch" -b "$branch" main
+    fi
+
+    local repl="zsh"
+    if [[ -f "$wt/Project.toml" ]]; then
+      repl="julia --project=."
+    elif [[ -f "$wt/DESCRIPTION" ]]; then
+      repl="R"
+    fi
+
+    local t="$project:$branch"
+    tmux new-window -t "$project" -n "$branch" -c "$wt"
+    tmux select-pane -t "$t.0" -T "nvim"
+    tmux send-keys -t "$t.0" "nvim ." Enter
+    tmux split-window -t "$t" -h -c "$wt"
+    tmux select-pane -t "$t.1" -T "happy:$branch"
+    tmux send-keys -t "$t.1" \
+      "${AGENT_CLI_DEV_TOOL}" Enter
+    tmux split-window -t "$t.1" -v -c "$wt"
+    tmux select-pane -t "$t.2" -T "repl"
+    tmux send-keys -t "$t.2" "$repl" Enter
+    tmux select-pane -t "$t.0"
+    tmux select-window -t "$t"
+  fi
+
+  if $needs_attach; then
+    tmux attach -t "$project"
   fi
 }
 
@@ -557,17 +600,49 @@ agent-to-proj() {
 }
 
 # List active project sessions (non-agent sessions)
+# List windows for a session, showing feature worktrees
+# Usage: _show_session_windows <session-name>
+_show_session_windows() {
+  local session="$1"
+  local windows
+  windows=$(tmux list-windows -t "$session" \
+    -F '#{window_index}:#{window_name}' 2>/dev/null)
+  echo "$windows" | while IFS= read -r win; do
+    echo "    $win"
+  done
+}
+
 projects() {
   echo "Active project sessions:"
   echo "========================"
-  tmux list-sessions -F '#{session_name}' 2>/dev/null | grep -v "^agent-" | sort || echo "  (none)"
+  local sessions
+  sessions=$(tmux list-sessions -F '#{session_name}' \
+    2>/dev/null | grep -v "^agent-" | sort)
+  if [[ -z "$sessions" ]]; then
+    echo "  (none)"
+    return 0
+  fi
+  echo "$sessions" | while IFS= read -r s; do
+    echo "  $s"
+    _show_session_windows "$s"
+  done
 }
 
 # List active agent sessions
 agents() {
   echo "Active agent sessions:"
   echo "======================"
-  tmux list-sessions -F '#{session_name}' 2>/dev/null | grep "^agent-" | sort || echo "  (none)"
+  local sessions
+  sessions=$(tmux list-sessions -F '#{session_name}' \
+    2>/dev/null | grep "^agent-" | sort)
+  if [[ -z "$sessions" ]]; then
+    echo "  (none)"
+    return 0
+  fi
+  echo "$sessions" | while IFS= read -r s; do
+    echo "  $s"
+    _show_session_windows "$s"
+  done
 }
 
 # Combined session manager
@@ -588,21 +663,44 @@ mtmux() {
       ;;
     all|*)
       local all_sessions
-      all_sessions=$(tmux list-sessions -F '#{session_name}' 2>/dev/null | sort)
+      all_sessions=$(tmux list-sessions \
+        -F '#{session_name}' 2>/dev/null | sort)
 
       if [[ -z "$all_sessions" ]]; then
         echo "No active sessions"
         return 0
       fi
 
+      local proj_sessions
+      proj_sessions=$(echo "$all_sessions" \
+        | grep -v "^agent-")
+      local agent_sessions
+      agent_sessions=$(echo "$all_sessions" \
+        | grep "^agent-")
+
       echo "Projects:"
-      echo "$all_sessions" | grep -v "^agent-" | sed 's/^/  /' || echo "  (none)"
+      if [[ -z "$proj_sessions" ]]; then
+        echo "  (none)"
+      else
+        echo "$proj_sessions" | while IFS= read -r s; do
+          echo "  $s"
+          _show_session_windows "$s"
+        done
+      fi
       echo ""
       echo "Agents:"
-      echo "$all_sessions" | grep "^agent-" | sed 's/^/  /' || echo "  (none)"
+      if [[ -z "$agent_sessions" ]]; then
+        echo "  (none)"
+      else
+        echo "$agent_sessions" | while IFS= read -r s; do
+          echo "  $s"
+          _show_session_windows "$s"
+        done
+      fi
       ;;
   esac
 
   echo ""
-  echo "Commands: proj <name>, agent [name], agent-to-proj"
+  echo "Commands: proj <name> [branch],"
+  echo "  agent [name] [worktree], agent-to-proj"
 }
