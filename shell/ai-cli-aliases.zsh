@@ -157,15 +157,22 @@ proj() {
   local input="$1"
   local branch="$2"
   if [[ -z "$input" ]]; then
-    echo "Usage: proj <project-name> [branch]"
+    echo "Usage: proj <project-name|.> [branch]"
     return 1
   fi
 
-  # Resolve partial name to full project name
+  # Resolve project name and root path
   local project
-  project=$(_find_project "$input")
-  if [[ $? -ne 0 ]]; then
-    return 1
+  local project_root
+  if [[ "$input" == "." ]]; then
+    project="home"
+    project_root="$HOME/code"
+  else
+    project=$(_find_project "$input")
+    if [[ $? -ne 0 ]]; then
+      return 1
+    fi
+    project_root="$HOME/code/$project"
   fi
 
   # Start session if it doesn't exist
@@ -174,16 +181,17 @@ proj() {
     needs_attach=true
   elif [[ -n "$branch" ]]; then
     # Start detached so we can add feature window first
-    tmuxinator start project "$project" --no-attach
+    tmuxinator start project \
+      "$project" "$project_root" --no-attach
     needs_attach=true
   else
-    tmuxinator start project "$project"
+    tmuxinator start project "$project" "$project_root"
     return
   fi
 
   # Create feature worktree window if branch specified
   if [[ -n "$branch" ]]; then
-    local root="$HOME/code/$project"
+    local root="$project_root"
     local wt="$root/worktrees/$branch"
     if [[ ! -d "$wt" ]]; then
       mkdir -p "$root/worktrees"
