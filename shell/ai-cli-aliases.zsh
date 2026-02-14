@@ -7,6 +7,10 @@
 # Defaults to 'happy' if not set.
 : ${AGENT_CLI_DEV_TOOL:=happy}
 
+# Root directory for code repositories, organised by GitHub org
+# Defaults to ~/code if not set.
+: ${CODE_DIR:=$HOME/code}
+
 # Smart tmux-claude launcher
 tc() {
   local command_name="$1"
@@ -162,17 +166,19 @@ proj() {
   fi
 
   # Resolve project name and root path
+  local project_path
   local project
   local project_root
   if [[ "$input" == "." ]]; then
     project="home"
-    project_root="$HOME/code"
+    project_root="$CODE_DIR"
   else
-    project=$(_find_project "$input")
+    project_path=$(_find_project "$input")
     if [[ $? -ne 0 ]]; then
       return 1
     fi
-    project_root="$HOME/code/$project"
+    project="${project_path##*/}"
+    project_root="$CODE_DIR/$project_path"
   fi
 
   # Start session if it doesn't exist
@@ -334,28 +340,59 @@ feat-list() {
 # =============================================================================
 
 # Find a project by partial name match
-# Returns the full project name if found, empty string if not
+# Searches ~/code/{org}/ subdirectories (two levels deep)
+# Returns org/project path so $CODE_DIR/$result works
+# Skips archive/ and worktree directories
 # Usage: _find_project <partial-name>
 _find_project() {
   local partial="$1"
-  local code_dir="$HOME/code"
+  local code_dir="$CODE_DIR"
 
   # Empty input
   if [[ -z "$partial" ]]; then
     return 1
   fi
 
-  # Exact match first
-  if [[ -d "$code_dir/$partial" ]]; then
+  # Support explicit org/project format
+  if [[ "$partial" == */* && -d "$code_dir/$partial" ]]; then
     echo "$partial"
     return 0
   fi
 
-  # Find partial matches (case-insensitive, anchored to start)
+  # Collect all org/project pairs, skipping archive
+  local -a all_projects
+  for org_dir in "$code_dir"/*/; do
+    local org=$(basename "$org_dir")
+    [[ "$org" == "archive" ]] && continue
+    for proj_dir in "$org_dir"/*/; do
+      [[ ! -d "$proj_dir" ]] && continue
+      local proj=$(basename "$proj_dir")
+      # Skip worktree directories
+      [[ "$proj" == "worktrees" ]] && continue
+      [[ "$proj" == worktree-* ]] && continue
+      [[ "$proj" == .dev ]] && continue
+      all_projects+=("$org/$proj")
+    done
+  done
+
+  # Exact match on project name (ignoring org)
   local -a matches
-  while IFS= read -r match; do
-    [[ -n "$match" ]] && matches+=("$match")
-  done < <(ls -1 "$code_dir" 2>/dev/null | grep -i "^$partial")
+  for entry in "${all_projects[@]}"; do
+    local proj="${entry##*/}"
+    if [[ "$proj" == "$partial" ]]; then
+      matches+=("$entry")
+    fi
+  done
+
+  # If no exact match, try partial (case-insensitive)
+  if [[ ${#matches[@]} -eq 0 ]]; then
+    for entry in "${all_projects[@]}"; do
+      local proj="${entry##*/}"
+      if [[ "${proj:l}" == "${partial:l}"* ]]; then
+        matches+=("$entry")
+      fi
+    done
+  fi
 
   if [[ ${#matches[@]} -eq 0 ]]; then
     echo "Error: No project matching '$partial'" >&2
@@ -370,20 +407,35 @@ _find_project() {
   fi
 }
 
-# List available projects (directories in ~/code), ordered by last modified
+# List available projects from ~/code/{org}/ subdirs
 # Usage: lsproj [filter]
 lsproj() {
   local filter="$1"
-  local code_dir="$HOME/code"
+  local code_dir="$CODE_DIR"
 
-  echo "Available projects (most recent first):"
-  echo "========================================"
+  echo "Available projects (by org):"
+  echo "============================"
 
-  if [[ -n "$filter" ]]; then
-    ls -1t "$code_dir" | grep -i "$filter"
-  else
-    ls -1t "$code_dir"
-  fi
+  for org_dir in "$code_dir"/*/; do
+    local org=$(basename "$org_dir")
+    [[ "$org" == "archive" ]] && continue
+    local found=false
+    for proj_dir in "$org_dir"/*/; do
+      [[ ! -d "$proj_dir" ]] && continue
+      local proj=$(basename "$proj_dir")
+      [[ "$proj" == "worktrees" ]] && continue
+      [[ "$proj" == worktree-* ]] && continue
+      [[ "$proj" == .dev ]] && continue
+      if [[ -z "$filter" ]] || \
+         echo "$proj" | grep -qi "$filter"; then
+        if ! $found; then
+          echo "  $org/"
+          found=true
+        fi
+        echo "    $proj"
+      fi
+    done
+  done
 }
 
 # =============================================================================
@@ -405,12 +457,14 @@ agent() {
 
   if [[ -n "$input" && -n "$worktree" ]]; then
     # agent <project> <worktree> - go to project and create/use worktree
-    project=$(_find_project "$input")
+    local project_path
+    project_path=$(_find_project "$input")
     if [[ $? -ne 0 ]]; then
       return 1
     fi
+    project="${project_path##*/}"
 
-    local project_dir="$HOME/code/$project"
+    local project_dir="$CODE_DIR/$project_path"
     local worktree_path="$project_dir/worktrees/$worktree"
     if [[ ! -d "$worktree_path" ]]; then
       echo "Creating worktree: $worktree"
@@ -433,12 +487,14 @@ agent() {
       work_dir="$git_root/worktrees/$input"
     else
       # Try to find project by partial name
-      project=$(_find_project "$input")
+      local project_path
+      project_path=$(_find_project "$input")
       if [[ $? -ne 0 ]]; then
         return 1
       fi
+      project="${project_path##*/}"
       session_name="agent-${project}"
-      work_dir="$HOME/code/$project"
+      work_dir="$CODE_DIR/$project_path"
     fi
   else
     # agent - use current project
@@ -566,11 +622,13 @@ agent-to-proj() {
     return 1
   fi
 
-  # Extract project name
+  # Extract project name and find its path
   local project="${session_name#agent-}"
   local work_dir
-  if [[ -d "$HOME/code/$project" ]]; then
-    work_dir="$HOME/code/$project"
+  local project_path
+  project_path=$(_find_project "$project" 2>/dev/null)
+  if [[ $? -eq 0 ]]; then
+    work_dir="$CODE_DIR/$project_path"
   else
     work_dir="$PWD"
   fi
