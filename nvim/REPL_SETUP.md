@@ -209,8 +209,10 @@ Visual undo history browser. Navigate branches of changes and restore any state.
 
 | Key | Action |
 |---|---|
+| `<leader>?` | Searchable keybinding cheatsheet |
 | `<leader>:` | All commands |
 | `<leader>;` | Command history |
+| `<leader>fF` | Frequent files (frecency) |
 | `<leader>cm` | Molten commands |
 | `<leader>cq` | Quarto commands |
 
