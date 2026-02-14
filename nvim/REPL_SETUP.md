@@ -102,6 +102,26 @@ Automatically highlights other uses of the word under the cursor using LSP, tree
 | `[[` | Previous reference |
 | `<leader>ux` | Toggle illuminate on/off |
 
+## Pinned files (harpoon)
+
+Quick-switch between a small set of working files.
+
+| Key | Action |
+|---|---|
+| `<leader>ha` | Add current file to harpoon |
+| `<leader>hh` | Open harpoon menu |
+| `<leader>1`-`4` | Jump to pinned file 1-4 |
+| `<leader>hp` | Previous pinned file |
+| `<leader>hn` | Next pinned file |
+
+## Undo tree
+
+Visual undo history browser. Navigate branches of changes and restore any state.
+
+| Key | Action |
+|---|---|
+| `<leader>uu` | Toggle undo tree |
+
 ## Quarto / Molten
 
 ### Quarto runner (molten)
