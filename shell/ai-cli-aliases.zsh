@@ -367,10 +367,12 @@ _find_project() {
     for proj_dir in "$org_dir"/*/; do
       [[ ! -d "$proj_dir" ]] && continue
       local proj=$(basename "$proj_dir")
-      # Skip worktree directories
+      # Skip non-project directories
       [[ "$proj" == "worktrees" ]] && continue
       [[ "$proj" == worktree-* ]] && continue
       [[ "$proj" == .dev ]] && continue
+      [[ "$proj" == .git ]] && continue
+      [[ "$proj" == .* ]] && continue
       all_projects+=("$org/$proj")
     done
   done
