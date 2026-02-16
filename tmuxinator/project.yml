@@ -7,7 +7,7 @@
 #   - R or Julia REPL (bottom-right pane, 25%, auto-detected)
 
 name: <%= @args[0] %>
-root: <%= @args[1] || "~/code/#{@args[0]}" %>
+root: <%= @args[1] %>
 
 startup_window: main
 
