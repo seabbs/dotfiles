@@ -4,6 +4,7 @@
   TMUX POPUPS (prefix = Ctrl-b)
   ----------------------------------------------------------------
   Ctrl-b G     GitHub dashboard (notifications)
+  Ctrl-b A     AI agent popup (ephemeral, current dir)
   Ctrl-b T     btop system monitor
   Ctrl-b t     scratch terminal
   Ctrl-b C-h   this cheatsheet
