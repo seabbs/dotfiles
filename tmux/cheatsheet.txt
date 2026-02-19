@@ -1,0 +1,94 @@
+  Workflow Cheatsheet            /search  n/N next/prev  q quit
+  ================================================================
+
+  TMUX POPUPS (prefix = Ctrl-b)
+  ----------------------------------------------------------------
+  Ctrl-b G     GitHub dashboard (notifications)
+  Ctrl-b T     btop system monitor
+  Ctrl-b t     scratch terminal
+  Ctrl-b C-h   this cheatsheet
+
+  TMUX PANES
+  ----------------------------------------------------------------
+  Ctrl-b |     split vertical
+  Ctrl-b -     split horizontal
+  Ctrl-b h/j/k/l    navigate panes
+  Alt-h/j/k/l        navigate panes (no prefix)
+  Ctrl-b H/J/K/L    resize panes
+  Ctrl-b z     zoom/unzoom pane
+  Ctrl-b b     break pane to new window
+  Ctrl-b J     join pane from another window
+
+  TMUX WINDOWS
+  ----------------------------------------------------------------
+  Ctrl-b c     new window
+  Ctrl-b D     dev layout (nvim | happy / repl)
+  Alt-1..9     switch to window N
+
+  TMUX SESSIONS
+  ----------------------------------------------------------------
+  Ctrl-b s     session picker
+  Ctrl-b w     window/session tree
+  Alt-(/)      prev/next session
+  Ctrl-b r     reload tmux.conf
+
+  TMUX COPY MODE
+  ----------------------------------------------------------------
+  Ctrl-b [     enter copy mode
+  v            begin selection
+  y / Enter    yank to clipboard
+
+  SHELL: PROJECT MANAGEMENT
+  ----------------------------------------------------------------
+  proj <name> [branch]     open full project (nvim + happy + repl)
+  agent [name] [worktree]  open agent session (happy only)
+  agent-to-proj            upgrade agent to full project layout
+  gproj / gagent           gemini variants of proj / agent
+  lsproj [filter]          list available projects
+
+  SHELL: WORKTREES
+  ----------------------------------------------------------------
+  feat <branch> [base]     new feature worktree window
+  feat-done <branch>       cleanup worktree and window
+  feat-list                list all worktrees
+  agent-feat <branch>      agent worktree window
+  agent-feat-done <branch> cleanup agent worktree
+
+  SHELL: SESSION MONITORING
+  ----------------------------------------------------------------
+  projects     list active project sessions
+  agents       list active agent sessions
+  mtmux        list all sessions
+
+  SHELL: AI COMMANDS
+  ----------------------------------------------------------------
+  tc <cmd>       tmux + claude session
+  commit         commit (haiku)
+  review         code review
+  pr             create PR (sonnet)
+  lint           lint changed files (sonnet)
+  test           run tests (sonnet)
+  scan-issues    find fixable issues
+  issue-summary  summarise an issue
+  uk-news        BBC/Guardian summary
+
+  GH DASH (inside Ctrl-b G popup)
+  ----------------------------------------------------------------
+  s          cycle views (PRs / Issues / Notifications)
+  h / l      switch section
+  j / k      navigate items
+  /          edit section filter
+  p          open project for selected repo
+  a          open agent for selected repo
+  C          code review PR in Neovim (Octo)
+  O          checkout PR branch
+  o          open in browser
+  d          mark notification done
+  ?          full gh-dash help
+
+  NEOVIM
+  ----------------------------------------------------------------
+  <leader>?      searchable keybinding cheatsheet (legendary.nvim)
+  <leader>ci     GitHub Actions pipeline status (pipeline.nvim)
+  \ll            start/stop LaTeX compilation (VimTeX)
+  \lv            forward search to Skim PDF
