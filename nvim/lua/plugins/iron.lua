@@ -15,7 +15,7 @@ return {
     {
       "<leader>rf",
       function()
-        require("iron.core").focus_on()
+        require("iron.core").focus_on(vim.bo.filetype)
       end,
       desc = "Focus REPL",
     },
@@ -83,7 +83,8 @@ return {
     {
       "<leader>sF",
       function()
-        require("iron.core").send_motion("af")
+        vim.cmd("normal! vaf")
+        require("iron.core").visual_send()
       end,
       desc = "Send function to REPL",
     },
@@ -116,14 +117,15 @@ return {
     {
       "<leader>sm",
       function()
-        require("iron.core").mark_motion("af")
+        vim.cmd("normal! vaf")
+        require("iron.core").mark_visual()
       end,
       desc = "Mark function",
     },
     {
       "<leader>sd",
       function()
-        require("iron.core").remove_mark()
+        require("iron.marks").drop_last()
       end,
       desc = "Remove mark",
     },
@@ -148,22 +150,7 @@ return {
         repl_open_cmd =
           require("iron.view").split.vertical.botright(80),
       },
-      keymaps = {
-        send_motion = false,
-        visual_send = false,
-        send_file = false,
-        send_line = false,
-        send_paragraph = false,
-        send_until_cursor = false,
-        send_mark = false,
-        mark_motion = false,
-        mark_visual = false,
-        remove_mark = false,
-        cr = false,
-        interrupt = false,
-        exit = false,
-        clear = false,
-      },
+      keymaps = {},
       highlight = { italic = true },
       ignore_blank_lines = true,
     })
