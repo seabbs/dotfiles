@@ -3,7 +3,8 @@
 
   TMUX POPUPS (prefix = Ctrl-b)
   ----------------------------------------------------------------
-  Ctrl-b G     GitHub dashboard (notifications)
+  Ctrl-b G     GitHub dashboard (global)
+  Ctrl-b g     GitHub dashboard (current repo)
   Ctrl-b A     AI agent popup (ephemeral, current dir)
   Ctrl-b T     btop system monitor
   Ctrl-b t     scratch terminal
@@ -46,6 +47,7 @@
   agent-to-proj            upgrade agent to full project layout
   gproj / gagent           gemini variants of proj / agent
   lsproj [filter]          list available projects
+  gm                       checkout main and pull latest
 
   SHELL: WORKTREES
   ----------------------------------------------------------------

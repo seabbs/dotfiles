@@ -151,6 +151,23 @@ gagent-feat() {
 }
 
 # =============================================================================
+# Git helpers
+# =============================================================================
+
+# Switch to main and pull latest (stashes and restores uncommitted changes)
+gm() {
+  local stashed=false
+  if ! git diff --quiet 2>/dev/null || \
+     ! git diff --cached --quiet 2>/dev/null; then
+    git stash && stashed=true
+  fi
+  git checkout main && git pull
+  if $stashed; then
+    git stash pop
+  fi
+}
+
+# =============================================================================
 # tmux workflow functions
 # =============================================================================
 
