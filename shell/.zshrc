@@ -31,11 +31,13 @@ source <(fzf --zsh)
 # zoxide integration
 eval "$(zoxide init zsh)"
 
-alias julia-claude="~/code/archive/julia-claude/julia-claude"
+# Resolve dotfiles location from this symlinked .zshrc
+DOTFILES="$(dirname "$(readlink -f ~/.zshrc)")"
+DOTFILES="$(cd "$DOTFILES/.." && pwd)"
 
 # Sync all repos under ~/code to latest default branch
-alias sync-repos="$HOME/code/seabbs/dotfiles/scripts/sync-repos.sh"
-alias job-status="bash $HOME/code/seabbs/dotfiles/scripts/job-status.sh"
+alias sync-repos="$DOTFILES/scripts/sync-repos.sh"
+alias job-status="bash $DOTFILES/scripts/job-status.sh"
 
 # GitHub account switching aliases
 alias ghbot='gh auth switch --user seabbs-bot'
