@@ -19,6 +19,4 @@ Main tmux configuration with:
 
 ## Setup
 
-```bash
-ln -sf ~/code/dotfiles/tmux/tmux.conf ~/.tmux.conf
-```
+Symlink is managed by `scripts/link.sh` (runs automatically during setup).

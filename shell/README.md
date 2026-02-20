@@ -1,6 +1,6 @@
 # Shell configuration
 
-## claude-aliases.zsh
+## ai-cli-aliases.zsh
 
 Tmux workflow functions for Claude Code development.
 
@@ -33,11 +33,5 @@ Both `agent` and `proj` support partial name matching:
 
 ## Setup
 
-```bash
-ln -sf ~/code/dotfiles/shell/claude-aliases.zsh ~/.config/zsh/claude-aliases.zsh
-```
-
-Add to `.zshrc`:
-```bash
-source ~/.config/zsh/claude-aliases.zsh
-```
+Symlink is managed by `scripts/link.sh` (runs automatically during setup).
+The `.zshrc` sources `ai-cli-aliases.zsh` from `~/.config/zsh/`.

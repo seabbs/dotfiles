@@ -35,6 +35,7 @@ alias julia-claude="~/code/archive/julia-claude/julia-claude"
 
 # Sync all repos under ~/code to latest default branch
 alias sync-repos="$HOME/code/seabbs/dotfiles/scripts/sync-repos.sh"
+alias job-status="bash $HOME/code/seabbs/dotfiles/scripts/job-status.sh"
 
 # GitHub account switching aliases
 alias ghbot='gh auth switch --user seabbs-bot'
