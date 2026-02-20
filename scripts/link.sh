@@ -35,6 +35,10 @@ link "julia/startup.jl"          "$HOME/.julia/config/startup.jl"
 
 # Git
 link "git/ignore"                "$HOME/.config/git/ignore"
+link "git/config"                "$HOME/.config/git/config"
+
+# Bat
+link "bat/config"                "$HOME/.config/bat/config"
 
 # GitHub CLI
 link "gh/config.yml"             "$HOME/.config/gh/config.yml"

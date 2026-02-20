@@ -14,3 +14,7 @@ npm install -g @anthropic-ai/claude-code
 npm install -g happy-coder
 brew install act
 brew install glow
+brew install git-delta
+brew install bat
+brew install hyperfine
+brew install direnv

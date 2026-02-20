@@ -26,10 +26,11 @@ bash scripts/link.sh
 
 | Directory | Purpose |
 |---|---|
+| `bat/` | Bat (syntax-highlighted cat) configuration |
 | `brew/` | Homebrew installation |
 | `cli/` | CLI tools (gh, docker, claude-code, happy, etc.) |
 | `gh/` | GitHub CLI and gh-dash configuration |
-| `git/` | Global gitignore |
+| `git/` | Git config (delta, gitignore) |
 | `iterm2/` | iTerm2 profile and keybindings |
 | `jobs/` | Scheduled jobs (launchd on Mac, cron on Linux) |
 | `julia/` | Julia via juliaup, startup config |
@@ -59,6 +60,8 @@ It runs automatically during setup, or can be run standalone.
 | `R/.Rprofile` | `~/.Rprofile` |
 | `julia/startup.jl` | `~/.julia/config/startup.jl` |
 | `git/ignore` | `~/.config/git/ignore` |
+| `git/config` | `~/.config/git/config` |
+| `bat/config` | `~/.config/bat/config` |
 | `gh/config.yml` | `~/.config/gh/config.yml` |
 | `gh/dash.yml` | `~/.config/gh-dash/config.yml` |
 

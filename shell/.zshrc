@@ -38,6 +38,26 @@ DOTFILES="$(cd "$DOTFILES/.." && pwd)"
 # Sync all repos under ~/code to latest default branch
 alias sync-repos="$DOTFILES/scripts/sync-repos.sh"
 alias job-status="bash $DOTFILES/scripts/job-status.sh"
+alias cat="bat --paging=never"
+alias catp="bat"
+
+# Benchmark one or two scripts (auto-detects R/Julia/Python)
+bench() {
+  _bench_cmd() {
+    case "$1" in
+      *.R|*.r) echo "Rscript $1" ;;
+      *.jl) echo "julia --project=. $1" ;;
+      *.py) echo "python3 $1" ;;
+      *) echo "$1" ;;
+    esac
+  }
+  local args=("$(_bench_cmd "$1")")
+  [ -n "$2" ] && args+=("$(_bench_cmd "$2")")
+  hyperfine --warmup 1 "${args[@]}"
+}
+
+# direnv
+eval "$(direnv hook zsh)"
 
 # GitHub account switching aliases
 alias ghbot='gh auth switch --user seabbs-bot'
