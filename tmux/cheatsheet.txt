@@ -63,6 +63,15 @@
   agents       list active agent sessions
   mtmux        list all sessions
 
+  SHELL: TOOLS
+  ----------------------------------------------------------------
+  cat <file>       syntax-highlighted cat (bat)
+  catp <file>      bat with pager
+  bench a.R        benchmark a script (auto-detects R/jl/py)
+  bench a.jl b.jl  compare two scripts
+  job-status       show scheduled job status and logs
+  sync-repos       fetch and fast-forward all repos
+
   SHELL: AI COMMANDS
   ----------------------------------------------------------------
   tc <cmd>       tmux + claude session
@@ -84,10 +93,20 @@
   p          open project for selected repo
   a          open agent for selected repo
   C          code review PR in Neovim (Octo)
+  R          request reviewer on PR
   O          checkout PR branch
   o          open in browser
   d          mark notification done
   ?          full gh-dash help
+
+  GIT DIFF (delta side-by-side pager)
+  ----------------------------------------------------------------
+  n            next file/hunk
+  N            previous file/hunk
+  q            quit pager
+  /            search
+  g            go to top
+  G            go to bottom
 
   NEOVIM
   ----------------------------------------------------------------

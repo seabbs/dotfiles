@@ -1,0 +1,4 @@
+--theme="TwoDark"
+--style="numbers,changes,header"
+--map-syntax="*.Rmd:R"
+--map-syntax="*.qmd:Markdown"

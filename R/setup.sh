@@ -1,11 +1,13 @@
-#!bin/bash
+#!/bin/bash
 
 bash python/setup.sh
 
-brew install --cask r
+if [[ "$(uname)" == "Darwin" ]]; then
+  brew install --cask r
+else
+  brew install r
+fi
 
 pip3 install radian
-
-cp R/.Rprofile ~/.Rprofile
 
 Rscript R/packages.R

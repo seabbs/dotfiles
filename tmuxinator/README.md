@@ -16,12 +16,4 @@ proj myproject  # Opens ~/code/myproject with full layout
 
 ## Setup
 
-```bash
-mkdir -p ~/.config/tmuxinator
-ln -sf ~/code/dotfiles/tmuxinator/project.yml ~/.config/tmuxinator/project.yml
-```
-
-Requires [tmuxinator](https://github.com/tmuxinator/tmuxinator):
-```bash
-brew install tmuxinator
-```
+Symlink and install are managed by `scripts/link.sh` and `shell/setup.sh` (run automatically during setup).

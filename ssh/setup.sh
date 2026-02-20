@@ -1,4 +1,4 @@
-#!bin/bash
+#!/bin/bash
 
 cp ssh/config ~/.ssh/config
 
