@@ -8,4 +8,7 @@ fi
 juliaup add release
 juliaup default release
 
+# Install global dev packages
+julia julia/packages.jl
+
 echo 'export JULIA_NUM_THREADS=auto' >> ~/.zshrc
