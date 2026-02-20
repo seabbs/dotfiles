@@ -1,10 +1,11 @@
+const REPL_PACKAGES = [
+    :Revise, :Term, :JET, :Cthulhu,
+    :CodeTracking, :PrettyPrinting,
+    :BenchmarkTools, :TestEnv, :OhMyREPL,
+]
+
 atreplinit() do repl
-    pkgs = [
-        :Revise, :Term, :JET, :Cthulhu,
-        :CodeTracking, :PrettyPrinting,
-        :BenchmarkTools, :TestEnv, :OhMyREPL,
-    ]
-    for pkg in pkgs
+    for pkg in REPL_PACKAGES
         try
             @eval using $pkg
         catch e
