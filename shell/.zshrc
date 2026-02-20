@@ -15,7 +15,7 @@ alias R=radian
 export EDITOR="code --wait"
 
 # PATH configuration
-export PATH="$PATH:$HOME/.local/bin:$HOME/.lmstudio/bin:$HOME/.cargo/bin:$HOME/Library/TinyTeX/bin/universal-darwin"
+export PATH="$PATH:$HOME/.local/bin:$HOME/.lmstudio/bin:$HOME/.cargo/bin:$HOME/.julia/bin:$HOME/Library/TinyTeX/bin/universal-darwin"
 
 # >>> juliaup initialize >>>
 # !! Contents within this block are managed by juliaup !!
