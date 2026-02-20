@@ -11,4 +11,7 @@ juliaup default release
 # Install global dev packages
 julia julia/setup-packages.jl
 
+# Install JuliaC as a standalone app (not in global env)
+julia -e 'using Pkg; Pkg.develop(url="https://github.com/JuliaLang/JuliaC.jl"); Pkg.Apps.add("JuliaC")'
+
 echo 'export JULIA_NUM_THREADS=auto' >> ~/.zshrc
