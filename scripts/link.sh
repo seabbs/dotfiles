@@ -44,4 +44,11 @@ link "bat/config"                "$HOME/.config/bat/config"
 link "gh/config.yml"             "$HOME/.config/gh/config.yml"
 link "gh/dash.yml"               "$HOME/.config/gh-dash/config.yml"
 
+# Claude Code
+link "claude/CLAUDE.md"            "$HOME/.claude/CLAUDE.md"
+link "claude/commands"             "$HOME/.claude/commands"
+link "claude/settings.json"        "$HOME/.claude/settings.json"
+link "claude/settings.local.json"  "$HOME/.claude/settings.local.json"
+link "claude/setup.sh"             "$HOME/.claude/setup.sh"
+
 echo "Done."
