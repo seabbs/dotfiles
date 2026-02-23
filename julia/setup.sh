@@ -25,4 +25,4 @@ julia -e '
   Pkg.Apps.add("JuliaC")
 '
 
-echo 'export JULIA_NUM_THREADS=auto' >> ~/.zshrc
+# JULIA_NUM_THREADS and JULIA_PROJECT are set in shell/.zshrc

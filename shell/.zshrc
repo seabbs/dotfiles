@@ -12,7 +12,9 @@ eval "$(starship init zsh)"
 alias python=python3
 alias pip=pip3
 alias R=radian
-export EDITOR="code --wait"
+export EDITOR="nvim"
+export JULIA_NUM_THREADS=auto
+export JULIA_PROJECT=@.
 
 # PATH configuration
 export PATH="$PATH:$HOME/.local/bin:$HOME/.lmstudio/bin:$HOME/.cargo/bin:$HOME/.julia/bin:$HOME/Library/TinyTeX/bin/universal-darwin"
