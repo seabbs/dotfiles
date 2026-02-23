@@ -1,4 +1,4 @@
 [submodule "claude"]
 	path = claude
 	url = https://github.com/seabbs/claude.git
-	branch = feat/migrate-to-marketplace
+	branch = main
