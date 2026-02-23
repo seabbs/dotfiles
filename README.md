@@ -34,10 +34,9 @@ bash scripts/link.sh
 | `iterm2/` | iTerm2 profile and keybindings |
 | `jobs/` | Scheduled jobs (launchd on Mac, cron on Linux) |
 | `julia/` | Julia via juliaup, startup config |
-| `languages/` | Rust |
 | `mac/` | Mac-specific setup and GUI apps |
 | `nvim/` | Neovim config (LazyVim-based) |
-| `python/` | Python, pipenv, poetry |
+| `python/` | Python, uv |
 | `R/` | R, radian, packages, .Rprofile |
 | `remote/` | Remote Linux machine setup |
 | `scripts/` | Shared scripts (symlinks, repo sync, Julia maintenance) |
