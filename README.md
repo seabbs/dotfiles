@@ -28,6 +28,7 @@ bash scripts/link.sh
 |---|---|
 | `bat/` | Bat (syntax-highlighted cat) configuration |
 | `brew/` | Homebrew installation |
+| `claude/` | Claude Code config (submodule: [seabbs/claude](https://github.com/seabbs/claude)) |
 | `cli/` | CLI tools (gh, docker, claude-code, happy, etc.) |
 | `gh/` | GitHub CLI and gh-dash configuration |
 | `git/` | Git config (delta, gitignore) |
@@ -63,6 +64,8 @@ It runs automatically during setup, or can be run standalone.
 | `bat/config` | `~/.config/bat/config` |
 | `gh/config.yml` | `~/.config/gh/config.yml` |
 | `gh/dash.yml` | `~/.config/gh-dash/config.yml` |
+| `claude/CLAUDE.md` | `~/.claude/CLAUDE.md` |
+| `claude/commands/` | `~/.claude/commands` |
 
 ## Scheduled jobs
 
