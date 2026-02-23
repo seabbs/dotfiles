@@ -77,5 +77,6 @@ On Linux, user crontab entries are created.
 |---|---|---|
 | `sync-repos` | Daily 07:00 | Fetch and fast-forward all repos under `~/code` |
 | `julia-maintenance` | Daily 06:30 | Update Julia via juliaup, precompile active projects |
+| `update-claude-plugins` | Daily 07:15 | Update Claude Code plugins from marketplaces |
 
 Check status with `job-status` (alias available after sourcing `.zshrc`).
