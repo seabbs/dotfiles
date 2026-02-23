@@ -1,0 +1,52 @@
+name: Update claude submodule
+
+on:
+  repository_dispatch:
+    types: [claude-updated]
+  workflow_dispatch:
+  schedule:
+    - cron: "0 7 * * *"
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: true
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Update claude submodule
+        run: |
+          git submodule update --remote claude
+          if git diff --quiet; then
+            echo "already up to date"
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          fi
+        id: check
+
+      - name: Create PR
+        if: steps.check.outputs.changed == 'true'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          branch="auto/update-claude-submodule"
+          git checkout -B "$branch"
+          git add claude
+          sha=$(cd claude && git rev-parse --short HEAD)
+          git commit -m "chore: Update claude submodule to ${sha}"
+          git push -f origin "$branch"
+          if ! gh pr list --head "$branch" --json number --jq '.[0]' | grep -q .; then
+            gh pr create \
+              --title "chore: Update claude submodule" \
+              --body "Automated submodule bump triggered by new commits on \`seabbs/claude\` main." \
+              --head "$branch"
+          fi
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

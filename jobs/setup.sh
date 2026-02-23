@@ -8,11 +8,13 @@ DOTFILES="$(cd "$SCRIPT_DIR/.." && pwd)"
 
 mkdir -p "$HOME/.local/share/sync-repos"
 mkdir -p "$HOME/.local/share/julia-maintenance"
+mkdir -p "$HOME/.local/share/update-claude-plugins"
 
 # Job definitions: label, script, hour, minute, extra PATH
 JOBS=(
   "com.seabbs.sync-repos|sync-repos.sh|7|0|"
   "com.seabbs.julia-maintenance|julia-maintenance.sh|6|30|$HOME/.juliaup/bin:"
+  "com.seabbs.update-claude-plugins|update-claude-plugins.sh|7|15|$HOME/.local/bin:"
 )
 
 if [[ "$(uname)" == "Darwin" ]]; then
@@ -83,4 +85,5 @@ else
   }
   install_cron "sync-repos.sh" "0 7 * * *" "sync-repos"
   install_cron "julia-maintenance.sh" "30 6 * * *" "julia-maintenance"
+  install_cron "update-claude-plugins.sh" "15 7 * * *" "update-claude-plugins"
 fi
