@@ -25,4 +25,8 @@ julia -e '
   Pkg.Apps.add("JuliaC")
 '
 
-echo 'export JULIA_NUM_THREADS=auto' >> ~/.zshrc
+# Add Julia env vars to zshrc (idempotent)
+grep -qF 'JULIA_NUM_THREADS' ~/.zshrc \
+  || echo 'export JULIA_NUM_THREADS=auto' >> ~/.zshrc
+grep -qF 'JULIA_PROJECT' ~/.zshrc \
+  || echo 'export JULIA_PROJECT=@.' >> ~/.zshrc

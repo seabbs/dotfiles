@@ -69,7 +69,7 @@ while IFS= read -r toml; do
 
   log "$name" "precompiling..."
   $JULIA --project="$dir" \
-    -e 'using Pkg; Pkg.instantiate(); Pkg.precompile()' \
+    -e 'using Pkg; try Pkg.resolve() catch end; Pkg.instantiate(); Pkg.precompile()' \
     >> "$LOG_FILE" 2>&1
   log "$name" "done"
   precompiled=$((precompiled + 1))

@@ -2,7 +2,9 @@
 
 brew install zsh
 brew install starship
-echo 'eval "$(starship init zsh)"' >> ~/.zshrc
+# Add starship init to zshrc (idempotent)
+grep -qF 'starship init zsh' ~/.zshrc \
+  || echo 'eval "$(starship init zsh)"' >> ~/.zshrc
 brew install tmux
 brew install tree
 brew install htop
