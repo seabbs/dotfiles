@@ -200,7 +200,7 @@ proj() {
 
   # Start session if it doesn't exist
   local needs_attach=false
-  if tmux has-session -t "$project" 2>/dev/null; then
+  if tmux has-session -t "=$project" 2>/dev/null; then
     needs_attach=true
   elif [[ -n "$branch" ]]; then
     # Start detached so we can add feature window first
@@ -230,7 +230,7 @@ proj() {
     fi
 
     local t="$project:$branch"
-    tmux new-window -t "$project" -n "$branch" -c "$wt"
+    tmux new-window -t "=$project" -n "$branch" -c "$wt"
     tmux select-pane -t "$t.0" -T "nvim"
     tmux send-keys -t "$t.0" "nvim ." Enter
     tmux split-window -t "$t" -h -c "$wt"
@@ -245,7 +245,7 @@ proj() {
   fi
 
   if $needs_attach; then
-    tmux attach -t "$project"
+    tmux attach -t "=$project"
   fi
 }
 
@@ -530,9 +530,9 @@ agent() {
   fi
 
   # Check if session already exists
-  if tmux has-session -t "$session_name" 2>/dev/null; then
+  if tmux has-session -t "=$session_name" 2>/dev/null; then
     echo "Attaching to existing agent session: $session_name"
-    tmux attach -t "$session_name"
+    tmux attach -t "=$session_name"
   else
     echo "Creating agent session: $session_name"
     echo "Working directory: $work_dir"
@@ -574,17 +574,17 @@ agent-feat() {
 
   if [[ -z "$TMUX" ]]; then
     # Not in tmux - create session if needed, add window, attach
-    if ! tmux has-session -t "$session_name" 2>/dev/null; then
+    if ! tmux has-session -t "=$session_name" 2>/dev/null; then
       echo "Creating agent session: $session_name"
       tmux new-session -d -s "$session_name" -c "$root" "${AGENT_CLI_DEV_TOOL}"
     fi
 
     # Add worktree window
-    tmux new-window -t "$session_name" -n "$branch" -c "$worktree_path"
-    tmux send-keys -t "$session_name:$branch" "${AGENT_CLI_DEV_TOOL}" Enter
+    tmux new-window -t "=$session_name" -n "$branch" -c "$worktree_path"
+    tmux send-keys -t "=$session_name:$branch" "${AGENT_CLI_DEV_TOOL}" Enter
 
     # Attach to session
-    tmux attach -t "$session_name:$branch"
+    tmux attach -t "=$session_name:$branch"
   else
     # In tmux - just add window to current session
     tmux new-window -n "$branch" -c "$worktree_path"
