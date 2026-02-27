@@ -37,6 +37,9 @@ link "julia/startup.jl"          "$HOME/.julia/config/startup.jl"
 link "git/ignore"                "$HOME/.config/git/ignore"
 link "git/config"                "$HOME/.config/git/config"
 
+# Ghostty
+link "ghostty/config"            "$HOME/.config/ghostty/config"
+
 # Bat
 link "bat/config"                "$HOME/.config/bat/config"
 

@@ -3,7 +3,7 @@ return {
     "nvim-neotest/neotest",
     dependencies = {
       "nvim-neotest/neotest-python",
-      "seandewar/neotest-testthat",
+      "shunsambongi/neotest-testthat",
     },
     opts = {
       adapters = {

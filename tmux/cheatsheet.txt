@@ -29,7 +29,11 @@
 
   TMUX SESSIONS
   ----------------------------------------------------------------
-  Ctrl-b s     session picker
+  Ctrl-b f     session switcher (fzf popup)
+                 C-a all  C-s sessions  C-p projects  C-d kill
+  Ctrl-b L     toggle last session
+  Ctrl-b Tab   toggle last window
+  Ctrl-b s     session picker (built-in)
   Ctrl-b w     window/session tree
   Alt-(/)      prev/next session
   Ctrl-b r     reload tmux.conf
@@ -108,7 +112,20 @@
   g            go to top
   G            go to bottom
 
-  NEOVIM
+  NEOVIM: SEND TO REPL (vim-slime → tmux bottom-right pane)
+  ----------------------------------------------------------------
+  <leader>sc     send line (normal) / selection (visual)
+  <leader>sp     send paragraph
+  <leader>sf     send whole file
+  <leader>su     send up to cursor line
+  <leader>sF     send function (treesitter)
+  <leader>sb     send code block (quarto/rmd)
+  <leader>sa     send all code blocks (quarto/rmd)
+  <leader>sU     send code blocks up to cursor (quarto/rmd)
+  <leader>so     start httpgd plot server (R)
+  <leader>s=     reconfigure target pane
+
+  NEOVIM: OTHER
   ----------------------------------------------------------------
   <leader>?      searchable keybinding cheatsheet (legendary.nvim)
   <leader>ci     GitHub Actions pipeline status (pipeline.nvim)
