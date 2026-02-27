@@ -42,6 +42,13 @@ list_all() {
   list_projects
 }
 
+# Handle --list-* flags for fzf reload
+case "${1:-}" in
+  --list-all)      list_all; exit 0 ;;
+  --list-sessions) list_sessions; exit 0 ;;
+  --list-projects) list_projects; exit 0 ;;
+esac
+
 selected=$(list_all | fzf \
   --no-sort --border-label ' sessions ' \
   --prompt '  ' \
@@ -52,13 +59,6 @@ selected=$(list_all | fzf \
   --bind "ctrl-p:change-prompt(  )+reload($0 --list-projects)" \
   --bind "ctrl-d:execute-silent(tmux kill-session -t {2..} 2>/dev/null)+reload($0 --list-all)" \
 )
-
-# Handle --list-* flags for fzf reload
-case "${1:-}" in
-  --list-all)      list_all; exit 0 ;;
-  --list-sessions) list_sessions; exit 0 ;;
-  --list-projects) list_projects; exit 0 ;;
-esac
 
 [[ -z "$selected" ]] && exit 0
 [[ "$selected" == "────────────" ]] && exit 0
