@@ -33,11 +33,15 @@ return {
       send_text(text)
     end
 
-    -- Send current line
+    -- Send line(s): supports count, e.g. 5<leader>sc
     vim.keymap.set("n", "<leader>sc", function()
-      local line = vim.api.nvim_get_current_line()
-      send_text(line)
-    end, { desc = "Send line to REPL" })
+      local cursor = vim.api.nvim_win_get_cursor(0)[1]
+      local count = vim.v.count1
+      local lines = vim.api.nvim_buf_get_lines(
+        0, cursor - 1, cursor - 1 + count, false
+      )
+      send_text(table.concat(lines, "\n"))
+    end, { desc = "Send line(s) to REPL" })
 
     -- Send visual selection (use slime's built-in)
     vim.keymap.set("x", "<leader>sc", "<Plug>SlimeRegionSend",
@@ -68,12 +72,15 @@ return {
       local node = ts.get_node()
       if not node then return end
 
-      -- Walk up to find function node
+      -- Walk up to find function/struct/macro node
       while node do
         local type = node:type()
         if type == "function_definition"
           or type == "function_declaration"
-          or type == "method_definition" then
+          or type == "method_definition"
+          or type == "struct_definition"
+          or type == "module_definition"
+          or type == "macrocall_expression" then
           break
         end
         node = node:parent()
@@ -84,11 +91,11 @@ return {
         send_lines(sr + 1, er + 1)
       else
         vim.notify(
-          "No function found at cursor",
+          "No definition found at cursor",
           vim.log.levels.WARN
         )
       end
-    end, { desc = "Send function to REPL" })
+    end, { desc = "Send definition to REPL" })
 
     -- Reconfigure target pane
     vim.keymap.set("n", "<leader>s=",
@@ -183,6 +190,42 @@ return {
         end, {
           buffer = true,
           desc = "Start httpgd server",
+        })
+      end,
+    })
+
+    -- Julia: start MuxDisplay plot pane
+    -- Splits nvim pane to create a plot pane below,
+    -- then tells the REPL to send plots there.
+    -- Requires: MuxDisplay in global Julia env
+    --   julia -e 'using Pkg; Pkg.add("MuxDisplay")'
+    vim.api.nvim_create_autocmd("FileType", {
+      pattern = { "julia" },
+      callback = function()
+        vim.keymap.set("n", "<leader>so", function()
+          local nvim_pane = vim.env.TMUX_PANE
+          if not nvim_pane then
+            vim.notify(
+              "Not in tmux", vim.log.levels.WARN
+            )
+            return
+          end
+          local pane_id = vim.fn.system(
+            "tmux split-window -t "
+              .. nvim_pane
+              .. " -v -d -l 30%"
+              .. " -P -F '#{pane_id}'"
+          ):gsub("%s+", "")
+          send_text(
+            "using MuxDisplay; "
+              .. "MuxDisplay.enable("
+              .. 'target_pane="'
+              .. pane_id
+              .. '")'
+          )
+        end, {
+          buffer = true,
+          desc = "Start MuxDisplay plots",
         })
       end,
     })
