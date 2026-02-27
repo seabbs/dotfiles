@@ -142,4 +142,38 @@ function M.get_all_code_blocks()
   return table.concat(code_blocks, "\n")
 end
 
+function M.next_block()
+  local cursor_line = vim.api.nvim_win_get_cursor(0)[1]
+  local lines = vim.api.nvim_buf_get_lines(
+    0, 0, -1, false
+  )
+  for i = cursor_line + 1, #lines do
+    if is_block_start(lines[i]) then
+      vim.api.nvim_win_set_cursor(0, { i + 1, 0 })
+      return
+    end
+  end
+  vim.notify("No next code block", vim.log.levels.INFO)
+end
+
+function M.prev_block()
+  local cursor_line = vim.api.nvim_win_get_cursor(0)[1]
+  local lines = vim.api.nvim_buf_get_lines(
+    0, 0, -1, false
+  )
+  -- Search backwards; skip the fence of the block we're
+  -- already inside (cursor_line - 2 skips current)
+  local start = cursor_line - 2
+  if start < 1 then start = 1 end
+  for i = start, 1, -1 do
+    if is_block_start(lines[i]) then
+      vim.api.nvim_win_set_cursor(0, { i + 1, 0 })
+      return
+    end
+  end
+  vim.notify(
+    "No previous code block", vim.log.levels.INFO
+  )
+end
+
 return M

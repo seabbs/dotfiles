@@ -199,4 +199,43 @@ function M.get_code_blocks_to_cursor()
   return table.concat(code_blocks, "\n")
 end
 
+function M.next_block()
+  local cursor_line = vim.api.nvim_win_get_cursor(0)[1]
+  local lines = vim.api.nvim_buf_get_lines(
+    0, 0, -1, false
+  )
+  local classes = classify_lines(lines)
+  for i = cursor_line + 1, #lines do
+    if classes[i] == "code"
+      and (i == 1 or classes[i - 1] ~= "code") then
+      vim.api.nvim_win_set_cursor(0, { i, 0 })
+      return
+    end
+  end
+  vim.notify("No next code block", vim.log.levels.INFO)
+end
+
+function M.prev_block()
+  local cursor_line = vim.api.nvim_win_get_cursor(0)[1]
+  local lines = vim.api.nvim_buf_get_lines(
+    0, 0, -1, false
+  )
+  local classes = classify_lines(lines)
+  -- Find the start of a code block before the current
+  -- position. Skip the block we're already in.
+  local in_current = classes[cursor_line] == "code"
+  for i = cursor_line - 1, 1, -1 do
+    if classes[i] ~= "code" then
+      in_current = false
+    elseif not in_current
+      and (i == 1 or classes[i - 1] ~= "code") then
+      vim.api.nvim_win_set_cursor(0, { i, 0 })
+      return
+    end
+  end
+  vim.notify(
+    "No previous code block", vim.log.levels.INFO
+  )
+end
+
 return M

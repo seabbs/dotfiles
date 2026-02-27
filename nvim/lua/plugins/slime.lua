@@ -137,6 +137,20 @@ return {
           buffer = true,
           desc = "Send code blocks up to cursor",
         })
+
+        vim.keymap.set("n", "<leader>s]", function()
+          quarto.next_block()
+        end, {
+          buffer = true,
+          desc = "Next code block",
+        })
+
+        vim.keymap.set("n", "<leader>s[", function()
+          quarto.prev_block()
+        end, {
+          buffer = true,
+          desc = "Previous code block",
+        })
       end,
     })
 
@@ -175,6 +189,20 @@ return {
         end, {
           buffer = true,
           desc = "Send code blocks up to cursor",
+        })
+
+        vim.keymap.set("n", "<leader>s]", function()
+          literate.next_block()
+        end, {
+          buffer = true,
+          desc = "Next code block",
+        })
+
+        vim.keymap.set("n", "<leader>s[", function()
+          literate.prev_block()
+        end, {
+          buffer = true,
+          desc = "Previous code block",
         })
       end,
     })
