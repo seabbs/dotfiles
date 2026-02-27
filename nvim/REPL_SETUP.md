@@ -20,25 +20,10 @@ Pkg.add("LanguageServer")
 **Python:**
 Mason auto-installs `basedpyright` on first use.
 
-## REPL (iron.nvim)
+## REPL (vim-slime → tmux)
 
-### Management
-
-| Key | Action |
-|---|---|
-| `<leader>rs` | Toggle REPL (auto-detects filetype) |
-| `<leader>rr` | Restart REPL |
-| `<leader>rf` | Focus REPL |
-| `<leader>rh` | Hide REPL (keeps process) |
-| `<leader>rk` | Kill REPL (terminate) |
-
-### Language-specific REPLs
-
-| Key | Action |
-|---|---|
-| `<leader>rj` | Start Julia REPL |
-| `<leader>rR` | Start R REPL |
-| `<leader>rp` | Start Python REPL |
+Sends code from Neovim to the bottom-right tmux pane (where your REPL lives).
+Works with any REPL (R, Julia, Python) — slime just sends text to tmux.
 
 ### Sending code
 
@@ -46,26 +31,25 @@ Mason auto-installs `basedpyright` on first use.
 |---|---|---|
 | `<leader>sc` | normal | Send current line |
 | `<leader>sc` | visual | Send selection |
-| `<leader>sf` | normal | Send entire file |
 | `<leader>sp` | normal | Send paragraph |
-| `<leader>sF` | normal | Send function block |
+| `<leader>sf` | normal | Send entire file |
 | `<leader>su` | normal | Send from start to cursor |
+| `<leader>sF` | normal | Send function (treesitter) |
 | `<leader>sb` | normal | Send code block (Quarto/Rmd) |
 | `<leader>sa` | normal | Send all code blocks (Quarto/Rmd) |
-
-### Marks
-
-| Key | Action |
-|---|---|
-| `<leader>sm` | Mark function for repeated execution |
-| `<leader>s<cr>` | Send marked region |
-| `<leader>sd` | Remove mark |
+| `<leader>sU` | normal | Send code blocks up to cursor (Quarto/Rmd) |
 
 ### R-specific
 
 | Key | Action |
 |---|---|
 | `<leader>so` | Start httpgd plot server |
+
+### Configuration
+
+| Key | Action |
+|---|---|
+| `<leader>s=` | Reconfigure target pane |
 
 ## Testing (neotest)
 
@@ -90,7 +74,7 @@ Unified test runner with adapters for R (testthat), Python (pytest), and Julia (
 | Key | Action |
 |---|---|
 | `<leader>cji` | Open Julia REPL (terminal) |
-| `<leader>cjs` | Send Pkg.test() to iron REPL |
+| `<leader>cjs` | Send Pkg.test() to REPL |
 
 ## Highlight (vim-illuminate)
 
@@ -218,9 +202,9 @@ Visual undo history browser. Navigate branches of changes and restore any state.
 
 ## Troubleshooting
 
-**R REPL not starting:**
-Check radian is installed (`pip install radian`).
-Falls back to `R` if not found.
+**Slime not sending to correct pane:**
+Press `<leader>s=` to reconfigure. Use `{bottom-right}` for standard layout.
+Run `tmux display-panes` (or prefix + q) to see pane numbers.
 
 **LSP not working:**
 R: verify `languageserver` package is installed.
@@ -228,10 +212,10 @@ Julia: run `:checkhealth lsp`.
 Python: Mason should auto-install.
 
 **Code block keybindings not working:**
-`<leader>sb` and `<leader>sa` only work in `.rmd` and `.qmd` files.
+`<leader>sb`, `<leader>sa`, `<leader>sU` only work in `.rmd`, `.qmd`, and `.md` files.
 Check filetype with `:set filetype?`.
 
 **Plots not showing:**
 R: run `<leader>so` to start httpgd.
-Julia: use PlotlyJS or Plots with browser backend.
+Julia: GUI backends (GR, GLMakie) open native macOS windows.
 Python: use `plt.show()` or save to file.

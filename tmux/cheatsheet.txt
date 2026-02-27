@@ -108,7 +108,20 @@
   g            go to top
   G            go to bottom
 
-  NEOVIM
+  NEOVIM: SEND TO REPL (vim-slime → tmux bottom-right pane)
+  ----------------------------------------------------------------
+  <leader>sc     send line (normal) / selection (visual)
+  <leader>sp     send paragraph
+  <leader>sf     send whole file
+  <leader>su     send up to cursor line
+  <leader>sF     send function (treesitter)
+  <leader>sb     send code block (quarto/rmd)
+  <leader>sa     send all code blocks (quarto/rmd)
+  <leader>sU     send code blocks up to cursor (quarto/rmd)
+  <leader>so     start httpgd plot server (R)
+  <leader>s=     reconfigure target pane
+
+  NEOVIM: OTHER
   ----------------------------------------------------------------
   <leader>?      searchable keybinding cheatsheet (legendary.nvim)
   <leader>ci     GitHub Actions pipeline status (pipeline.nvim)

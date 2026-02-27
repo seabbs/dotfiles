@@ -1,5 +1,8 @@
+-- Disabled: replaced by vim-slime for tmux REPL workflow
+-- Re-enable by setting enabled = true
 return {
   "Vigemus/iron.nvim",
+  enabled = false,
   keys = {
     -- REPL management
     {
