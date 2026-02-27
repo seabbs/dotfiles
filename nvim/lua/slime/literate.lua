@@ -208,7 +208,16 @@ function M.next_block()
   for i = cursor_line + 1, #lines do
     if classes[i] == "code"
       and (i == 1 or classes[i - 1] ~= "code") then
-      vim.api.nvim_win_set_cursor(0, { i, 0 })
+      -- Found block start, now find its last code line
+      local last = i
+      for j = i + 1, #lines do
+        if classes[j] == "code" then
+          last = j
+        else
+          break
+        end
+      end
+      vim.api.nvim_win_set_cursor(0, { last, 0 })
       return
     end
   end

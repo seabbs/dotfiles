@@ -149,7 +149,19 @@ function M.next_block()
   )
   for i = cursor_line + 1, #lines do
     if is_block_start(lines[i]) then
-      vim.api.nvim_win_set_cursor(0, { i + 1, 0 })
+      -- Find the closing fence, land on last code line
+      for j = i + 1, #lines do
+        if lines[j]:match("^```%s*$") then
+          vim.api.nvim_win_set_cursor(
+            0, { j - 1, 0 }
+          )
+          return
+        end
+      end
+      -- No closing fence, go to end of file
+      vim.api.nvim_win_set_cursor(
+        0, { #lines, 0 }
+      )
       return
     end
   end
