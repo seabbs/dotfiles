@@ -33,90 +33,6 @@ return {
       send_text(text)
     end
 
-    -- Navigate to next/prev code block in plain files.
-    -- A block boundary requires a comment line OR 2+
-    -- consecutive blank lines (single blanks are just
-    -- formatting within a block).
-    local function is_comment(line, comment)
-      return line:match("^%s*" .. comment)
-    end
-
-    local function is_blank(line)
-      return line:match("^%s*$")
-    end
-
-    -- Check if line i is a block boundary
-    local function is_separator(lines, i, comment)
-      if is_comment(lines[i], comment) then
-        return true
-      end
-      if is_blank(lines[i]) and i > 1
-        and is_blank(lines[i - 1]) then
-        return true
-      end
-      if is_blank(lines[i]) and i < #lines
-        and is_blank(lines[i + 1]) then
-        return true
-      end
-      return false
-    end
-
-    local function is_code_line(lines, i, comment)
-      return not is_blank(lines[i])
-        and not is_comment(lines[i], comment)
-    end
-
-    local function next_code_block(comment)
-      local cur = vim.api.nvim_win_get_cursor(0)[1]
-      local lines = vim.api.nvim_buf_get_lines(
-        0, 0, -1, false
-      )
-      local found_sep = false
-      for i = cur + 1, #lines do
-        if is_separator(lines, i, comment) then
-          found_sep = true
-        elseif found_sep
-          and is_code_line(lines, i, comment) then
-          vim.api.nvim_win_set_cursor(0, { i, 0 })
-          return
-        end
-      end
-      vim.notify(
-        "No next code block", vim.log.levels.INFO
-      )
-    end
-
-    local function prev_code_block(comment)
-      local cur = vim.api.nvim_win_get_cursor(0)[1]
-      local lines = vim.api.nvim_buf_get_lines(
-        0, 0, -1, false
-      )
-      local i = cur - 1
-      -- Phase 1: skip current code
-      while i >= 1
-        and not is_separator(lines, i, comment) do
-        i = i - 1
-      end
-      -- Phase 2: skip separator
-      while i >= 1
-        and not is_code_line(lines, i, comment) do
-        i = i - 1
-      end
-      if i < 1 then
-        vim.notify(
-          "No previous code block",
-          vim.log.levels.INFO
-        )
-        return
-      end
-      -- Phase 3: find start of this block
-      while i > 1
-        and is_code_line(lines, i - 1, comment) do
-        i = i - 1
-      end
-      vim.api.nvim_win_set_cursor(0, { i, 0 })
-    end
-
     -- Send line(s): supports count, e.g. 5<leader>sc
     vim.keymap.set("n", "<leader>rc", function()
       local cursor = vim.api.nvim_win_get_cursor(0)[1]
@@ -342,25 +258,5 @@ return {
       end,
     })
 
-    -- Plain R: navigate between code blocks
-    -- (Julia uses literate navigation above)
-    vim.api.nvim_create_autocmd("FileType", {
-      pattern = { "r" },
-      callback = function()
-        vim.keymap.set("n", "<leader>rj", function()
-          next_code_block("#")
-        end, {
-          buffer = true,
-          desc = "Next code block",
-        })
-
-        vim.keymap.set("n", "<leader>rk", function()
-          prev_code_block("#")
-        end, {
-          buffer = true,
-          desc = "Previous code block",
-        })
-      end,
-    })
   end,
 }
