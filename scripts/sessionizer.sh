@@ -58,9 +58,14 @@ case "${1:-}" in
   --list-sessions) list_sessions; exit 0 ;;
   --list-projects) list_projects; exit 0 ;;
   --list-windows)  list_windows "$2"; exit 0 ;;
+  --kill-session)
+    tmux kill-session -t "=$2" 2>/dev/null
+    exit 0
+    ;;
   --kill-window)
     session="$2"
     win_ref="$3"
+    win_index="${win_ref%%:*}"
     win_name="${win_ref#*:}"
     # Get project root to check for worktree
     root=$(
@@ -76,9 +81,17 @@ case "${1:-}" in
       zsh -ic "cd $root && feat-done $win_name" \
         2>/dev/null
     else
-      tmux kill-window -t "=$session:$win_ref" \
+      tmux kill-window -t "=$session:$win_index" \
         2>/dev/null
     fi
+    exit 0
+    ;;
+  --link-session)
+    session="$2"
+    # Create a grouped session with a unique name
+    linked="${session}-$$"
+    tmux new-session -d -t "=$session" -s "$linked"
+    tmux switch-client -t "=$linked"
     exit 0
     ;;
 esac
@@ -94,7 +107,7 @@ selected=$(list_all | fzf \
   --bind "ctrl-a:change-prompt(  )+reload($0 --list-all)" \
   --bind "ctrl-s:change-prompt(  )+reload($0 --list-sessions)" \
   --bind "ctrl-p:change-prompt(  )+reload($0 --list-projects)" \
-  --bind "ctrl-d:execute-silent(tmux kill-session -t {2..} 2>/dev/null)+reload($0 --list-all)" \
+  --bind "ctrl-d:execute-silent($0 --kill-session {2..})+reload($0 --list-all)" \
 )
 
 [[ -z "$selected" ]] && exit 0
@@ -121,10 +134,11 @@ result=$(list_windows "$session" | fzf \
   --no-sort \
   --border-label " $session " \
   --prompt '  ' \
-  --header 'Enter=select  C-d=kill window  Type=new' \
+  --header 'Enter=select  C-d=kill  C-l=linked view  Type=new' \
   --print-query \
   --bind 'tab:down,btab:up' \
   --bind "ctrl-d:execute-silent($0 --kill-window $session {1})+reload($0 --list-windows $session)" \
+  --bind "ctrl-l:execute-silent($0 --link-session $session)+abort" \
 )
 
 query=$(echo "$result" | sed -n '1p')
