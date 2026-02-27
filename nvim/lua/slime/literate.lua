@@ -5,6 +5,7 @@
 --   Lines starting with "# " are markdown
 --   Lines starting with "#-" are block separators
 --   md"""...""" blocks are markdown (triple-quoted)
+--   #=...=# blocks are comments
 --   Everything else is code
 
 local M = {}
@@ -29,21 +30,32 @@ local function is_code(line)
   return not is_markdown(line) and not is_separator(line)
 end
 
--- Classify each line, accounting for md"""...""" blocks
+-- Classify each line, accounting for multi-line blocks:
+-- md"""...""" and #=...=#
 local function classify_lines(lines)
   local classes = {}
   local in_md_block = false
+  local in_comment_block = false
   for i, line in ipairs(lines) do
     if in_md_block then
       classes[i] = "markdown"
       if is_md_close(line) then
         in_md_block = false
       end
+    elseif in_comment_block then
+      classes[i] = "comment"
+      if line:match("=#") then
+        in_comment_block = false
+      end
     elseif is_md_open(line) then
       classes[i] = "markdown"
-      -- Single-line md"""...""" check
       if not line:match('^md""".*"""$') then
         in_md_block = true
+      end
+    elseif line:match("^#=") then
+      classes[i] = "comment"
+      if not line:match("=#") then
+        in_comment_block = true
       end
     elseif is_separator(line) then
       classes[i] = "separator"
