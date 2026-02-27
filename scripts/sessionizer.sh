@@ -49,13 +49,7 @@ list_all() {
 list_windows() {
   local session="$1"
   tmux list-windows -t "=$session" \
-    -F '#{window_index}:#{window_name}' 2>/dev/null \
-    | while read -r w; do
-      echo "$w"
-    done
-  echo "────────────"
-  echo "[+ new feature branch]"
-  echo "[+ bare terminal]"
+    -F '#{window_index}:#{window_name}' 2>/dev/null
 }
 
 # Handle flags for fzf reload
@@ -98,51 +92,55 @@ else
   fi
 fi
 
-# Step 2: pick a window or create a feature branch
-win_selected=$(list_windows "$session" | fzf \
+# Step 2: pick a window or type a new branch name
+# --print-query: line 1 = query, line 2 = key, line 3 = match
+# --expect=ctrl-n: ctrl-n for bare terminal, enter for proj
+result=$(list_windows "$session" | fzf \
   --no-sort \
   --border-label " $session " \
   --prompt '  ' \
-  --header 'Select window or create feature branch' \
+  --header 'Enter=select/new feat  C-n=new bare' \
+  --print-query \
+  --expect=ctrl-n \
   --bind 'tab:down,btab:up' \
 )
 
-[[ -z "$win_selected" ]] && exit 0
-[[ "$win_selected" == "────────────" ]] && exit 0
+query=$(echo "$result" | sed -n '1p')
+key=$(echo "$result" | sed -n '2p')
+match=$(echo "$result" | sed -n '3p')
 
-if [[ "$win_selected" == "[+ bare terminal]" ]]; then
-  # Get project root for the working directory
-  project_root=$(
+# Escape with no input
+[[ -z "$query" && -z "$match" ]] && exit 0
+
+# Helper: resolve project root from session
+get_project_root() {
+  local root
+  root=$(
     tmux display-message -t "=$session:1" \
       -p '#{pane_current_path}' 2>/dev/null
   )
-  project_root=$(
-    git -C "$project_root" rev-parse --show-toplevel \
-      2>/dev/null || echo "$project_root"
-  )
+  git -C "$root" rev-parse --show-toplevel \
+    2>/dev/null || echo "$root"
+}
+
+if [[ -n "$match" ]]; then
+  # Matched an existing window: switch to it
+  win_index="${match%%:*}"
   tmux switch-client -t "=$session"
-  tmux new-window -t "=$session" -c "$project_root"
-elif [[ "$win_selected" == "[+ new feature branch]" ]]; then
-  # Prompt for branch name
-  printf "Branch name: "
-  read -r branch
-  [[ -z "$branch" ]] && exit 0
-
-  # Switch to session first, then create feature window
+  tmux select-window -t "=$session:$win_index"
+elif [[ "$key" == "ctrl-n" && -n "$query" ]]; then
+  # Ctrl-n: bare terminal with query as window name
+  project_root=$(get_project_root)
   tmux switch-client -t "=$session"
+  tmux new-window -t "=$session" -n "$query" \
+    -c "$project_root"
+elif [[ -n "$query" ]]; then
+  # Enter with no match: create feature branch
+  branch="$query"
+  tmux switch-client -t "=$session"
+  project_root=$(get_project_root)
 
-  # Get the project root from the session's first pane
-  project_root=$(
-    tmux display-message -t "=$session:1" \
-      -p '#{pane_current_path}' 2>/dev/null
-  )
-  # Walk up to find git root
-  project_root=$(
-    git -C "$project_root" rev-parse --show-toplevel \
-      2>/dev/null || echo "$project_root"
-  )
-
-  # Create worktree and window (inline feat logic)
+  # Create worktree
   wt="$project_root/worktrees/$branch"
   if [[ ! -d "$wt" ]]; then
     mkdir -p "$project_root/worktrees"
@@ -170,9 +168,4 @@ elif [[ "$win_selected" == "[+ new feature branch]" ]]; then
   tmux send-keys -t "$t.2" "$repl" Enter
   tmux select-pane -t "$t.0"
   tmux select-window -t "$t"
-else
-  # Switch to the selected window
-  win_index="${win_selected%%:*}"
-  tmux switch-client -t "=$session"
-  tmux select-window -t "=$session:$win_index"
 fi
