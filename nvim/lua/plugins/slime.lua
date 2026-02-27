@@ -33,6 +33,70 @@ return {
       send_text(text)
     end
 
+    -- Navigate to next/prev code block in plain files
+    -- (skips comments and blank lines)
+    local function is_code_line(line, comment)
+      if line:match("^%s*$") then return false end
+      if line:match("^%s*" .. comment) then return false end
+      return true
+    end
+
+    local function next_code_block(comment)
+      local cur = vim.api.nvim_win_get_cursor(0)[1]
+      local lines = vim.api.nvim_buf_get_lines(
+        0, 0, -1, false
+      )
+      -- Skip past current code, then past non-code,
+      -- land on first code line
+      local past_code = false
+      for i = cur + 1, #lines do
+        if not is_code_line(lines[i], comment) then
+          past_code = true
+        elseif past_code then
+          vim.api.nvim_win_set_cursor(0, { i, 0 })
+          return
+        end
+      end
+      vim.notify(
+        "No next code block", vim.log.levels.INFO
+      )
+    end
+
+    local function prev_code_block(comment)
+      local cur = vim.api.nvim_win_get_cursor(0)[1]
+      local lines = vim.api.nvim_buf_get_lines(
+        0, 0, -1, false
+      )
+      -- Walk backwards through 3 phases:
+      -- 1) skip current code block
+      -- 2) skip gap (comments/blanks)
+      -- 3) find start of previous code block
+      local i = cur - 1
+      -- Phase 1: skip current code
+      while i >= 1
+        and is_code_line(lines[i], comment) do
+        i = i - 1
+      end
+      -- Phase 2: skip gap
+      while i >= 1
+        and not is_code_line(lines[i], comment) do
+        i = i - 1
+      end
+      if i < 1 then
+        vim.notify(
+          "No previous code block",
+          vim.log.levels.INFO
+        )
+        return
+      end
+      -- Phase 3: find start of this block
+      while i > 1
+        and is_code_line(lines[i - 1], comment) do
+        i = i - 1
+      end
+      vim.api.nvim_win_set_cursor(0, { i, 0 })
+    end
+
     -- Send line(s): supports count, e.g. 5<leader>sc
     vim.keymap.set("n", "<leader>sc", function()
       local cursor = vim.api.nvim_win_get_cursor(0)[1]
@@ -254,6 +318,27 @@ return {
         end, {
           buffer = true,
           desc = "Start MuxDisplay plots",
+        })
+      end,
+    })
+
+    -- Plain R/Julia: navigate between code blocks
+    -- (skips comment lines and blanks)
+    vim.api.nvim_create_autocmd("FileType", {
+      pattern = { "r", "julia" },
+      callback = function()
+        vim.keymap.set("n", "<leader>s]", function()
+          next_code_block("#")
+        end, {
+          buffer = true,
+          desc = "Next code block",
+        })
+
+        vim.keymap.set("n", "<leader>s[", function()
+          prev_code_block("#")
+        end, {
+          buffer = true,
+          desc = "Previous code block",
         })
       end,
     })
