@@ -54,6 +54,7 @@ list_windows() {
     done
   echo "────────────"
   echo "[+ new feature branch]"
+  echo "[+ bare terminal]"
 }
 
 # Handle flags for fzf reload
@@ -108,7 +109,19 @@ win_selected=$(list_windows "$session" | fzf \
 [[ -z "$win_selected" ]] && exit 0
 [[ "$win_selected" == "────────────" ]] && exit 0
 
-if [[ "$win_selected" == "[+ new feature branch]" ]]; then
+if [[ "$win_selected" == "[+ bare terminal]" ]]; then
+  # Get project root for the working directory
+  project_root=$(
+    tmux display-message -t "=$session:1" \
+      -p '#{pane_current_path}' 2>/dev/null
+  )
+  project_root=$(
+    git -C "$project_root" rev-parse --show-toplevel \
+      2>/dev/null || echo "$project_root"
+  )
+  tmux switch-client -t "=$session"
+  tmux new-window -t "=$session" -c "$project_root"
+elif [[ "$win_selected" == "[+ new feature branch]" ]]; then
   # Prompt for branch name
   printf "Branch name: "
   read -r branch
