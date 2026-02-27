@@ -18,10 +18,11 @@
 CODE_DIR="${CODE_DIR:-$HOME/code}"
 
 list_sessions() {
-  tmux list-sessions -F '#{session_name}' 2>/dev/null \
-    | while read -r s; do
-      echo "[active] $s"
-    done
+  tmux list-sessions \
+    -F '#{session_activity} #{session_name}' \
+    2>/dev/null \
+    | sort -rn \
+    | awk '{print "[active] " $2}'
 }
 
 list_projects() {
