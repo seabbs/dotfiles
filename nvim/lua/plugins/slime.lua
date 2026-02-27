@@ -98,7 +98,7 @@ return {
     end
 
     -- Send line(s): supports count, e.g. 5<leader>sc
-    vim.keymap.set("n", "<leader>sc", function()
+    vim.keymap.set("n", "<leader>rc", function()
       local cursor = vim.api.nvim_win_get_cursor(0)[1]
       local count = vim.v.count1
       local lines = vim.api.nvim_buf_get_lines(
@@ -108,16 +108,16 @@ return {
     end, { desc = "Send line(s) to REPL" })
 
     -- Send visual selection (use slime's built-in)
-    vim.keymap.set("x", "<leader>sc", "<Plug>SlimeRegionSend",
+    vim.keymap.set("x", "<leader>rc", "<Plug>SlimeRegionSend",
       { desc = "Send selection to REPL" })
 
     -- Send paragraph
-    vim.keymap.set("n", "<leader>sp",
+    vim.keymap.set("n", "<leader>rp",
       "<Plug>SlimeParagraphSend",
       { desc = "Send paragraph to REPL" })
 
     -- Send file
-    vim.keymap.set("n", "<leader>sf", function()
+    vim.keymap.set("n", "<leader>rf", function()
       local lines = vim.api.nvim_buf_get_lines(
         0, 0, -1, false
       )
@@ -125,13 +125,13 @@ return {
     end, { desc = "Send file to REPL" })
 
     -- Send up to cursor (inclusive)
-    vim.keymap.set("n", "<leader>su", function()
+    vim.keymap.set("n", "<leader>ru", function()
       local cursor = vim.api.nvim_win_get_cursor(0)[1]
       send_lines(1, cursor)
     end, { desc = "Send up to cursor" })
 
     -- Send function (treesitter-aware)
-    vim.keymap.set("n", "<leader>sF", function()
+    vim.keymap.set("n", "<leader>rF", function()
       local ts = vim.treesitter
       local node = ts.get_node()
       if not node then return end
@@ -162,7 +162,7 @@ return {
     end, { desc = "Send definition to REPL" })
 
     -- Reconfigure target pane
-    vim.keymap.set("n", "<leader>s=",
+    vim.keymap.set("n", "<leader>r=",
       "<Plug>SlimeConfig",
       { desc = "Set REPL target pane" })
 
@@ -172,7 +172,7 @@ return {
       callback = function()
         local quarto = require("slime.quarto")
 
-        vim.keymap.set("n", "<leader>sb", function()
+        vim.keymap.set("n", "<leader>rb", function()
           local code = quarto.get_code_block()
           if code ~= "" then
             send_text(code)
@@ -182,7 +182,7 @@ return {
           desc = "Send code block to REPL",
         })
 
-        vim.keymap.set("n", "<leader>sa", function()
+        vim.keymap.set("n", "<leader>ra", function()
           local code = quarto.get_all_code_blocks()
           if code ~= "" then
             send_text(code)
@@ -192,7 +192,7 @@ return {
           desc = "Send all code blocks to REPL",
         })
 
-        vim.keymap.set("n", "<leader>sU", function()
+        vim.keymap.set("n", "<leader>rU", function()
           local code = quarto.get_code_blocks_to_cursor()
           if code ~= "" then
             send_text(code)
@@ -202,14 +202,14 @@ return {
           desc = "Send code blocks up to cursor",
         })
 
-        vim.keymap.set("n", "<leader>s]", function()
+        vim.keymap.set("n", "<leader>rj", function()
           quarto.next_block()
         end, {
           buffer = true,
           desc = "Next code block",
         })
 
-        vim.keymap.set("n", "<leader>s[", function()
+        vim.keymap.set("n", "<leader>rk", function()
           quarto.prev_block()
         end, {
           buffer = true,
@@ -224,7 +224,7 @@ return {
       callback = function()
         local literate = require("slime.literate")
 
-        vim.keymap.set("n", "<leader>sb", function()
+        vim.keymap.set("n", "<leader>rb", function()
           local code = literate.get_code_block()
           if code ~= "" then
             send_text(code)
@@ -234,7 +234,7 @@ return {
           desc = "Send code block to REPL",
         })
 
-        vim.keymap.set("n", "<leader>sa", function()
+        vim.keymap.set("n", "<leader>ra", function()
           local code = literate.get_all_code_blocks()
           if code ~= "" then
             send_text(code)
@@ -244,7 +244,7 @@ return {
           desc = "Send all code blocks to REPL",
         })
 
-        vim.keymap.set("n", "<leader>sU", function()
+        vim.keymap.set("n", "<leader>rU", function()
           local code =
             literate.get_code_blocks_to_cursor()
           if code ~= "" then
@@ -255,14 +255,14 @@ return {
           desc = "Send code blocks up to cursor",
         })
 
-        vim.keymap.set("n", "<leader>s]", function()
+        vim.keymap.set("n", "<leader>rj", function()
           literate.next_block()
         end, {
           buffer = true,
           desc = "Next code block",
         })
 
-        vim.keymap.set("n", "<leader>s[", function()
+        vim.keymap.set("n", "<leader>rk", function()
           literate.prev_block()
         end, {
           buffer = true,
@@ -275,7 +275,7 @@ return {
     vim.api.nvim_create_autocmd("FileType", {
       pattern = { "r", "rmd", "quarto" },
       callback = function()
-        vim.keymap.set("n", "<leader>so", function()
+        vim.keymap.set("n", "<leader>ro", function()
           send_text(
             "library(httpgd)\nhgd()\nhgd_browse()"
           )
@@ -294,7 +294,7 @@ return {
     vim.api.nvim_create_autocmd("FileType", {
       pattern = { "julia" },
       callback = function()
-        vim.keymap.set("n", "<leader>so", function()
+        vim.keymap.set("n", "<leader>ro", function()
           local nvim_pane = vim.env.TMUX_PANE
           if not nvim_pane then
             vim.notify(
@@ -327,14 +327,14 @@ return {
     vim.api.nvim_create_autocmd("FileType", {
       pattern = { "r", "julia" },
       callback = function()
-        vim.keymap.set("n", "<leader>s]", function()
+        vim.keymap.set("n", "<leader>rj", function()
           next_code_block("#")
         end, {
           buffer = true,
           desc = "Next code block",
         })
 
-        vim.keymap.set("n", "<leader>s[", function()
+        vim.keymap.set("n", "<leader>rk", function()
           prev_code_block("#")
         end, {
           buffer = true,
