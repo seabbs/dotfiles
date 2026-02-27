@@ -143,35 +143,12 @@ else
     tmux new-window -t "=$session" -n "$query" \
       -c "$project_root"
   else
-    # Create feature branch worktree
-    branch="$query"
-    wt="$project_root/worktrees/$branch"
-    if [[ ! -d "$wt" ]]; then
-      mkdir -p "$project_root/worktrees"
-      git -C "$project_root" worktree add \
-        "worktrees/$branch" -b "$branch" main
-    fi
-
-    repl="zsh"
-    if [[ -f "$wt/Project.toml" ]]; then
-      repl="julia --project=."
-    elif [[ -f "$wt/DESCRIPTION" ]]; then
-      repl="R"
-    fi
-
-    t="$session:$branch"
+    # Run feat in a temporary window that sources
+    # the shell config, runs feat, then closes itself.
+    # feat creates its own window with the full layout
+    # so this runner window is just a launcher.
     tmux new-window -t "=$session" \
-      -n "$branch" -c "$wt"
-    tmux select-pane -t "$t.0" -T "nvim"
-    tmux send-keys -t "$t.0" "nvim ." Enter
-    tmux split-window -t "$t" -h -c "$wt"
-    tmux select-pane -t "$t.1" -T "agent"
-    tmux send-keys -t "$t.1" \
-      "${AGENT_CLI_DEV_TOOL:-happy}" Enter
-    tmux split-window -t "$t.1" -v -c "$wt"
-    tmux select-pane -t "$t.2" -T "repl"
-    tmux send-keys -t "$t.2" "$repl" Enter
-    tmux select-pane -t "$t.0"
-    tmux select-window -t "$t"
+      -n "_launcher" -c "$project_root" \
+      "zsh -ic 'feat $query; exit'"
   fi
 fi
