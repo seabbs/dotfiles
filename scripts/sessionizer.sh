@@ -92,22 +92,19 @@ else
   fi
 fi
 
-# Step 2: pick a window or type a new branch name
-# --print-query: line 1 = query, line 2 = key, line 3 = match
-# --expect=ctrl-n: ctrl-n for bare terminal, enter for proj
+# Step 2: pick a window or type a new name
+# --print-query outputs query on line 1, match on line 2
 result=$(list_windows "$session" | fzf \
   --no-sort \
   --border-label " $session " \
   --prompt '  ' \
-  --header 'Enter=select/new feat  C-n=new bare' \
+  --header 'Type to filter or enter new name' \
   --print-query \
-  --expect=ctrl-n \
   --bind 'tab:down,btab:up' \
 )
 
 query=$(echo "$result" | sed -n '1p')
-key=$(echo "$result" | sed -n '2p')
-match=$(echo "$result" | sed -n '3p')
+match=$(echo "$result" | sed -n '2p')
 
 # Escape with no input
 [[ -z "$query" && -z "$match" ]] && exit 0
@@ -128,44 +125,53 @@ if [[ -n "$match" ]]; then
   win_index="${match%%:*}"
   tmux switch-client -t "=$session"
   tmux select-window -t "=$session:$win_index"
-elif [[ "$key" == "ctrl-n" && -n "$query" ]]; then
-  # Ctrl-n: bare terminal with query as window name
+else
+  # No match: ask what kind of window to create
+  win_type=$(printf "feature branch\nbare terminal" \
+    | fzf \
+      --no-sort \
+      --border-label " new: $query " \
+      --prompt '  ' \
+      --header 'What kind of window?' \
+  )
+
+  [[ -z "$win_type" ]] && exit 0
   project_root=$(get_project_root)
   tmux switch-client -t "=$session"
-  tmux new-window -t "=$session" -n "$query" \
-    -c "$project_root"
-elif [[ -n "$query" ]]; then
-  # Enter with no match: create feature branch
-  branch="$query"
-  tmux switch-client -t "=$session"
-  project_root=$(get_project_root)
 
-  # Create worktree
-  wt="$project_root/worktrees/$branch"
-  if [[ ! -d "$wt" ]]; then
-    mkdir -p "$project_root/worktrees"
-    git -C "$project_root" worktree add \
-      "worktrees/$branch" -b "$branch" main
+  if [[ "$win_type" == "bare terminal" ]]; then
+    tmux new-window -t "=$session" -n "$query" \
+      -c "$project_root"
+  else
+    # Create feature branch worktree
+    branch="$query"
+    wt="$project_root/worktrees/$branch"
+    if [[ ! -d "$wt" ]]; then
+      mkdir -p "$project_root/worktrees"
+      git -C "$project_root" worktree add \
+        "worktrees/$branch" -b "$branch" main
+    fi
+
+    repl="zsh"
+    if [[ -f "$wt/Project.toml" ]]; then
+      repl="julia --project=."
+    elif [[ -f "$wt/DESCRIPTION" ]]; then
+      repl="R"
+    fi
+
+    t="$session:$branch"
+    tmux new-window -t "=$session" \
+      -n "$branch" -c "$wt"
+    tmux select-pane -t "$t.0" -T "nvim"
+    tmux send-keys -t "$t.0" "nvim ." Enter
+    tmux split-window -t "$t" -h -c "$wt"
+    tmux select-pane -t "$t.1" -T "agent"
+    tmux send-keys -t "$t.1" \
+      "${AGENT_CLI_DEV_TOOL:-happy}" Enter
+    tmux split-window -t "$t.1" -v -c "$wt"
+    tmux select-pane -t "$t.2" -T "repl"
+    tmux send-keys -t "$t.2" "$repl" Enter
+    tmux select-pane -t "$t.0"
+    tmux select-window -t "$t"
   fi
-
-  repl="zsh"
-  if [[ -f "$wt/Project.toml" ]]; then
-    repl="julia --project=."
-  elif [[ -f "$wt/DESCRIPTION" ]]; then
-    repl="R"
-  fi
-
-  t="$session:$branch"
-  tmux new-window -t "=$session" -n "$branch" -c "$wt"
-  tmux select-pane -t "$t.0" -T "nvim"
-  tmux send-keys -t "$t.0" "nvim ." Enter
-  tmux split-window -t "$t" -h -c "$wt"
-  tmux select-pane -t "$t.1" -T "agent"
-  tmux send-keys -t "$t.1" \
-    "${AGENT_CLI_DEV_TOOL:-happy}" Enter
-  tmux split-window -t "$t.1" -v -c "$wt"
-  tmux select-pane -t "$t.2" -T "repl"
-  tmux send-keys -t "$t.2" "$repl" Enter
-  tmux select-pane -t "$t.0"
-  tmux select-window -t "$t"
 fi
