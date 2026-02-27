@@ -151,6 +151,61 @@ gagent-feat() {
 }
 
 # =============================================================================
+# Worktree helpers
+# =============================================================================
+
+# Sync gitignored files from main worktree to new worktree
+# Usage: _sync_worktree_files <source_root> <worktree_path>
+# Copies files that exist in source but aren't tracked by
+# git (gitignored deps, caches, etc.). One-directional:
+# source -> dest only. Silent no-op if nothing to copy.
+_sync_worktree_files() {
+  local source="$1"
+  local dest="$2"
+
+  [[ -z "$source" || -z "$dest" ]] && return 0
+  [[ ! -d "$source" || ! -d "$dest" ]] && return 0
+
+  # Resolve to main worktree root (in case source is
+  # itself a worktree)
+  local main_root
+  main_root=$(
+    git -C "$source" worktree list --porcelain \
+      | head -1 | sed 's/^worktree //'
+  )
+  if [[ -n "$main_root" && -d "$main_root" ]]; then
+    source="$main_root"
+  fi
+
+  [[ "$source" == "$dest" ]] && return 0
+
+  # Get all gitignored files from source
+  local files
+  files=$(
+    git -C "$source" ls-files \
+      --others --ignored --exclude-standard 2>/dev/null
+  )
+  [[ -z "$files" ]] && return 0
+
+  # Copy each file, skipping worktrees/ and .git/
+  while IFS= read -r relpath; do
+    case "$relpath" in
+      worktrees/*|.git/*) continue ;;
+    esac
+    [[ ! -e "$source/$relpath" ]] && continue
+    if [[ -f "$source/$relpath" ]]; then
+      mkdir -p "$(dirname "$dest/$relpath")"
+      cp -n "$source/$relpath" "$dest/$relpath" \
+        2>/dev/null
+    elif [[ -d "$source/$relpath" ]]; then
+      mkdir -p "$dest/$relpath"
+      rsync -a --quiet \
+        "$source/$relpath/" "$dest/$relpath/"
+    fi
+  done <<< "$files"
+}
+
+# =============================================================================
 # Git helpers
 # =============================================================================
 
@@ -220,6 +275,7 @@ proj() {
       mkdir -p "$root/worktrees"
       git -C "$root" worktree add \
         "worktrees/$branch" -b "$branch" main
+      _sync_worktree_files "$root" "$wt"
     fi
 
     local repl="zsh"
@@ -280,6 +336,7 @@ feat() {
   if [[ ! -d "$worktree_path" ]]; then
     mkdir -p "$root/worktrees"
     git -C "$root" worktree add "worktrees/$branch" -b "$branch" "$base"
+    _sync_worktree_files "$root" "$worktree_path"
   fi
 
   # Detect REPL type
@@ -490,6 +547,7 @@ agent() {
       mkdir -p "$project_dir/worktrees"
       git -C "$project_dir" worktree add "worktrees/$worktree" -b "$worktree" 2>/dev/null \
         || git -C "$project_dir" worktree add "worktrees/$worktree" "$worktree"
+      _sync_worktree_files "$project_dir" "$worktree_path"
     fi
 
     session_name="agent-${project}-${worktree}"
@@ -570,6 +628,7 @@ agent-feat() {
     mkdir -p "$root/worktrees"
     git -C "$root" worktree add "worktrees/$branch" -b "$branch" "$base" 2>/dev/null \
       || git -C "$root" worktree add "worktrees/$branch" "$branch"
+    _sync_worktree_files "$root" "$worktree_path"
   fi
 
   if [[ -z "$TMUX" ]]; then
