@@ -133,6 +133,45 @@ return {
       end,
     })
 
+    -- Julia/Literate.jl code blocks
+    vim.api.nvim_create_autocmd("FileType", {
+      pattern = { "julia" },
+      callback = function()
+        local literate = require("slime.literate")
+
+        vim.keymap.set("n", "<leader>sb", function()
+          local code = literate.get_code_block()
+          if code ~= "" then
+            send_text(code)
+          end
+        end, {
+          buffer = true,
+          desc = "Send code block to REPL",
+        })
+
+        vim.keymap.set("n", "<leader>sa", function()
+          local code = literate.get_all_code_blocks()
+          if code ~= "" then
+            send_text(code)
+          end
+        end, {
+          buffer = true,
+          desc = "Send all code blocks to REPL",
+        })
+
+        vim.keymap.set("n", "<leader>sU", function()
+          local code =
+            literate.get_code_blocks_to_cursor()
+          if code ~= "" then
+            send_text(code)
+          end
+        end, {
+          buffer = true,
+          desc = "Send code blocks up to cursor",
+        })
+      end,
+    })
+
     -- R: start httpgd plot server
     vim.api.nvim_create_autocmd("FileType", {
       pattern = { "r", "rmd", "quarto" },
