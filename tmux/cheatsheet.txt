@@ -32,6 +32,7 @@
   Ctrl-b f     session switcher (fzf popup)
                  C-a all  C-s sessions  C-p projects  C-d kill
   Ctrl-b L     toggle last session
+  Ctrl-b Tab   toggle last window
   Ctrl-b s     session picker (built-in)
   Ctrl-b w     window/session tree
   Alt-(/)      prev/next session
