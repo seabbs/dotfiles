@@ -58,6 +58,29 @@ case "${1:-}" in
   --list-sessions) list_sessions; exit 0 ;;
   --list-projects) list_projects; exit 0 ;;
   --list-windows)  list_windows "$2"; exit 0 ;;
+  --kill-window)
+    session="$2"
+    win_ref="$3"
+    win_name="${win_ref#*:}"
+    # Get project root to check for worktree
+    root=$(
+      tmux display-message -t "=$session:1" \
+        -p '#{pane_current_path}' 2>/dev/null
+    )
+    root=$(
+      git -C "$root" rev-parse --show-toplevel \
+        2>/dev/null || echo "$root"
+    )
+    # If worktree exists, use feat-done to clean up
+    if [[ -d "$root/worktrees/$win_name" ]]; then
+      zsh -ic "cd $root && feat-done $win_name" \
+        2>/dev/null
+    else
+      tmux kill-window -t "=$session:$win_ref" \
+        2>/dev/null
+    fi
+    exit 0
+    ;;
 esac
 
 # Step 1: pick a session or project
@@ -98,9 +121,10 @@ result=$(list_windows "$session" | fzf \
   --no-sort \
   --border-label " $session " \
   --prompt '  ' \
-  --header 'Type to filter or enter new name' \
+  --header 'Enter=select  C-d=kill window  Type=new' \
   --print-query \
   --bind 'tab:down,btab:up' \
+  --bind "ctrl-d:execute-silent($0 --kill-window $session {1})+reload($0 --list-windows $session)" \
 )
 
 query=$(echo "$result" | sed -n '1p')
