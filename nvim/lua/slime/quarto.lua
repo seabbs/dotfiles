@@ -1,7 +1,12 @@
--- Helper functions for sending Rmd/Quarto code blocks
+-- Helper functions for sending code blocks
 -- via vim-slime to a tmux REPL pane
+-- Supports Quarto/Rmd (```{lang}) and markdown (```lang)
 
 local M = {}
+
+local function is_block_start(line)
+  return line:match("^```%{") or line:match("^```%w")
+end
 
 local function find_code_block()
   local cursor_line = vim.api.nvim_win_get_cursor(0)[1]
@@ -11,7 +16,7 @@ local function find_code_block()
 
   local start_line = nil
   for i = cursor_line, 1, -1 do
-    if lines[i]:match("^```%{") then
+    if is_block_start(lines[i]) then
       start_line = i
       break
     end
@@ -65,7 +70,7 @@ function M.get_code_blocks_to_cursor()
 
   for i, line in ipairs(lines) do
     if i > cursor_line then break end
-    if line:match("^```%{") then
+    if is_block_start(line) then
       in_block = true
       block_start = i
       current_block = {}
@@ -110,7 +115,7 @@ function M.get_all_code_blocks()
   local current_block = {}
 
   for _, line in ipairs(lines) do
-    if line:match("^```%{") then
+    if is_block_start(line) then
       in_block = true
       current_block = {}
     elseif line:match("^```%s*$") and in_block then
