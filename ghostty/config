@@ -5,8 +5,8 @@
 font-family = JetBrains Mono
 font-size = 14
 
-# Theme (matches tmux status bar colours)
-theme = GruvboxDark
+# Theme (matches nvim tokyonight)
+theme = TokyoNight Night
 
 # Window
 window-padding-x = 4

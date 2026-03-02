@@ -31,16 +31,27 @@
   ----------------------------------------------------------------
   Ctrl-b f     session switcher (fzf popup)
                  C-a all  C-s sessions  C-p projects  C-d kill
-  Ctrl-b L     toggle last session
-  Ctrl-b Tab   toggle last window
+  Ctrl-b \     toggle last session
+  Ctrl-b /     toggle last window
   Ctrl-b s     session picker (built-in)
   Ctrl-b w     window/session tree
   Alt-(/)      prev/next session
   Ctrl-b r     reload tmux.conf
 
+  TMUX URLS & TEXT GRABBING
+  ----------------------------------------------------------------
+  Ctrl-b u     pick URL from pane (fzf, opens in browser)
+  Ctrl-b Tab   pick any text from pane (extrakto, inserts)
+
+  TMUX SESSION SAVE/RESTORE
+  ----------------------------------------------------------------
+  Ctrl-b C-s   save session layout (resurrect)
+  Ctrl-b C-r   restore session layout (resurrect)
+                 continuum auto-saves every 15 min
+
   TMUX COPY MODE
   ----------------------------------------------------------------
-  Ctrl-b [     enter copy mode
+  Ctrl-b [     enter copy mode (scroll with j/k, C-u/C-d)
   v            begin selection
   y / Enter    yank to clipboard
 
@@ -114,16 +125,16 @@
 
   NEOVIM: SEND TO REPL (vim-slime → tmux bottom-right pane)
   ----------------------------------------------------------------
-  <leader>sc     send line (normal) / selection (visual)
-  <leader>sp     send paragraph
-  <leader>sf     send whole file
-  <leader>su     send up to cursor line
-  <leader>sF     send function (treesitter)
-  <leader>sb     send code block (quarto/rmd)
-  <leader>sa     send all code blocks (quarto/rmd)
-  <leader>sU     send code blocks up to cursor (quarto/rmd)
-  <leader>so     start httpgd plot server (R)
-  <leader>s=     reconfigure target pane
+  <leader>rc     send line (normal) / selection (visual)
+  <leader>rp     send paragraph
+  <leader>rf     send whole file
+  <leader>ru     send up to cursor line
+  <leader>rF     send function (treesitter)
+  <leader>rb     send code block (quarto/rmd)
+  <leader>ra     send all code blocks (quarto/rmd)
+  <leader>rU     send code blocks up to cursor (quarto/rmd)
+  <leader>ro     start httpgd plot server (R)
+  <leader>r=     reconfigure target pane
 
   NEOVIM: OTHER
   ----------------------------------------------------------------

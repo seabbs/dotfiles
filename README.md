@@ -32,7 +32,7 @@ bash scripts/link.sh
 | `cli/` | CLI tools (gh, docker, claude-code, happy, etc.) |
 | `gh/` | GitHub CLI and gh-dash configuration |
 | `git/` | Git config (delta, gitignore) |
-| `iterm2/` | iTerm2 profile and keybindings |
+| `ghostty/` | Ghostty terminal configuration |
 | `jobs/` | Scheduled jobs (launchd on Mac, cron on Linux) |
 | `julia/` | Julia via juliaup, startup config |
 | `mac/` | Mac-specific setup and GUI apps |
@@ -63,6 +63,7 @@ It runs automatically during setup, or can be run standalone.
 | `git/config` | `~/.config/git/config` |
 | `bat/config` | `~/.config/bat/config` |
 | `gh/config.yml` | `~/.config/gh/config.yml` |
+| `ghostty/config` | `~/.config/ghostty/config` |
 | `gh/dash.yml` | `~/.config/gh-dash/config.yml` |
 | `claude/CLAUDE.md` | `~/.claude/CLAUDE.md` |
 | `claude/commands/` | `~/.claude/commands` |
