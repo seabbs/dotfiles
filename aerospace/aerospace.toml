@@ -74,10 +74,11 @@ alt-b = '''exec-and-forget osascript -e '
 ' || open -a Arc'''
 
 # ----- fzf window finder -----
-alt-w = '''exec-and-forget ghostty -e bash -c '
+alt-w = '''exec-and-forget /Applications/Ghostty.app/Contents/MacOS/ghostty -e bash -c '
+  export PATH="/opt/homebrew/bin:$PATH"
   win=$(aerospace list-windows --all \
     | fzf --prompt="Window> " --no-sort) \
-  && id=$(echo "$win" | awk "{print \\$1}") \
+  && id=$(echo "$win" | cut -d"|" -f1 | tr -d " ") \
   && aerospace focus --window-id "$id"
 '
 '''
@@ -120,6 +121,9 @@ alt-ctrl-l = 'join-with right'
 
 # ----- Open Finder -----
 alt-e = 'exec-and-forget open -a Finder'
+
+# ----- Reload config -----
+alt-shift-r = 'reload-config'
 
 # ----- Enter modes -----
 alt-r = 'mode resize'
