@@ -12,6 +12,9 @@ after-startup-command = [
 # Mouse follows focus when switching monitors
 on-focus-changed = ['move-mouse window-lazy-center']
 
+# Remap Option to Alt so macOS doesn't produce special characters
+key-mapping.preset = 'qwerty'
+
 # Normalizations
 enable-normalization-flatten-containers = true
 enable-normalization-opposite-orientation-for-nested-containers = true
@@ -22,12 +25,12 @@ default-root-container-orientation = 'auto'
 
 # Gaps
 [gaps]
-inner.horizontal = 8
-inner.vertical = 8
-outer.left = 8
-outer.right = 8
-outer.top = 8
-outer.bottom = 8
+inner.horizontal = 0
+inner.vertical = 0
+outer.left = 0
+outer.right = 0
+outer.top = 0
+outer.bottom = 0
 
 # =============================================================================
 # Main bindings (Alt as modifier)
@@ -71,7 +74,7 @@ alt-b = '''exec-and-forget osascript -e '
 ' || open -a Arc'''
 
 # ----- fzf window finder -----
-alt-w = '''exec-and-forget bash -c '
+alt-w = '''exec-and-forget ghostty -e bash -c '
   win=$(aerospace list-windows --all \
     | fzf --prompt="Window> " --no-sort) \
   && id=$(echo "$win" | awk "{print \\$1}") \
@@ -91,25 +94,32 @@ alt-o = '''exec-and-forget bash -c '
 # ----- Layout -----
 alt-f = 'fullscreen'
 alt-slash = 'layout tiles horizontal vertical'
-alt-comma = 'layout accordion horizontal vertical'
+alt-shift-slash = 'layout accordion horizontal vertical'
 alt-shift-equal = 'balance-sizes'
 
 # ----- Close window -----
 alt-shift-q = 'close'
 
-# ----- Previous workspace -----
+# ----- Cycle workspaces -----
 alt-tab = 'workspace-back-and-forth'
+alt-leftSquareBracket = 'workspace prev'
+alt-rightSquareBracket = 'workspace next'
 
 # ----- Monitor navigation -----
+alt-comma = 'focus-monitor prev'
 alt-period = 'focus-monitor next'
-alt-shift-period = 'focus-monitor prev'
-alt-shift-tab = 'move-workspace-to-monitor next'
+alt-backtick = 'focus-monitor next'
+alt-shift-comma = 'move-workspace-to-monitor prev'
+alt-shift-period = 'move-workspace-to-monitor next'
 
 # ----- Join with adjacent container -----
 alt-ctrl-h = 'join-with left'
 alt-ctrl-j = 'join-with down'
 alt-ctrl-k = 'join-with up'
 alt-ctrl-l = 'join-with right'
+
+# ----- Open Finder -----
+alt-e = 'exec-and-forget open -a Finder'
 
 # ----- Enter modes -----
 alt-r = 'mode resize'
