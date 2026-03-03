@@ -15,7 +15,6 @@
   Ctrl-b |     split vertical
   Ctrl-b -     split horizontal
   Ctrl-b h/j/k/l    navigate panes
-  Alt-h/j/k/l        navigate panes (no prefix)
   Ctrl-b H/J/K/L    resize panes
   Ctrl-b z     zoom/unzoom pane
   Ctrl-b b     break pane to new window
@@ -25,7 +24,7 @@
   ----------------------------------------------------------------
   Ctrl-b c     new window
   Ctrl-b D     dev layout (nvim | happy / repl)
-  Alt-1..9     switch to window N
+  Ctrl-b 1..9  switch to window N
 
   TMUX SESSIONS
   ----------------------------------------------------------------
@@ -35,7 +34,7 @@
   Ctrl-b /     toggle last window
   Ctrl-b s     session picker (built-in)
   Ctrl-b w     window/session tree
-  Alt-(/)      prev/next session
+  Ctrl-b (/)   prev/next session
   Ctrl-b r     reload tmux.conf
 
   TMUX URLS & TEXT GRABBING
@@ -142,3 +141,61 @@
   <leader>ci     GitHub Actions pipeline status (pipeline.nvim)
   \ll            start/stop LaTeX compilation (VimTeX)
   \lv            forward search to Skim PDF
+
+  AEROSPACE (Alt = modifier, manages outer windows)
+  ================================================================
+
+  FOCUS / MOVE
+  ----------------------------------------------------------------
+  Alt-h/j/k/l          focus window
+  Alt-Shift-h/j/k/l    move window
+  Alt-Ctrl-h/j/k/l     join with adjacent container
+
+  WORKSPACES
+  ----------------------------------------------------------------
+  Alt-1..6              switch workspace
+  Alt-Shift-1..6        move window to workspace
+  Alt-Tab               previous workspace
+  Alt-Shift-=           balance window sizes
+
+  LAYOUT
+  ----------------------------------------------------------------
+  Alt-f                 fullscreen toggle
+  Alt-/                 cycle tile layouts (h/v)
+  Alt-,                 cycle accordion layouts (h/v)
+
+  APP LAUNCHERS
+  ----------------------------------------------------------------
+  Alt-t                 focus/open Ghostty
+  Alt-b                 focus/open browser
+  Alt-w                 fzf window finder
+  Alt-o                 open clipboard URL in browser
+
+  SPLIT MODE (Alt-s then key)
+  ----------------------------------------------------------------
+  b                     split + browser
+  g                     split + Ghostty
+  o                     split + Obsidian
+  Escape                cancel
+
+  MONITORS
+  ----------------------------------------------------------------
+  Alt-.                 focus next monitor
+  Alt-Shift-.           focus prev monitor
+  Alt-Shift-Tab         move workspace to next monitor
+
+  CLOSE / MODES
+  ----------------------------------------------------------------
+  Alt-Shift-q           close window
+  Alt-r                 resize mode (h/j/k/l, Esc to exit)
+  Alt-Shift-;           service mode (r=reload, f=flatten)
+
+  SCRATCHPAD (comms apps)
+  ----------------------------------------------------------------
+  Alt-Shift-w           toggle WhatsApp
+  Alt-Shift-s           toggle Signal
+  Alt-Shift-m           toggle Messages
+  Alt-Shift-a           toggle Slack
+  Alt-Shift-e           toggle Teams
+  Alt-Shift-x           hide all scratchpad windows
+  Alt-Shift-n           cycle next scratchpad window

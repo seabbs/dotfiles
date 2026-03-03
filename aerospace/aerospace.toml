@@ -1,0 +1,293 @@
+# =============================================================================
+# AeroSpace tiling window manager
+# =============================================================================
+# Alt = outer layer (windows/workspaces)
+# Tmux prefix = inner layer (terminal panes/windows)
+
+# Launch JankyBorders on startup (tokyonight colours)
+after-startup-command = [
+  'exec-and-forget borders active_color=0xff7aa2f7 inactive_color=0xff3b4261 width=5.0',
+]
+
+# Mouse follows focus when switching monitors
+on-focus-changed = ['move-mouse window-lazy-center']
+
+# Normalizations
+enable-normalization-flatten-containers = true
+enable-normalization-opposite-orientation-for-nested-containers = true
+
+# Layout defaults
+default-root-container-layout = 'tiles'
+default-root-container-orientation = 'auto'
+
+# Gaps
+[gaps]
+inner.horizontal = 8
+inner.vertical = 8
+outer.left = 8
+outer.right = 8
+outer.top = 8
+outer.bottom = 8
+
+# =============================================================================
+# Main bindings (Alt as modifier)
+# =============================================================================
+[mode.main.binding]
+
+# ----- Focus windows -----
+alt-h = 'focus left'
+alt-j = 'focus down'
+alt-k = 'focus up'
+alt-l = 'focus right'
+
+# ----- Move windows -----
+alt-shift-h = 'move left'
+alt-shift-j = 'move down'
+alt-shift-k = 'move up'
+alt-shift-l = 'move right'
+
+# ----- Workspaces -----
+alt-1 = 'workspace 1'
+alt-2 = 'workspace 2'
+alt-3 = 'workspace 3'
+alt-4 = 'workspace 4'
+alt-5 = 'workspace 5'
+alt-6 = 'workspace 6'
+
+# ----- Move window to workspace -----
+alt-shift-1 = 'move-node-to-workspace 1'
+alt-shift-2 = 'move-node-to-workspace 2'
+alt-shift-3 = 'move-node-to-workspace 3'
+alt-shift-4 = 'move-node-to-workspace 4'
+alt-shift-5 = 'move-node-to-workspace 5'
+alt-shift-6 = 'move-node-to-workspace 6'
+
+# ----- App launchers -----
+alt-t = '''exec-and-forget osascript -e '
+  tell application "Ghostty" to activate
+' || open -a Ghostty'''
+alt-b = '''exec-and-forget osascript -e '
+  tell application "Arc" to activate
+' || open -a Arc'''
+
+# ----- fzf window finder -----
+alt-w = '''exec-and-forget bash -c '
+  win=$(aerospace list-windows --all \
+    | fzf --prompt="Window> " --no-sort) \
+  && id=$(echo "$win" | awk "{print \\$1}") \
+  && aerospace focus --window-id "$id"
+'
+'''
+
+# ----- Clipboard URL opener -----
+alt-o = '''exec-and-forget bash -c '
+  url=$(pbpaste)
+  if [[ "$url" =~ ^https?:// ]]; then
+    open "$url"
+  fi
+'
+'''
+
+# ----- Layout -----
+alt-f = 'fullscreen'
+alt-slash = 'layout tiles horizontal vertical'
+alt-comma = 'layout accordion horizontal vertical'
+alt-shift-equal = 'balance-sizes'
+
+# ----- Close window -----
+alt-shift-q = 'close'
+
+# ----- Previous workspace -----
+alt-tab = 'workspace-back-and-forth'
+
+# ----- Monitor navigation -----
+alt-period = 'focus-monitor next'
+alt-shift-period = 'focus-monitor prev'
+alt-shift-tab = 'move-workspace-to-monitor next'
+
+# ----- Join with adjacent container -----
+alt-ctrl-h = 'join-with left'
+alt-ctrl-j = 'join-with down'
+alt-ctrl-k = 'join-with up'
+alt-ctrl-l = 'join-with right'
+
+# ----- Enter modes -----
+alt-r = 'mode resize'
+alt-shift-semicolon = 'mode service'
+alt-s = 'mode split'
+
+# ----- Scratchpad: comms apps -----
+alt-shift-w = '''exec-and-forget bash -c '
+  app="WhatsApp"
+  if aerospace list-windows --focused | grep -qi "$app"; then
+    aerospace move-node-to-workspace S
+  elif aerospace list-windows --workspace S | grep -qi "$app"; then
+    id=$(aerospace list-windows --workspace S \
+      | grep -i "$app" | awk "{print \\$1}")
+    aerospace move-node-to-workspace focused --window-id "$id"
+    aerospace focus --window-id "$id"
+  else
+    open -a "$app"
+  fi
+'
+'''
+alt-shift-s = '''exec-and-forget bash -c '
+  app="Signal"
+  if aerospace list-windows --focused | grep -qi "$app"; then
+    aerospace move-node-to-workspace S
+  elif aerospace list-windows --workspace S | grep -qi "$app"; then
+    id=$(aerospace list-windows --workspace S \
+      | grep -i "$app" | awk "{print \\$1}")
+    aerospace move-node-to-workspace focused --window-id "$id"
+    aerospace focus --window-id "$id"
+  else
+    open -a "$app"
+  fi
+'
+'''
+alt-shift-m = '''exec-and-forget bash -c '
+  app="Messages"
+  if aerospace list-windows --focused | grep -qi "$app"; then
+    aerospace move-node-to-workspace S
+  elif aerospace list-windows --workspace S | grep -qi "$app"; then
+    id=$(aerospace list-windows --workspace S \
+      | grep -i "$app" | awk "{print \\$1}")
+    aerospace move-node-to-workspace focused --window-id "$id"
+    aerospace focus --window-id "$id"
+  else
+    open -a "$app"
+  fi
+'
+'''
+alt-shift-a = '''exec-and-forget bash -c '
+  app="Slack"
+  if aerospace list-windows --focused | grep -qi "$app"; then
+    aerospace move-node-to-workspace S
+  elif aerospace list-windows --workspace S | grep -qi "$app"; then
+    id=$(aerospace list-windows --workspace S \
+      | grep -i "$app" | awk "{print \\$1}")
+    aerospace move-node-to-workspace focused --window-id "$id"
+    aerospace focus --window-id "$id"
+  else
+    open -a "$app"
+  fi
+'
+'''
+alt-shift-e = '''exec-and-forget bash -c '
+  app="Microsoft Teams"
+  if aerospace list-windows --focused | grep -qi "teams"; then
+    aerospace move-node-to-workspace S
+  elif aerospace list-windows --workspace S \
+    | grep -qi "teams"; then
+    id=$(aerospace list-windows --workspace S \
+      | grep -i "teams" | awk "{print \\$1}")
+    aerospace move-node-to-workspace focused --window-id "$id"
+    aerospace focus --window-id "$id"
+  else
+    open -a "$app"
+  fi
+'
+'''
+
+# Hide all scratchpad windows
+alt-shift-x = '''exec-and-forget bash -c '
+  aerospace list-windows --workspace focused \
+    | grep -iE "whatsapp|signal|messages|slack|teams" \
+    | awk "{print \\$1}" \
+    | while read id; do
+        aerospace move-node-to-workspace S --window-id "$id"
+      done
+'
+'''
+
+# Cycle scratchpad windows to current workspace
+alt-shift-n = '''exec-and-forget bash -c '
+  ids=$(aerospace list-windows --workspace S \
+    | grep -iE "whatsapp|signal|messages|slack|teams" \
+    | awk "{print \\$1}")
+  if [ -n "$ids" ]; then
+    id=$(echo "$ids" | head -1)
+    aerospace move-node-to-workspace focused --window-id "$id"
+    aerospace focus --window-id "$id"
+  fi
+'
+'''
+
+# =============================================================================
+# Resize mode
+# =============================================================================
+[mode.resize.binding]
+h = 'resize width -50'
+j = 'resize height +50'
+k = 'resize height -50'
+l = 'resize width +50'
+enter = 'mode main'
+esc = 'mode main'
+
+# =============================================================================
+# Service mode (debugging / reload)
+# =============================================================================
+[mode.service.binding]
+r = ['reload-config', 'mode main']
+f = ['flatten-workspace-tree', 'mode main']
+esc = 'mode main'
+
+# =============================================================================
+# Open-app mode (Alt+s then key)
+# =============================================================================
+[mode.split.binding]
+b = [
+  'exec-and-forget open -a Arc',
+  'mode main',
+]
+g = [
+  'exec-and-forget open -a Ghostty',
+  'mode main',
+]
+o = [
+  'exec-and-forget open -a Obsidian',
+  'mode main',
+]
+esc = 'mode main'
+
+# =============================================================================
+# Window rules
+# =============================================================================
+
+# Float utilities
+[[on-window-detected]]
+if.app-id = 'com.apple.finder'
+run = 'layout floating'
+
+[[on-window-detected]]
+if.app-id = 'us.zoom.xos'
+run = 'layout floating'
+
+[[on-window-detected]]
+if.app-id = 'com.apple.systempreferences'
+run = 'layout floating'
+
+[[on-window-detected]]
+if.app-id = 'com.apple.calculator'
+run = 'layout floating'
+
+# Comms apps start in scratchpad workspace
+[[on-window-detected]]
+if.app-id = 'net.whatsapp.WhatsApp'
+run = ['layout floating', 'move-node-to-workspace S']
+
+[[on-window-detected]]
+if.app-id = 'org.whispersystems.signal-desktop'
+run = ['layout floating', 'move-node-to-workspace S']
+
+[[on-window-detected]]
+if.app-id = 'com.apple.MobileSMS'
+run = ['layout floating', 'move-node-to-workspace S']
+
+[[on-window-detected]]
+if.app-id = 'com.tinyspeck.slackmacgap'
+run = ['layout floating', 'move-node-to-workspace S']
+
+[[on-window-detected]]
+if.app-id = 'com.microsoft.teams2'
+run = ['layout floating', 'move-node-to-workspace S']

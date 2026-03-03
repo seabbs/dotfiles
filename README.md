@@ -26,6 +26,7 @@ bash scripts/link.sh
 
 | Directory | Purpose |
 |---|---|
+| `aerospace/` | AeroSpace tiling window manager configuration |
 | `bat/` | Bat (syntax-highlighted cat) configuration |
 | `brew/` | Homebrew installation |
 | `claude/` | Claude Code config (submodule: [seabbs/claude](https://github.com/seabbs/claude)) |
@@ -61,6 +62,7 @@ It runs automatically during setup, or can be run standalone.
 | `julia/startup.jl` | `~/.julia/config/startup.jl` |
 | `git/ignore` | `~/.config/git/ignore` |
 | `git/config` | `~/.config/git/config` |
+| `aerospace/aerospace.toml` | `~/.config/aerospace/aerospace.toml` |
 | `bat/config` | `~/.config/bat/config` |
 | `gh/config.yml` | `~/.config/gh/config.yml` |
 | `ghostty/config` | `~/.config/ghostty/config` |
