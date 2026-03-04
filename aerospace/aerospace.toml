@@ -1,0 +1,245 @@
+# =============================================================================
+# AeroSpace tiling window manager
+# =============================================================================
+# Alt = outer layer (windows/workspaces)
+# Tmux prefix = inner layer (terminal panes/windows)
+
+# Launch JankyBorders on startup (tokyonight colours)
+after-startup-command = [
+  'exec-and-forget borders active_color=0xff7aa2f7 inactive_color=0xff3b4261 width=5.0',
+]
+
+# Mouse follows focus when switching monitors
+on-focus-changed = ['move-mouse window-lazy-center']
+
+# Remap Option to Alt so macOS doesn't produce special characters
+key-mapping.preset = 'qwerty'
+
+# Normalizations
+enable-normalization-flatten-containers = true
+enable-normalization-opposite-orientation-for-nested-containers = true
+
+# Layout defaults
+default-root-container-layout = 'tiles'
+default-root-container-orientation = 'auto'
+
+# Gaps
+[gaps]
+inner.horizontal = 0
+inner.vertical = 0
+outer.left = 0
+outer.right = 0
+outer.top = 0
+outer.bottom = 0
+
+# =============================================================================
+# Main bindings (Alt as modifier)
+# =============================================================================
+[mode.main.binding]
+
+# ----- Focus windows -----
+alt-h = 'focus left'
+alt-j = 'focus down'
+alt-k = 'focus up'
+alt-l = 'focus right'
+
+# ----- Move windows -----
+alt-shift-h = 'move left'
+alt-shift-j = 'move down'
+alt-shift-k = 'move up'
+alt-shift-l = 'move right'
+
+# ----- Workspaces -----
+alt-1 = 'workspace 1'
+alt-2 = 'workspace 2'
+alt-3 = 'workspace 3'
+alt-4 = 'workspace 4'
+alt-5 = 'workspace 5'
+alt-6 = 'workspace 6'
+
+# ----- Move window to workspace -----
+alt-shift-1 = 'move-node-to-workspace 1'
+alt-shift-2 = 'move-node-to-workspace 2'
+alt-shift-3 = 'move-node-to-workspace 3'
+alt-shift-4 = 'move-node-to-workspace 4'
+alt-shift-5 = 'move-node-to-workspace 5'
+alt-shift-6 = 'move-node-to-workspace 6'
+
+# ----- App launchers -----
+alt-t = '''exec-and-forget osascript -e '
+  tell application "Ghostty" to activate
+' || open -a Ghostty'''
+alt-b = '''exec-and-forget osascript -e '
+  tell application "Arc" to activate
+' || open -a Arc'''
+
+# ----- fzf window finder -----
+alt-w = '''exec-and-forget /Applications/Ghostty.app/Contents/MacOS/ghostty -e bash -c '
+  export PATH="/opt/homebrew/bin:$PATH"
+  win=$(aerospace list-windows --all \
+    | fzf --prompt="Window> " --no-sort) \
+  && id=$(echo "$win" | cut -d"|" -f1 | tr -d " ") \
+  && aerospace focus --window-id "$id"
+'
+'''
+
+# ----- Clipboard URL opener -----
+alt-o = '''exec-and-forget bash -c '
+  url=$(pbpaste)
+  if [[ "$url" =~ ^https?:// ]]; then
+    open "$url"
+  fi
+'
+'''
+
+# ----- Dev workspace (terminal + browser) -----
+alt-d = 'exec-and-forget $HOME/code/seabbs/dotfiles/scripts/aerospace-dev-workspace.sh'
+
+# ----- Layout -----
+alt-f = 'fullscreen'
+alt-slash = 'layout tiles horizontal vertical'
+alt-shift-slash = 'layout accordion horizontal vertical'
+alt-shift-equal = 'balance-sizes'
+
+# ----- Close window -----
+alt-shift-q = 'close'
+
+# ----- Cycle workspaces -----
+alt-tab = 'workspace-back-and-forth'
+alt-leftSquareBracket = 'workspace prev'
+alt-rightSquareBracket = 'workspace next'
+
+# ----- Monitor navigation -----
+alt-comma = 'focus-monitor prev'
+alt-period = 'focus-monitor next'
+alt-backtick = 'focus-monitor next'
+alt-shift-comma = 'move-workspace-to-monitor prev'
+alt-shift-period = 'move-workspace-to-monitor next'
+alt-ctrl-comma = 'move-node-to-monitor prev'
+alt-ctrl-period = 'move-node-to-monitor next'
+
+# ----- Join with adjacent container -----
+alt-ctrl-h = 'join-with left'
+alt-ctrl-j = 'join-with down'
+alt-ctrl-k = 'join-with up'
+alt-ctrl-l = 'join-with right'
+
+# ----- Finder (scratchpad toggle) -----
+alt-e = 'exec-and-forget $HOME/code/seabbs/dotfiles/scripts/aerospace-scratchpad.sh com.apple.finder Finder'
+
+# ----- Reload config -----
+alt-shift-r = 'reload-config'
+
+# ----- Enter modes -----
+alt-r = 'mode resize'
+alt-shift-semicolon = 'mode service'
+alt-s = 'mode split'
+
+# ----- Scratchpad: comms apps -----
+alt-shift-w = 'exec-and-forget $HOME/code/seabbs/dotfiles/scripts/aerospace-scratchpad.sh net.whatsapp.WhatsApp WhatsApp'
+alt-shift-s = 'exec-and-forget $HOME/code/seabbs/dotfiles/scripts/aerospace-scratchpad.sh org.whispersystems.signal-desktop Signal'
+alt-shift-m = 'exec-and-forget $HOME/code/seabbs/dotfiles/scripts/aerospace-scratchpad.sh com.apple.MobileSMS Messages'
+alt-shift-a = 'exec-and-forget $HOME/code/seabbs/dotfiles/scripts/aerospace-scratchpad.sh com.tinyspeck.slackmacgap Slack'
+alt-shift-e = 'exec-and-forget $HOME/code/seabbs/dotfiles/scripts/aerospace-scratchpad.sh com.microsoft.teams2 "Microsoft Teams"'
+alt-shift-o = 'exec-and-forget $HOME/code/seabbs/dotfiles/scripts/aerospace-scratchpad.sh com.microsoft.Outlook "Microsoft Outlook"'
+
+# Hide all scratchpad windows
+alt-shift-x = 'exec-and-forget $HOME/code/seabbs/dotfiles/scripts/aerospace-scratchpad-hide-all.sh'
+
+# Cycle scratchpad windows to current workspace
+alt-shift-n = 'exec-and-forget $HOME/code/seabbs/dotfiles/scripts/aerospace-scratchpad-next.sh'
+
+# =============================================================================
+# Resize mode
+# =============================================================================
+[mode.resize.binding]
+h = 'resize width -50'
+j = 'resize height +50'
+k = 'resize height -50'
+l = 'resize width +50'
+enter = 'mode main'
+esc = 'mode main'
+
+# =============================================================================
+# Service mode (debugging / reload)
+# =============================================================================
+[mode.service.binding]
+r = ['reload-config', 'mode main']
+f = ['flatten-workspace-tree', 'mode main']
+esc = 'mode main'
+
+# =============================================================================
+# Open-app mode (Alt+s then key)
+# =============================================================================
+[mode.split.binding]
+b = [
+  '''exec-and-forget osascript -e '
+    tell application "Arc" to activate
+    tell application "System Events"
+      keystroke "n" using command down
+    end tell
+  '
+  ''',
+  'mode main',
+]
+g = [
+  '''exec-and-forget osascript -e '
+    tell application "Ghostty" to activate
+    tell application "System Events"
+      keystroke "n" using command down
+    end tell
+  '
+  ''',
+  'mode main',
+]
+o = [
+  'exec-and-forget open -a Obsidian',
+  'mode main',
+]
+esc = 'mode main'
+
+# =============================================================================
+# Window rules
+# =============================================================================
+
+# Float utilities
+[[on-window-detected]]
+if.app-id = 'com.apple.finder'
+run = 'layout floating'
+
+[[on-window-detected]]
+if.app-id = 'us.zoom.xos'
+run = 'layout floating'
+
+[[on-window-detected]]
+if.app-id = 'com.apple.systempreferences'
+run = 'layout floating'
+
+[[on-window-detected]]
+if.app-id = 'com.apple.calculator'
+run = 'layout floating'
+
+# Comms apps float (scratchpad scripts handle workspace)
+[[on-window-detected]]
+if.app-id = 'net.whatsapp.WhatsApp'
+run = 'layout floating'
+
+[[on-window-detected]]
+if.app-id = 'org.whispersystems.signal-desktop'
+run = 'layout floating'
+
+[[on-window-detected]]
+if.app-id = 'com.apple.MobileSMS'
+run = 'layout floating'
+
+[[on-window-detected]]
+if.app-id = 'com.tinyspeck.slackmacgap'
+run = 'layout floating'
+
+[[on-window-detected]]
+if.app-id = 'com.microsoft.teams2'
+run = 'layout floating'
+
+[[on-window-detected]]
+if.app-id = 'com.microsoft.Outlook'
+run = 'layout floating'

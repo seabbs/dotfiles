@@ -40,6 +40,9 @@ link "git/config"                "$HOME/.config/git/config"
 # Ghostty
 link "ghostty/config"            "$HOME/.config/ghostty/config"
 
+# AeroSpace
+link "aerospace/aerospace.toml"  "$HOME/.config/aerospace/aerospace.toml"
+
 # Bat
 link "bat/config"                "$HOME/.config/bat/config"
 
