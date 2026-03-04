@@ -92,6 +92,9 @@ alt-o = '''exec-and-forget bash -c '
 '
 '''
 
+# ----- Dev workspace (terminal + browser) -----
+alt-d = 'exec-and-forget $HOME/code/seabbs/dotfiles/scripts/aerospace-dev-workspace.sh'
+
 # ----- Layout -----
 alt-f = 'fullscreen'
 alt-slash = 'layout tiles horizontal vertical'
@@ -112,6 +115,8 @@ alt-period = 'focus-monitor next'
 alt-backtick = 'focus-monitor next'
 alt-shift-comma = 'move-workspace-to-monitor prev'
 alt-shift-period = 'move-workspace-to-monitor next'
+alt-ctrl-comma = 'move-node-to-monitor prev'
+alt-ctrl-period = 'move-node-to-monitor next'
 
 # ----- Join with adjacent container -----
 alt-ctrl-h = 'join-with left'
@@ -119,8 +124,8 @@ alt-ctrl-j = 'join-with down'
 alt-ctrl-k = 'join-with up'
 alt-ctrl-l = 'join-with right'
 
-# ----- Open Finder -----
-alt-e = 'exec-and-forget open -a Finder'
+# ----- Finder (scratchpad toggle) -----
+alt-e = 'exec-and-forget $HOME/code/seabbs/dotfiles/scripts/aerospace-scratchpad.sh com.apple.finder Finder'
 
 # ----- Reload config -----
 alt-shift-r = 'reload-config'
@@ -131,101 +136,18 @@ alt-shift-semicolon = 'mode service'
 alt-s = 'mode split'
 
 # ----- Scratchpad: comms apps -----
-alt-shift-w = '''exec-and-forget bash -c '
-  app="WhatsApp"
-  if aerospace list-windows --focused | grep -qi "$app"; then
-    aerospace move-node-to-workspace S
-  elif aerospace list-windows --workspace S | grep -qi "$app"; then
-    id=$(aerospace list-windows --workspace S \
-      | grep -i "$app" | awk "{print \\$1}")
-    aerospace move-node-to-workspace focused --window-id "$id"
-    aerospace focus --window-id "$id"
-  else
-    open -a "$app"
-  fi
-'
-'''
-alt-shift-s = '''exec-and-forget bash -c '
-  app="Signal"
-  if aerospace list-windows --focused | grep -qi "$app"; then
-    aerospace move-node-to-workspace S
-  elif aerospace list-windows --workspace S | grep -qi "$app"; then
-    id=$(aerospace list-windows --workspace S \
-      | grep -i "$app" | awk "{print \\$1}")
-    aerospace move-node-to-workspace focused --window-id "$id"
-    aerospace focus --window-id "$id"
-  else
-    open -a "$app"
-  fi
-'
-'''
-alt-shift-m = '''exec-and-forget bash -c '
-  app="Messages"
-  if aerospace list-windows --focused | grep -qi "$app"; then
-    aerospace move-node-to-workspace S
-  elif aerospace list-windows --workspace S | grep -qi "$app"; then
-    id=$(aerospace list-windows --workspace S \
-      | grep -i "$app" | awk "{print \\$1}")
-    aerospace move-node-to-workspace focused --window-id "$id"
-    aerospace focus --window-id "$id"
-  else
-    open -a "$app"
-  fi
-'
-'''
-alt-shift-a = '''exec-and-forget bash -c '
-  app="Slack"
-  if aerospace list-windows --focused | grep -qi "$app"; then
-    aerospace move-node-to-workspace S
-  elif aerospace list-windows --workspace S | grep -qi "$app"; then
-    id=$(aerospace list-windows --workspace S \
-      | grep -i "$app" | awk "{print \\$1}")
-    aerospace move-node-to-workspace focused --window-id "$id"
-    aerospace focus --window-id "$id"
-  else
-    open -a "$app"
-  fi
-'
-'''
-alt-shift-e = '''exec-and-forget bash -c '
-  app="Microsoft Teams"
-  if aerospace list-windows --focused | grep -qi "teams"; then
-    aerospace move-node-to-workspace S
-  elif aerospace list-windows --workspace S \
-    | grep -qi "teams"; then
-    id=$(aerospace list-windows --workspace S \
-      | grep -i "teams" | awk "{print \\$1}")
-    aerospace move-node-to-workspace focused --window-id "$id"
-    aerospace focus --window-id "$id"
-  else
-    open -a "$app"
-  fi
-'
-'''
+alt-shift-w = 'exec-and-forget $HOME/code/seabbs/dotfiles/scripts/aerospace-scratchpad.sh net.whatsapp.WhatsApp WhatsApp'
+alt-shift-s = 'exec-and-forget $HOME/code/seabbs/dotfiles/scripts/aerospace-scratchpad.sh org.whispersystems.signal-desktop Signal'
+alt-shift-m = 'exec-and-forget $HOME/code/seabbs/dotfiles/scripts/aerospace-scratchpad.sh com.apple.MobileSMS Messages'
+alt-shift-a = 'exec-and-forget $HOME/code/seabbs/dotfiles/scripts/aerospace-scratchpad.sh com.tinyspeck.slackmacgap Slack'
+alt-shift-e = 'exec-and-forget $HOME/code/seabbs/dotfiles/scripts/aerospace-scratchpad.sh com.microsoft.teams2 "Microsoft Teams"'
+alt-shift-o = 'exec-and-forget $HOME/code/seabbs/dotfiles/scripts/aerospace-scratchpad.sh com.microsoft.Outlook "Microsoft Outlook"'
 
 # Hide all scratchpad windows
-alt-shift-x = '''exec-and-forget bash -c '
-  aerospace list-windows --workspace focused \
-    | grep -iE "whatsapp|signal|messages|slack|teams" \
-    | awk "{print \\$1}" \
-    | while read id; do
-        aerospace move-node-to-workspace S --window-id "$id"
-      done
-'
-'''
+alt-shift-x = 'exec-and-forget $HOME/code/seabbs/dotfiles/scripts/aerospace-scratchpad-hide-all.sh'
 
 # Cycle scratchpad windows to current workspace
-alt-shift-n = '''exec-and-forget bash -c '
-  ids=$(aerospace list-windows --workspace S \
-    | grep -iE "whatsapp|signal|messages|slack|teams" \
-    | awk "{print \\$1}")
-  if [ -n "$ids" ]; then
-    id=$(echo "$ids" | head -1)
-    aerospace move-node-to-workspace focused --window-id "$id"
-    aerospace focus --window-id "$id"
-  fi
-'
-'''
+alt-shift-n = 'exec-and-forget $HOME/code/seabbs/dotfiles/scripts/aerospace-scratchpad-next.sh'
 
 # =============================================================================
 # Resize mode
@@ -251,11 +173,23 @@ esc = 'mode main'
 # =============================================================================
 [mode.split.binding]
 b = [
-  'exec-and-forget open -a Arc',
+  '''exec-and-forget osascript -e '
+    tell application "Arc" to activate
+    tell application "System Events"
+      keystroke "n" using command down
+    end tell
+  '
+  ''',
   'mode main',
 ]
 g = [
-  'exec-and-forget open -a Ghostty',
+  '''exec-and-forget osascript -e '
+    tell application "Ghostty" to activate
+    tell application "System Events"
+      keystroke "n" using command down
+    end tell
+  '
+  ''',
   'mode main',
 ]
 o = [
@@ -285,23 +219,27 @@ run = 'layout floating'
 if.app-id = 'com.apple.calculator'
 run = 'layout floating'
 
-# Comms apps start in scratchpad workspace
+# Comms apps float (scratchpad scripts handle workspace)
 [[on-window-detected]]
 if.app-id = 'net.whatsapp.WhatsApp'
-run = ['layout floating', 'move-node-to-workspace S']
+run = 'layout floating'
 
 [[on-window-detected]]
 if.app-id = 'org.whispersystems.signal-desktop'
-run = ['layout floating', 'move-node-to-workspace S']
+run = 'layout floating'
 
 [[on-window-detected]]
 if.app-id = 'com.apple.MobileSMS'
-run = ['layout floating', 'move-node-to-workspace S']
+run = 'layout floating'
 
 [[on-window-detected]]
 if.app-id = 'com.tinyspeck.slackmacgap'
-run = ['layout floating', 'move-node-to-workspace S']
+run = 'layout floating'
 
 [[on-window-detected]]
 if.app-id = 'com.microsoft.teams2'
-run = ['layout floating', 'move-node-to-workspace S']
+run = 'layout floating'
+
+[[on-window-detected]]
+if.app-id = 'com.microsoft.Outlook'
+run = 'layout floating'
