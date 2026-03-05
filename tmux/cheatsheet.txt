@@ -1,56 +1,56 @@
   Workflow Cheatsheet            /search  n/N next/prev  q quit
   ================================================================
 
-  TMUX POPUPS (prefix = Ctrl-b)
+  TMUX POPUPS (prefix = Ctrl-Space)
   ----------------------------------------------------------------
-  Ctrl-b G     GitHub dashboard (global)
-  Ctrl-b g     GitHub dashboard (current repo)
-  Ctrl-b A     AI agent popup (ephemeral, current dir)
-  Ctrl-b T     btop system monitor
-  Ctrl-b t     scratch terminal
-  Ctrl-b C-h   this cheatsheet
+  Ctrl-Space G     GitHub dashboard (global)
+  Ctrl-Space g     GitHub dashboard (current repo)
+  Ctrl-Space A     AI agent popup (ephemeral, current dir)
+  Ctrl-Space T     btop system monitor
+  Ctrl-Space t     scratch terminal
+  Ctrl-Space C-h   this cheatsheet
 
   TMUX PANES
   ----------------------------------------------------------------
-  Ctrl-b |     split vertical
-  Ctrl-b -     split horizontal
-  Ctrl-b h/j/k/l    navigate panes
-  Ctrl-b H/J/K/L    resize panes
-  Ctrl-b z     zoom/unzoom pane
-  Ctrl-b b     break pane to new window
-  Ctrl-b J     join pane from another window
+  Ctrl-Space |     split vertical
+  Ctrl-Space -     split horizontal
+  Ctrl-Space h/j/k/l    navigate panes
+  Ctrl-Space H/J/K/L    resize panes
+  Ctrl-Space z     zoom/unzoom pane
+  Ctrl-Space b     break pane to new window
+  Ctrl-Space J     join pane from another window
 
   TMUX WINDOWS
   ----------------------------------------------------------------
-  Ctrl-b c     new window
-  Ctrl-b D     dev layout (nvim | happy / repl)
-  Ctrl-b 1..9  switch to window N
+  Ctrl-Space c     new window
+  Ctrl-Space D     dev layout (nvim | happy / repl)
+  Ctrl-Space 1..9  switch to window N
 
   TMUX SESSIONS
   ----------------------------------------------------------------
-  Ctrl-b f     session switcher (fzf popup)
+  Ctrl-Space f     session switcher (fzf popup)
                  C-a all  C-s sessions  C-p projects  C-d kill
-  Ctrl-b \     toggle last session
-  Ctrl-b /     toggle last window
-  Ctrl-b s     session picker (built-in)
-  Ctrl-b w     window/session tree
-  Ctrl-b (/)   prev/next session
-  Ctrl-b r     reload tmux.conf
+  Ctrl-Space \     toggle last session
+  Ctrl-Space /     toggle last window
+  Ctrl-Space s     session picker (built-in)
+  Ctrl-Space w     window/session tree
+  Ctrl-Space (/)   prev/next session
+  Ctrl-Space r     reload tmux.conf
 
   TMUX URLS & TEXT GRABBING
   ----------------------------------------------------------------
-  Ctrl-b u     pick URL from pane (fzf, opens in browser)
-  Ctrl-b Tab   pick any text from pane (extrakto, inserts)
+  Ctrl-Space u     pick URL from pane (fzf, opens in browser)
+  Ctrl-Space Tab   pick any text from pane (extrakto, inserts)
 
   TMUX SESSION SAVE/RESTORE
   ----------------------------------------------------------------
-  Ctrl-b C-s   save session layout (resurrect)
-  Ctrl-b C-r   restore session layout (resurrect)
+  Ctrl-Space C-s   save session layout (resurrect)
+  Ctrl-Space C-r   restore session layout (resurrect)
                  continuum auto-saves every 15 min
 
   TMUX COPY MODE
   ----------------------------------------------------------------
-  Ctrl-b [     enter copy mode (scroll with j/k, C-u/C-d)
+  Ctrl-Space [     enter copy mode (scroll with j/k, C-u/C-d)
   v            begin selection
   y / Enter    yank to clipboard
 
@@ -98,7 +98,7 @@
   issue-summary  summarise an issue
   uk-news        BBC/Guardian summary
 
-  GH DASH (inside Ctrl-b G popup)
+  GH DASH (inside Ctrl-Space G popup)
   ----------------------------------------------------------------
   s          cycle views (PRs / Issues / Notifications)
   h / l      switch section
@@ -155,20 +155,21 @@
   ----------------------------------------------------------------
   Alt-1..6              switch workspace
   Alt-Shift-1..6        move window to workspace
-  Alt-Tab               previous workspace
+  Alt-\                 toggle last workspace
+  Alt-/                 toggle last focused window
   Alt-Shift-=           balance window sizes
 
   LAYOUT
   ----------------------------------------------------------------
-  Alt-f                 fullscreen toggle
-  Alt-/                 cycle tile layouts (h/v)
-  Alt-,                 cycle accordion layouts (h/v)
+  Alt-z                 fullscreen toggle
+  Alt-Shift-/           cycle tile layouts (h/v)
+  Alt-Ctrl-/            cycle accordion layouts (h/v)
 
-  APP LAUNCHERS
+  APP LAUNCHERS / FINDERS
   ----------------------------------------------------------------
   Alt-t                 focus/open Ghostty
-  Alt-b                 focus/open browser
-  Alt-w                 fzf window finder
+  Alt-f                 fzf window finder
+  Alt-w                 workspace tree view
   Alt-o                 open clipboard URL in browser
 
   SPLIT MODE (Alt-s then key)
@@ -184,9 +185,11 @@
   Alt-Shift-.           focus prev monitor
   Alt-Shift-Tab         move workspace to next monitor
 
-  CLOSE / MODES
+  ACTIONS
   ----------------------------------------------------------------
-  Alt-Shift-q           close window
+  Alt-x                 close window
+  Alt-Shift-c           close all but current window
+  Alt-b                 break window to new workspace
   Alt-r                 resize mode (h/j/k/l, Esc to exit)
   Alt-Shift-;           service mode (r=reload, f=flatten)
 

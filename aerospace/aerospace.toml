@@ -4,6 +4,9 @@
 # Alt = outer layer (windows/workspaces)
 # Tmux prefix = inner layer (terminal panes/windows)
 
+# Start AeroSpace on login
+start-at-login = true
+
 # Launch JankyBorders on startup (tokyonight colours)
 after-startup-command = [
   'exec-and-forget borders active_color=0xff7aa2f7 inactive_color=0xff3b4261 width=5.0',
@@ -69,17 +72,23 @@ alt-shift-6 = 'move-node-to-workspace 6'
 alt-t = '''exec-and-forget osascript -e '
   tell application "Ghostty" to activate
 ' || open -a Ghostty'''
-alt-b = '''exec-and-forget osascript -e '
-  tell application "Arc" to activate
-' || open -a Arc'''
 
-# ----- fzf window finder -----
-alt-w = '''exec-and-forget /Applications/Ghostty.app/Contents/MacOS/ghostty -e bash -c '
+# ----- Break window to new workspace -----
+alt-b = 'exec-and-forget $HOME/code/seabbs/dotfiles/scripts/aerospace-break-window.sh'
+
+# ----- fzf window finder (Alt+f = tmux prefix+f) -----
+alt-f = '''exec-and-forget /Applications/Ghostty.app/Contents/MacOS/ghostty -e bash -c '
   export PATH="/opt/homebrew/bin:$PATH"
   win=$(aerospace list-windows --all \
     | fzf --prompt="Window> " --no-sort) \
   && id=$(echo "$win" | cut -d"|" -f1 | tr -d " ") \
   && aerospace focus --window-id "$id"
+'
+'''
+
+# ----- Workspace tree view (Alt+w = tmux prefix+w) -----
+alt-w = '''exec-and-forget /Applications/Ghostty.app/Contents/MacOS/ghostty -e bash -c '
+  $HOME/code/seabbs/dotfiles/scripts/aerospace-tree-view.sh
 '
 '''
 
@@ -96,18 +105,20 @@ alt-o = '''exec-and-forget bash -c '
 alt-d = 'exec-and-forget $HOME/code/seabbs/dotfiles/scripts/aerospace-dev-workspace.sh'
 
 # ----- Layout -----
-alt-f = 'fullscreen'
-alt-slash = 'layout tiles horizontal vertical'
-alt-shift-slash = 'layout accordion horizontal vertical'
+alt-z = 'fullscreen'
+alt-slash = 'focus-back-and-forth'
+alt-shift-slash = 'layout tiles horizontal vertical'
+alt-ctrl-slash = 'layout accordion horizontal vertical'
 alt-shift-equal = 'balance-sizes'
 
-# ----- Close window -----
-alt-shift-q = 'close'
+# ----- Close window (Alt+x = tmux prefix+x) -----
+alt-x = 'close'
+alt-shift-c = 'close-all-windows-but-current'
 
-# ----- Cycle workspaces -----
-alt-tab = 'workspace-back-and-forth'
-alt-leftSquareBracket = 'workspace prev'
-alt-rightSquareBracket = 'workspace next'
+# ----- Cycle workspaces (shift+9=( shift+0=)) -----
+alt-backslash = 'workspace-back-and-forth'
+alt-shift-9 = 'workspace prev'
+alt-shift-0 = 'workspace next'
 
 # ----- Monitor navigation -----
 alt-comma = 'focus-monitor prev'
@@ -125,7 +136,7 @@ alt-ctrl-k = 'join-with up'
 alt-ctrl-l = 'join-with right'
 
 # ----- Finder (scratchpad toggle) -----
-alt-e = 'exec-and-forget $HOME/code/seabbs/dotfiles/scripts/aerospace-scratchpad.sh com.apple.finder Finder'
+alt-shift-e = 'exec-and-forget $HOME/code/seabbs/dotfiles/scripts/aerospace-scratchpad.sh com.apple.finder Finder'
 
 # ----- Reload config -----
 alt-shift-r = 'reload-config'
@@ -140,14 +151,17 @@ alt-shift-w = 'exec-and-forget $HOME/code/seabbs/dotfiles/scripts/aerospace-scra
 alt-shift-s = 'exec-and-forget $HOME/code/seabbs/dotfiles/scripts/aerospace-scratchpad.sh org.whispersystems.signal-desktop Signal'
 alt-shift-m = 'exec-and-forget $HOME/code/seabbs/dotfiles/scripts/aerospace-scratchpad.sh com.apple.MobileSMS Messages'
 alt-shift-a = 'exec-and-forget $HOME/code/seabbs/dotfiles/scripts/aerospace-scratchpad.sh com.tinyspeck.slackmacgap Slack'
-alt-shift-e = 'exec-and-forget $HOME/code/seabbs/dotfiles/scripts/aerospace-scratchpad.sh com.microsoft.teams2 "Microsoft Teams"'
+alt-shift-t = 'exec-and-forget $HOME/code/seabbs/dotfiles/scripts/aerospace-scratchpad.sh com.microsoft.teams2 "Microsoft Teams"'
 alt-shift-o = 'exec-and-forget $HOME/code/seabbs/dotfiles/scripts/aerospace-scratchpad.sh com.microsoft.Outlook "Microsoft Outlook"'
+
+# ----- Obsidian (scratchpad toggle) -----
+alt-shift-n = 'exec-and-forget $HOME/code/seabbs/dotfiles/scripts/aerospace-scratchpad.sh md.obsidian Obsidian'
 
 # Hide all scratchpad windows
 alt-shift-x = 'exec-and-forget $HOME/code/seabbs/dotfiles/scripts/aerospace-scratchpad-hide-all.sh'
 
-# Cycle scratchpad windows to current workspace
-alt-shift-n = 'exec-and-forget $HOME/code/seabbs/dotfiles/scripts/aerospace-scratchpad-next.sh'
+# Cycle scratchpad windows (shift+[={ shift+]=})
+alt-shift-leftSquareBracket = 'exec-and-forget $HOME/code/seabbs/dotfiles/scripts/aerospace-scratchpad-next.sh'
 
 # =============================================================================
 # Resize mode
@@ -217,6 +231,13 @@ run = 'layout floating'
 
 [[on-window-detected]]
 if.app-id = 'com.apple.calculator'
+run = 'layout floating'
+
+# Obsidian floats (scratchpad)
+# NOTE: Manually disable ctrl-space in Obsidian settings to avoid
+# conflict with system/input method shortcuts
+[[on-window-detected]]
+if.app-id = 'md.obsidian'
 run = 'layout floating'
 
 # Comms apps float (scratchpad scripts handle workspace)
