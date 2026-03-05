@@ -69,17 +69,23 @@ alt-shift-6 = 'move-node-to-workspace 6'
 alt-t = '''exec-and-forget osascript -e '
   tell application "Ghostty" to activate
 ' || open -a Ghostty'''
-alt-b = '''exec-and-forget osascript -e '
-  tell application "Arc" to activate
-' || open -a Arc'''
 
-# ----- fzf window finder -----
-alt-w = '''exec-and-forget /Applications/Ghostty.app/Contents/MacOS/ghostty -e bash -c '
+# ----- Break window to new workspace -----
+alt-b = 'exec-and-forget $HOME/code/seabbs/dotfiles/scripts/aerospace-break-window.sh'
+
+# ----- fzf window finder (Alt+f = tmux prefix+f) -----
+alt-f = '''exec-and-forget /Applications/Ghostty.app/Contents/MacOS/ghostty -e bash -c '
   export PATH="/opt/homebrew/bin:$PATH"
   win=$(aerospace list-windows --all \
     | fzf --prompt="Window> " --no-sort) \
   && id=$(echo "$win" | cut -d"|" -f1 | tr -d " ") \
   && aerospace focus --window-id "$id"
+'
+'''
+
+# ----- Workspace tree view (Alt+w = tmux prefix+w) -----
+alt-w = '''exec-and-forget /Applications/Ghostty.app/Contents/MacOS/ghostty -e bash -c '
+  $HOME/code/seabbs/dotfiles/scripts/aerospace-tree-view.sh
 '
 '''
 
@@ -96,18 +102,20 @@ alt-o = '''exec-and-forget bash -c '
 alt-d = 'exec-and-forget $HOME/code/seabbs/dotfiles/scripts/aerospace-dev-workspace.sh'
 
 # ----- Layout -----
-alt-f = 'fullscreen'
-alt-slash = 'layout tiles horizontal vertical'
-alt-shift-slash = 'layout accordion horizontal vertical'
+alt-z = 'fullscreen'
+alt-slash = 'focus-back-and-forth'
+alt-shift-slash = 'layout tiles horizontal vertical'
+alt-ctrl-slash = 'layout accordion horizontal vertical'
 alt-shift-equal = 'balance-sizes'
 
-# ----- Close window -----
-alt-shift-q = 'close'
+# ----- Close window (Alt+x = tmux prefix+x) -----
+alt-x = 'close'
+alt-shift-c = 'close-all-windows-but-current'
 
 # ----- Cycle workspaces -----
-alt-tab = 'workspace-back-and-forth'
-alt-leftSquareBracket = 'workspace prev'
-alt-rightSquareBracket = 'workspace next'
+alt-backslash = 'workspace-back-and-forth'
+alt-shift-9 = 'workspace prev'
+alt-shift-0 = 'workspace next'
 
 # ----- Monitor navigation -----
 alt-comma = 'focus-monitor prev'
