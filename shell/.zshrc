@@ -1,4 +1,5 @@
 source /opt/homebrew/share/zsh-autocomplete/zsh-autocomplete.plugin.zsh
+bindkey '^L' clear-screen
 
 # Shell options
 setopt HIST_IGNORE_DUPS
@@ -65,3 +66,8 @@ eval "$(direnv hook zsh)"
 alias ghbot='gh auth switch --user seabbs-bot'
 alias ghme='gh auth switch --user seabbs'
 alias dashboard='GH_TOKEN=$(gh auth token --user seabbs) gh dash'
+
+# Added by LM Studio CLI (lms)
+export PATH="$PATH:/Users/lshsa2/.lmstudio/bin"
+# End of LM Studio CLI section
+
