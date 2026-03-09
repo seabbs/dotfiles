@@ -8,6 +8,7 @@
   Ctrl-Space A     AI agent popup (ephemeral, current dir)
   Ctrl-Space T     btop system monitor
   Ctrl-Space t     scratch terminal
+  Ctrl-Space C-g   lazygit popup (current dir)
   Ctrl-Space C-h   this cheatsheet
 
   TMUX PANES
@@ -88,6 +89,7 @@
 
   SHELL: AI COMMANDS
   ----------------------------------------------------------------
+  ai             direct CLI agent (no tmux)
   tc <cmd>       tmux + claude session
   commit         commit (haiku)
   review         code review
