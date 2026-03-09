@@ -9,6 +9,7 @@ return {
     require("octo").setup({
       picker = "telescope",
       enable_builtin = true,
+      default_to_projects_v2 = true,
       default_remote = {"upstream", "origin"},
       default_merge_method = "squash",
       ssh_aliases = {},
