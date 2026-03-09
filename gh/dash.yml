@@ -77,20 +77,19 @@ defaults:
                 hidden: true
     refetchIntervalMinutes: 30
 keybindings:
-    universal:
+    prs:
         - key: p
           name: open project
           command: zsh -ic "proj {{.RepoName}}"
         - key: a
           name: open agent
           command: zsh -ic "agent {{.RepoName}}"
-    prs:
         - key: C
           name: code review
           command: >
-            tmux new-window -c "$HOME/$(echo {{.RepoPath}} | sed 's|^~/||')"
+            tmux new-window -c {{.RepoPath}}
             -n "review-{{.PrNumber}}"
-            'nvim -c "Octo pr edit {{.PrNumber}}"'
+            'nvim -c ":silent Octo pr edit {{.PrNumber}}"'
         - key: O
           builtin: checkout
         - key: R
@@ -99,6 +98,13 @@ keybindings:
             echo "Enter reviewer username:"; read reviewer;
             gh pr edit {{.PrNumber}} --repo {{.RepoName}}
             --add-reviewer "$reviewer"
+    issues:
+        - key: p
+          name: open project
+          command: zsh -ic "proj {{.RepoName}}"
+        - key: a
+          name: open agent
+          command: zsh -ic "agent {{.RepoName}}"
 repoPaths:
     epinowcast/*: ~/code/epinowcast/*
     epiforecasts/*: ~/code/epiforecasts/*
