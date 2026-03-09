@@ -3,9 +3,9 @@
 # Defaults to 'claude' if not set.
 : ${AGENT_CLI_PRIMARY_TOOL:=claude}
 
-# Set AGENT_CLI_DEV_TOOL to your preferred development-focused AI CLI (e.g., 'happy', 'gemini')
-# Defaults to 'happy' if not set.
-: ${AGENT_CLI_DEV_TOOL:=happy}
+# Set AGENT_CLI_DEV_TOOL to your preferred development-focused AI CLI (e.g., 'claude', 'gemini')
+# Defaults to 'claude' if not set.
+: ${AGENT_CLI_DEV_TOOL:=claude}
 
 # Root directory for code repositories, organised by GitHub org
 # Defaults to ~/code if not set.
@@ -91,6 +91,9 @@ tc() {
 }
 
 # Claude Code custom command aliases
+# Direct CLI alias (no tmux)
+alias ai='${AGENT_CLI_PRIMARY_TOOL}'
+
 # General model aliases
 alias haiku='${AGENT_CLI_PRIMARY_TOOL} --model haiku'
 alias sonnet='${AGENT_CLI_PRIMARY_TOOL} --model sonnet'
