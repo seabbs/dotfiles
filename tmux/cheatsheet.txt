@@ -15,7 +15,9 @@
   ----------------------------------------------------------------
   Ctrl-Space |     split vertical
   Ctrl-Space -     split horizontal
-  Ctrl-Space h/j/k/l    navigate panes
+  Ctrl-h/j/k/l          navigate panes (+ nvim splits)
+  Ctrl-Space h/j/k/l    navigate panes (fallback)
+  Ctrl-Space C-l         clear screen (C-l workaround)
   Ctrl-Space H/J/K/L    resize panes
   Ctrl-Space z     zoom/unzoom pane
   Ctrl-Space b     break pane to new window
