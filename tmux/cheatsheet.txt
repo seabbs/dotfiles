@@ -21,7 +21,7 @@
   Ctrl-Space H/J/K/L    resize panes
   Ctrl-Space z     zoom/unzoom pane
   Ctrl-Space b     break pane to new window
-  Ctrl-Space J     join pane from another window
+  Ctrl-Space M     join pane from another window
 
   TMUX WINDOWS
   ----------------------------------------------------------------
