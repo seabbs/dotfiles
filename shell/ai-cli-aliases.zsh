@@ -182,30 +182,16 @@ _sync_worktree_files() {
 
   [[ "$source" == "$dest" ]] && return 0
 
-  # Get all gitignored files from source
-  local files
-  files=$(
-    git -C "$source" ls-files \
-      --others --ignored --exclude-standard 2>/dev/null
-  )
-  [[ -z "$files" ]] && return 0
-
-  # Copy each file, skipping worktrees/ and .git/
-  while IFS= read -r relpath; do
-    case "$relpath" in
-      worktrees/*|.git/*) continue ;;
-    esac
-    [[ ! -e "$source/$relpath" ]] && continue
-    if [[ -f "$source/$relpath" ]]; then
-      mkdir -p "$(dirname "$dest/$relpath")"
-      cp -n "$source/$relpath" "$dest/$relpath" \
-        2>/dev/null
-    elif [[ -d "$source/$relpath" ]]; then
-      mkdir -p "$dest/$relpath"
-      rsync -a --quiet \
-        "$source/$relpath/" "$dest/$relpath/"
-    fi
-  done <<< "$files"
+  # Build file list from gitignored files, excluding
+  # worktrees/ and .git/ directories
+  git -C "$source" ls-files \
+    --others --ignored --exclude-standard 2>/dev/null \
+    | grep -v '^worktrees/' \
+    | grep -v '^\.git/' \
+    | rsync -a --quiet \
+        --ignore-existing \
+        --files-from=- \
+        "$source/" "$dest/"
 }
 
 # =============================================================================
@@ -278,7 +264,7 @@ proj() {
       mkdir -p "$root/worktrees"
       git -C "$root" worktree add \
         "worktrees/$branch" -b "$branch" main
-      _sync_worktree_files "$root" "$wt"
+      _sync_worktree_files "$root" "$wt" &
     fi
 
     local repl="zsh"
@@ -339,7 +325,7 @@ feat() {
   if [[ ! -d "$worktree_path" ]]; then
     mkdir -p "$root/worktrees"
     git -C "$root" worktree add "worktrees/$branch" -b "$branch" "$base"
-    _sync_worktree_files "$root" "$worktree_path"
+    _sync_worktree_files "$root" "$worktree_path" &
   fi
 
   # Detect REPL type
@@ -550,7 +536,7 @@ agent() {
       mkdir -p "$project_dir/worktrees"
       git -C "$project_dir" worktree add "worktrees/$worktree" -b "$worktree" 2>/dev/null \
         || git -C "$project_dir" worktree add "worktrees/$worktree" "$worktree"
-      _sync_worktree_files "$project_dir" "$worktree_path"
+      _sync_worktree_files "$project_dir" "$worktree_path" &
     fi
 
     session_name="agent-${project}-${worktree}"
@@ -631,7 +617,7 @@ agent-feat() {
     mkdir -p "$root/worktrees"
     git -C "$root" worktree add "worktrees/$branch" -b "$branch" "$base" 2>/dev/null \
       || git -C "$root" worktree add "worktrees/$branch" "$branch"
-    _sync_worktree_files "$root" "$worktree_path"
+    _sync_worktree_files "$root" "$worktree_path" &
   fi
 
   if [[ -z "$TMUX" ]]; then
