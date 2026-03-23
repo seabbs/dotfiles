@@ -7,7 +7,7 @@ echo ""
 if [[ "$(uname)" == "Darwin" ]]; then
   echo "Platform: macOS (launchd)"
   echo ""
-  for label in com.seabbs.sync-repos com.seabbs.julia-maintenance; do
+  for label in com.seabbs.sync-repos com.seabbs.julia-maintenance com.seabbs.update-claude-plugins; do
     status=$(launchctl print "gui/$(id -u)/$label" 2>/dev/null \
       | grep "state" | head -1 || echo "  not loaded")
     echo "$label"
@@ -16,16 +16,17 @@ if [[ "$(uname)" == "Darwin" ]]; then
 else
   echo "Platform: Linux (cron)"
   echo ""
-  crontab -l 2>/dev/null | grep -E "sync-repos|julia-maintenance" \
+  crontab -l 2>/dev/null | grep -E "sync-repos|julia-maintenance|update-claude-plugins" \
     || echo "  No jobs found"
 fi
 
 echo ""
 echo "=== Schedule ==="
-echo "  sync-repos:        daily at 07:00"
-echo "  julia-maintenance: daily at 06:30"
+echo "  sync-repos:             daily at 07:00"
+echo "  julia-maintenance:      daily at 06:30"
+echo "  update-claude-plugins:  daily at 07:15"
 
-for job in sync-repos julia-maintenance; do
+for job in sync-repos julia-maintenance update-claude-plugins; do
   log="$HOME/.local/share/$job/last-run.log"
   echo ""
   echo "=== $job (last run) ==="

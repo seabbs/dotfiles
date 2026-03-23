@@ -20,9 +20,13 @@ return {
       right_bubble_delimiter = "",
       left_bubble_delimiter = "",
       snippet_context_lines = 4,
-      gh_env = {
-        GH_TOKEN = vim.trim(vim.fn.system("gh auth token --user seabbs")),
-      },
+      gh_env = function()
+        return {
+          GH_TOKEN = vim.trim(
+            vim.fn.system("gh auth token --user seabbs")
+          ),
+        }
+      end,
       timeout = 5000,
       ui = {
         use_signcolumn = true,
