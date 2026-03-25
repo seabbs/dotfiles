@@ -5,6 +5,8 @@ prSections:
       filters: is:open review-requested:@me
     - title: Involved
       filters: is:open involves:@me -author:@me
+    - title: All
+      filters: is:open
 issuesSections:
     - title: My Issues
       filters: is:open author:@me
@@ -12,6 +14,8 @@ issuesSections:
       filters: is:open assignee:@me
     - title: Involved
       filters: is:open involves:@me -author:@me
+    - title: All
+      filters: is:open
 notificationsSections:
     - title: All
       filters: ""
@@ -118,7 +122,7 @@ theme:
             showSeparator: true
             compact: false
 pager:
-    diff: ""
+    diff: delta
 confirmQuit: false
 showAuthorIcons: true
 smartFilteringAtLaunch: true
