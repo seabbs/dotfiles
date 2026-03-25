@@ -15,6 +15,7 @@ INTERACTIVE=false
 log() {
   printf "%-50s %s\n" "$1" "$2" >> "$LOG_FILE"
   $INTERACTIVE && printf "%-50s %s\n" "$1" "$2"
+  return 0
 }
 
 : > "$LOG_FILE"
