@@ -13,3 +13,4 @@ brew install zoxide
 brew install btop
 brew install tmuxinator
 brew install go-task
+brew install television
