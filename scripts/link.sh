@@ -50,8 +50,9 @@ link "bat/config"                "$HOME/.config/bat/config"
 link "gh/config.yml"             "$HOME/.config/gh/config.yml"
 link "gh/dash.yml"               "$HOME/.config/gh-dash/config.yml"
 
-# Television (config only; cable channels managed by tv update-channels)
+# Television (stock cable channels managed by tv update-channels)
 link "tv/config.toml"               "$HOME/.config/television/config.toml"
+link "tv/cable/all-files.toml"      "$HOME/.config/television/cable/all-files.toml"
 
 # Claude Code (delegates to submodule's own link script)
 "$DOTFILES/claude/link.sh"
