@@ -28,8 +28,12 @@ export PATH
 
 source ~/.config/zsh/ai-cli-aliases.zsh
 
-# fzf integration
+# fzf integration (kept for piping: cmd | fzf)
 source <(fzf --zsh)
+
+# television shell integration (overrides fzf Ctrl+T/R
+# with context-aware channel picker and history search)
+eval "$(tv init zsh)"
 
 # zoxide integration
 eval "$(zoxide init zsh)"
