@@ -1,0 +1,20 @@
+[metadata]
+name = "all-files"
+description = "All files including gitignored and hidden"
+requirements = ["fd", "bat"]
+
+[source]
+command = "fd -t f --no-ignore --hidden --exclude .git"
+
+[preview]
+command = "bat -n --color=always '{}'"
+env = { BAT_THEME = "ansi" }
+
+[keybindings]
+f12 = "actions:edit"
+
+[actions.edit]
+description = "Opens the selected entries with the default editor"
+command = "${EDITOR:-vim} '{}'"
+shell = "bash"
+mode = "execute"
