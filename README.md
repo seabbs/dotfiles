@@ -45,6 +45,7 @@ bash scripts/link.sh
 | `shell/` | Zsh config and aliases |
 | `tmux/` | Tmux configuration |
 | `tmuxinator/` | Tmuxinator project templates |
+| `tv/` | Television fuzzy finder config and custom cable channels |
 
 ## Symlinks
 
@@ -67,7 +68,10 @@ It runs automatically during setup, or can be run standalone.
 | `gh/config.yml` | `~/.config/gh/config.yml` |
 | `ghostty/config` | `~/.config/ghostty/config` |
 | `gh/dash.yml` | `~/.config/gh-dash/config.yml` |
+| `tv/config.toml` | `~/.config/television/config.toml` |
+| `tv/cable/all-files.toml` | `~/.config/television/cable/all-files.toml` |
 | `claude/CLAUDE.md` | `~/.claude/CLAUDE.md` |
+| `claude/settings.json` | `~/.claude/settings.json` |
 | `claude/commands/` | `~/.claude/commands` |
 
 ## Scheduled jobs
