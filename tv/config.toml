@@ -1,0 +1,19 @@
+# Television configuration
+# https://github.com/alexpasmantier/television
+
+default_channel = "files"
+theme = "tokyonight"
+
+[shell_integration.channel_triggers]
+"git-branch" = [
+  "git checkout",
+  "git switch",
+  "git merge",
+  "git rebase",
+  "git diff",
+]
+"git-log" = ["git show", "git revert"]
+"dirs" = ["cd", "ls", "z"]
+"files" = ["cat", "bat", "nvim", "vim", "less"]
+"zsh-history" = ["!"]
+"env" = ["export", "unset"]
