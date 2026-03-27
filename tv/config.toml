@@ -11,9 +11,79 @@ theme = "tokyonight"
   "git merge",
   "git rebase",
   "git diff",
+  "git branch -d",
+  "git branch -D",
+  "git push origin",
 ]
-"git-log" = ["git show", "git revert"]
+# Git
+"git-log" = [
+  "git show", "git revert", "git cherry-pick",
+  "git reset",
+]
+"git-stash" = [
+  "git stash apply", "git stash pop",
+  "git stash drop", "git stash show",
+  "git stash branch",
+]
+"git-worktrees" = ["git worktree remove"]
+"git-tags" = ["git tag -d"]
+"git-remotes" = ["git remote remove", "git remote show"]
+"git-submodules" = ["git submodule update"]
+
+# Files and directories
 "dirs" = ["cd", "ls", "z"]
-"files" = ["cat", "bat", "nvim", "vim", "less"]
+"files" = [
+  "cat", "bat", "nvim", "vim", "less",
+  "head", "tail", "wc", "chmod", "cp", "mv",
+  "rm", "diff",
+]
+"dotfiles" = ["chezmoi"]
+
+# Shell
 "zsh-history" = ["!"]
 "env" = ["export", "unset"]
+"alias" = ["unalias"]
+"man-pages" = ["man"]
+"path" = ["which"]
+
+# System
+"procs" = ["kill", "killall"]
+"ssh-hosts" = ["ssh", "scp", "rsync"]
+"mounts" = ["umount"]
+"crontab" = ["crontab"]
+
+# Tmux
+"tmux-sessions" = [
+  "tmux attach", "tmux switch", "tmux kill-session",
+]
+"tmux-windows" = ["tmux select-window"]
+
+# Packages
+"brew-packages" = [
+  "brew uninstall", "brew info",
+  "brew upgrade", "brew reinstall",
+]
+"npm-packages" = ["npm uninstall", "npm info"]
+"npm-scripts" = ["npm run"]
+
+# GitHub
+"gh-prs" = [
+  "gh pr view", "gh pr checkout",
+  "gh pr close", "gh pr merge", "gh pr diff",
+]
+"gh-issues" = [
+  "gh issue view", "gh issue close",
+  "gh issue comment",
+]
+
+# Docker
+"docker-containers" = [
+  "docker stop", "docker start",
+  "docker restart", "docker logs", "docker exec",
+]
+"docker-images" = [
+  "docker rmi", "docker inspect",
+]
+
+# Build
+"make-targets" = ["make"]
