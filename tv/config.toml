@@ -11,14 +11,19 @@ theme = "tokyonight"
   "git merge",
   "git rebase",
   "git diff",
+  "git branch -d",
+  "git branch -D",
+  "git push origin",
 ]
 # Git
 "git-log" = [
   "git show", "git revert", "git cherry-pick",
+  "git reset",
 ]
 "git-stash" = [
   "git stash apply", "git stash pop",
   "git stash drop", "git stash show",
+  "git stash branch",
 ]
 "git-worktrees" = ["git worktree remove"]
 "git-tags" = ["git tag -d"]
