@@ -96,6 +96,20 @@ keybindings:
             'nvim -c ":silent Octo pr edit {{.PrNumber}}"'
         - key: O
           builtin: checkout
+        - key: V
+          name: review & merge
+          command: >
+            echo "Review comment for PR #{{.PrNumber}}:";
+            read -r comment;
+            gh pr review {{.PrNumber}} --repo {{.RepoName}}
+            --approve --body "$comment" &&
+            gh pr merge {{.PrNumber}} --repo {{.RepoName}}
+            --squash
+        - key: M
+          name: merge PR
+          command: >
+            gh pr merge {{.PrNumber}} --repo {{.RepoName}}
+            --squash
         - key: R
           name: request reviewer
           command: >
