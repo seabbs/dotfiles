@@ -33,7 +33,7 @@ return {
       send_text(text)
     end
 
-    -- Send line(s): supports count, e.g. 5<leader>sc
+    -- Send line(s): supports count, e.g. 5<leader>rc
     vim.keymap.set("n", "<leader>rc", function()
       local cursor = vim.api.nvim_win_get_cursor(0)[1]
       local count = vim.v.count1
@@ -43,6 +43,19 @@ return {
       send_text(table.concat(lines, "\n"))
     end, { desc = "Send line(s) to REPL" })
 
+    -- Send line(s) and advance
+    vim.keymap.set("n", "<leader>rC", function()
+      local cursor = vim.api.nvim_win_get_cursor(0)[1]
+      local count = vim.v.count1
+      local lines = vim.api.nvim_buf_get_lines(
+        0, cursor - 1, cursor - 1 + count, false
+      )
+      send_text(table.concat(lines, "\n"))
+      local total = vim.api.nvim_buf_line_count(0)
+      local target = math.min(cursor + count, total)
+      vim.api.nvim_win_set_cursor(0, { target, 0 })
+    end, { desc = "Send line(s) + advance" })
+
     -- Send visual selection (use slime's built-in)
     vim.keymap.set("x", "<leader>rc", "<Plug>SlimeRegionSend",
       { desc = "Send selection to REPL" })
@@ -51,6 +64,27 @@ return {
     vim.keymap.set("n", "<leader>rp",
       "<Plug>SlimeParagraphSend",
       { desc = "Send paragraph to REPL" })
+
+    -- Send paragraph and advance
+    vim.keymap.set("n", "<leader>rP", function()
+      vim.cmd("normal \<Plug>SlimeParagraphSend")
+      -- Move past blank lines to next paragraph
+      local cursor = vim.api.nvim_win_get_cursor(0)[1]
+      local total = vim.api.nvim_buf_line_count(0)
+      local lines = vim.api.nvim_buf_get_lines(
+        0, 0, -1, false
+      )
+      local i = cursor
+      while i <= total and lines[i] ~= "" do
+        i = i + 1
+      end
+      while i <= total and lines[i] == "" do
+        i = i + 1
+      end
+      if i <= total then
+        vim.api.nvim_win_set_cursor(0, { i, 0 })
+      end
+    end, { desc = "Send paragraph + advance" })
 
     -- Send file
     vim.keymap.set("n", "<leader>rf", function()
@@ -65,6 +99,58 @@ return {
       local cursor = vim.api.nvim_win_get_cursor(0)[1]
       send_lines(1, cursor)
     end, { desc = "Send up to cursor" })
+
+    -- Find top-level treesitter statement at cursor
+    local function find_statement()
+      local ts = vim.treesitter
+      local node = ts.get_node()
+      if not node then return nil end
+      -- Walk up to the nearest node whose parent is
+      -- the root or a function body
+      while node:parent() do
+        local parent = node:parent()
+        local pt = parent:type()
+        if pt == "program" or pt == "chunk"
+          or pt == "source_file"
+          or pt:match("body")
+          or pt:match("block") then
+          break
+        end
+        node = parent
+      end
+      return node
+    end
+
+    -- Send statement (treesitter-aware)
+    vim.keymap.set("n", "<leader>rs", function()
+      local node = find_statement()
+      if node then
+        local sr, _, er, _ = node:range()
+        send_lines(sr + 1, er + 1)
+      else
+        vim.notify(
+          "No statement found at cursor",
+          vim.log.levels.WARN
+        )
+      end
+    end, { desc = "Send statement to REPL" })
+
+    -- Send statement and advance
+    vim.keymap.set("n", "<leader>rS", function()
+      local node = find_statement()
+      if node then
+        local sr, _, er, _ = node:range()
+        send_lines(sr + 1, er + 1)
+        local total = vim.api.nvim_buf_line_count(0)
+        local target = math.min(er + 2, total)
+        vim.api.nvim_win_set_cursor(0, { target, 0 })
+      else
+        vim.notify(
+          "No statement found at cursor",
+          vim.log.levels.WARN
+        )
+      end
+    end, { desc = "Send statement + advance" })
 
     -- Send function (treesitter-aware)
     vim.keymap.set("n", "<leader>rF", function()
@@ -118,6 +204,17 @@ return {
           desc = "Send code block to REPL",
         })
 
+        vim.keymap.set("n", "<leader>rB", function()
+          local code = quarto.get_code_block()
+          if code ~= "" then
+            send_text(code)
+          end
+          quarto.next_block()
+        end, {
+          buffer = true,
+          desc = "Send code block + advance",
+        })
+
         vim.keymap.set("n", "<leader>ra", function()
           local code = quarto.get_all_code_blocks()
           if code ~= "" then
@@ -168,6 +265,17 @@ return {
         end, {
           buffer = true,
           desc = "Send code block to REPL",
+        })
+
+        vim.keymap.set("n", "<leader>rB", function()
+          local code = literate.get_code_block()
+          if code ~= "" then
+            send_text(code)
+          end
+          literate.next_block()
+        end, {
+          buffer = true,
+          desc = "Send code block + advance",
         })
 
         vim.keymap.set("n", "<leader>ra", function()
