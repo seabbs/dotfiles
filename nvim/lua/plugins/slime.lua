@@ -67,12 +67,19 @@ return {
 
     -- Send paragraph and advance
     vim.keymap.set("n", "<leader>rP", function()
-      -- Find paragraph boundaries (non-empty lines)
       local cursor = vim.api.nvim_win_get_cursor(0)[1]
       local total = vim.api.nvim_buf_line_count(0)
       local lines = vim.api.nvim_buf_get_lines(
         0, 0, -1, false
       )
+      -- Skip if cursor is on a blank line
+      if lines[cursor] == "" then
+        vim.notify(
+          "No paragraph at cursor",
+          vim.log.levels.INFO
+        )
+        return
+      end
       -- Find start of current paragraph
       local ps = cursor
       while ps > 1 and lines[ps - 1] ~= "" do
@@ -114,15 +121,19 @@ return {
       local ts = vim.treesitter
       local node = ts.get_node()
       if not node then return nil end
+      local root_types = {
+        program = true,
+        chunk = true,
+        source_file = true,
+        function_body = true,
+        brace_list = true,  -- R
+        block = true,       -- Julia/Python
+      }
       -- Walk up to the nearest node whose parent is
-      -- the root or a function body
+      -- a root or function body container
       while node:parent() do
         local parent = node:parent()
-        local pt = parent:type()
-        if pt == "program" or pt == "chunk"
-          or pt == "source_file"
-          or pt:match("body")
-          or pt:match("block") then
+        if root_types[parent:type()] then
           break
         end
         node = parent
@@ -217,8 +228,8 @@ return {
           local code = quarto.get_code_block()
           if code ~= "" then
             send_text(code)
+            quarto.next_block()
           end
-          quarto.next_block()
         end, {
           buffer = true,
           desc = "Send code block + advance",
@@ -280,8 +291,8 @@ return {
           local code = literate.get_code_block()
           if code ~= "" then
             send_text(code)
+            literate.next_block()
           end
-          literate.next_block()
         end, {
           buffer = true,
           desc = "Send code block + advance",
