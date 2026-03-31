@@ -67,17 +67,26 @@ return {
 
     -- Send paragraph and advance
     vim.keymap.set("n", "<leader>rP", function()
-      vim.cmd("normal \<Plug>SlimeParagraphSend")
-      -- Move past blank lines to next paragraph
+      -- Find paragraph boundaries (non-empty lines)
       local cursor = vim.api.nvim_win_get_cursor(0)[1]
       local total = vim.api.nvim_buf_line_count(0)
       local lines = vim.api.nvim_buf_get_lines(
         0, 0, -1, false
       )
-      local i = cursor
-      while i <= total and lines[i] ~= "" do
-        i = i + 1
+      -- Find start of current paragraph
+      local ps = cursor
+      while ps > 1 and lines[ps - 1] ~= "" do
+        ps = ps - 1
       end
+      -- Find end of current paragraph
+      local pe = cursor
+      while pe < total and lines[pe + 1] ~= "" do
+        pe = pe + 1
+      end
+      -- Send the paragraph
+      send_lines(ps, pe)
+      -- Advance past blank lines to next paragraph
+      local i = pe + 1
       while i <= total and lines[i] == "" do
         i = i + 1
       end
