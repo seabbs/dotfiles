@@ -48,7 +48,7 @@ list_sessions() {
     sid=$(basename "$f" .json)
 
     # Stale detection: pane gone or idle/waiting over 24h
-    local pane_id age
+    local pane_id age age_str
     pane_id=$(printf '%s' "$data" | jq -r '.tmux_pane // empty')
     age=$(( now - updated ))
     if [ -n "$pane_id" ] && [ -n "$panes" ]; then
@@ -79,8 +79,6 @@ list_sessions() {
     esac
 
     # Age since last update
-    local age=$(( now - updated ))
-    local age_str
     if [ "$age" -lt 60 ]; then
       age_str="${age}s"
     elif [ "$age" -lt 3600 ]; then
