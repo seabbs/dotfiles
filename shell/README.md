@@ -5,8 +5,8 @@
 Tmux workflow functions for Claude Code development.
 
 **Session management:**
-- `agent [project] [worktree]` - Start agent session (just happy)
-- `proj <name>` - Start full project session (nvim + happy + repl)
+- `agent [project] [worktree]` - Start agent session (just ai)
+- `proj <name>` - Start full project session (nvim + ai + repl)
 - `agent-to-proj` - Convert agent session to full project layout
 
 Both `agent` and `proj` support partial name matching:

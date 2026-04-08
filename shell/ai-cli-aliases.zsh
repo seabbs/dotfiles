@@ -280,7 +280,7 @@ proj() {
     tmux select-pane -t "$t.0" -T "nvim"
     tmux send-keys -t "$t.0" "nvim ." Enter
     tmux split-window -t "$t" -h -c "$wt"
-    tmux select-pane -t "$t.1" -T "happy:$branch"
+    tmux select-pane -t "$t.1" -T "ai:$branch"
     tmux send-keys -t "$t.1" \
       "${AGENT_CLI_DEV_TOOL}" Enter
     tmux split-window -t "$t.1" -v -c "$wt"
@@ -344,9 +344,9 @@ feat() {
   tmux select-pane -T "nvim"
   tmux send-keys "nvim ." Enter
 
-  # Pane 1: happy (top-right)
+  # Pane 1: ai (top-right)
   tmux split-window -h -c "$worktree_path"
-  tmux select-pane -T "happy:$branch"
+  tmux select-pane -T "ai:$branch"
   tmux send-keys "${AGENT_CLI_DEV_TOOL}" Enter
 
   # Pane 2: REPL (bottom-right)
@@ -637,7 +637,7 @@ agent-feat() {
   else
     # In tmux - just add window to current session
     tmux new-window -n "$branch" -c "$worktree_path"
-    tmux select-pane -T "happy:$branch"
+    tmux select-pane -T "ai:$branch"
     tmux send-keys "${AGENT_CLI_DEV_TOOL}" Enter
     echo "Created agent window: $branch"
   fi
@@ -710,15 +710,15 @@ agent-to-proj() {
   fi
 
   # Rename current pane
-  tmux select-pane -T "happy:main"
+  tmux select-pane -T "ai:main"
 
   # Add nvim pane to the left
   tmux split-window -hb -c "$work_dir"
   tmux select-pane -T "nvim"
   tmux send-keys "nvim ." Enter
 
-  # Add REPL pane below happy
-  tmux select-pane -t 1  # Go back to happy pane
+  # Add REPL pane below ai
+  tmux select-pane -t 1  # Go back to ai pane
   tmux split-window -v -c "$work_dir"
   tmux select-pane -T "repl"
   tmux send-keys "$repl" Enter

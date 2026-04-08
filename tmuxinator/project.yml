@@ -3,7 +3,7 @@
 #
 # Creates a session with:
 #   - nvim (left pane, 50%)
-#   - happy (top-right pane, 25%)
+#   - ai (top-right pane, 25%)
 #   - R or Julia REPL (bottom-right pane, 25%, auto-detected)
 
 name: <%= @args[0] %>
@@ -14,7 +14,7 @@ startup_window: main
 on_project_start: |
   # Set pane titles after layout is created
   tmux select-pane -t 0 -T "nvim"
-  tmux select-pane -t 1 -T "happy:main"
+  tmux select-pane -t 1 -T "ai:main"
   tmux select-pane -t 2 -T "repl"
 
 windows:
@@ -22,7 +22,7 @@ windows:
       layout: main-vertical
       panes:
         - nvim .
-        - happy
+        - ${AGENT_CLI_DEV_TOOL:-claude}
         - >-
           if [ -f Project.toml ]; then
             julia --project=.
