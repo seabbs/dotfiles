@@ -26,7 +26,7 @@
   TMUX WINDOWS
   ----------------------------------------------------------------
   Ctrl-Space c     new window
-  Ctrl-Space D     dev layout (nvim | happy / repl)
+  Ctrl-Space D     dev layout (nvim | ai / repl)
   Ctrl-Space 1..9  switch to window N
 
   TMUX SESSIONS
@@ -59,8 +59,8 @@
 
   SHELL: PROJECT MANAGEMENT
   ----------------------------------------------------------------
-  proj <name> [branch]     open full project (nvim + happy + repl)
-  agent [name] [worktree]  open agent session (happy only)
+  proj <name> [branch]     open full project (nvim + ai + repl)
+  agent [name] [worktree]  open agent session (ai only)
   agent-to-proj            upgrade agent to full project layout
   gproj / gagent           gemini variants of proj / agent
   lsproj [filter]          list available projects

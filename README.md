@@ -30,7 +30,7 @@ bash scripts/link.sh
 | `bat/` | Bat (syntax-highlighted cat) configuration |
 | `brew/` | Homebrew installation |
 | `claude/` | Claude Code config (submodule: [seabbs/claude](https://github.com/seabbs/claude)) |
-| `cli/` | CLI tools (gh, docker, claude-code, happy, etc.) |
+| `cli/` | CLI tools (gh, docker, claude-code, etc.) |
 | `gh/` | GitHub CLI and gh-dash configuration |
 | `git/` | Git config (delta, gitignore) |
 | `ghostty/` | Ghostty terminal configuration |
