@@ -7,6 +7,7 @@
 #   SessionEnd        → (removes file)
 #   UserPromptSubmit  → running
 #   PreToolUse        → running
+#   PostToolUse       → running
 #   Stop              → waiting (just finished a turn)
 #   Notification      → permission | idle (done, needs input)
 
@@ -30,7 +31,7 @@ fi
 
 # Map event to state
 case "$EVENT" in
-  SessionStart|UserPromptSubmit|PreToolUse)
+  SessionStart|UserPromptSubmit|PreToolUse|PostToolUse)
     STATE="running"
     ;;
   Stop)
