@@ -37,7 +37,7 @@ case "$EVENT" in
     ;;
   Notification)
     MATCHER=$(printf '%s' "$INPUT" \
-      | jq -r '.matcher_value // empty')
+      | jq -r '.notification_type // empty')
     case "$MATCHER" in
       permission_prompt) STATE="permission" ;;
       idle_prompt)       STATE="idle" ;;
@@ -65,6 +65,7 @@ if [ -n "$PANE_ID" ]; then
   fi
 fi
 
+TMP_FILE=$(mktemp "$STATUS_DIR/.tmp.XXXXXX")
 jq -n \
   --arg state "$STATE" \
   --arg cwd "$CWD" \
@@ -78,6 +79,7 @@ jq -n \
     tmux_pane:$pane,tmux_session:$ts,
     tmux_window:$tw,tmux_window_name:$twn,
     updated:$updated}' \
-  > "$STATUS_FILE"
+  > "$TMP_FILE" \
+  && mv "$TMP_FILE" "$STATUS_FILE"
 
 exit 0
