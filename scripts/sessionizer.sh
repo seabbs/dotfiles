@@ -12,6 +12,7 @@
 #   Ctrl-a  show all (sessions + projects)
 #   Ctrl-s  show active sessions only
 #   Ctrl-p  show projects only
+#   Ctrl-w  show worktrees across all repos
 #   Ctrl-d  kill selected session
 #   Enter   switch to / create session
 
@@ -40,6 +41,27 @@ list_projects() {
   done
 }
 
+list_worktrees() {
+  for org_dir in "$CODE_DIR"/*/; do
+    org=$(basename "$org_dir")
+    [[ "$org" == "archive" ]] && continue
+    for proj_dir in "$org_dir"/*/; do
+      [[ ! -d "$proj_dir" ]] && continue
+      proj=$(basename "$proj_dir")
+      [[ "$proj" == "worktrees" ]] && continue
+      [[ "$proj" == worktree-* ]] && continue
+      [[ "$proj" == .* ]] && continue
+      local wt_dir="$proj_dir/worktrees"
+      [[ ! -d "$wt_dir" ]] && continue
+      for branch_dir in "$wt_dir"/*/; do
+        [[ ! -d "$branch_dir" ]] && continue
+        branch=$(basename "$branch_dir")
+        echo "$org/$proj :: $branch"
+      done
+    done
+  done
+}
+
 list_all() {
   list_sessions
   echo "────────────"
@@ -56,8 +78,9 @@ list_windows() {
 case "${1:-}" in
   --list-all)      list_all; exit 0 ;;
   --list-sessions) list_sessions; exit 0 ;;
-  --list-projects) list_projects; exit 0 ;;
-  --list-windows)  list_windows "$2"; exit 0 ;;
+  --list-projects)   list_projects; exit 0 ;;
+  --list-worktrees)  list_worktrees; exit 0 ;;
+  --list-windows)    list_windows "$2"; exit 0 ;;
   --kill-session)
     tmux kill-session -t "=$2" 2>/dev/null
     exit 0
@@ -102,11 +125,12 @@ selected=$(list_all | fzf \
   --border-label ' sessions ' \
   --prompt '  ' \
   --header \
-    'C-a all  C-s sessions  C-p projects  C-d kill' \
+    'C-a all  C-s sessions  C-p projects  C-w worktrees  C-d kill' \
   --bind 'tab:down,btab:up' \
   --bind "ctrl-a:change-prompt(  )+reload($0 --list-all)" \
   --bind "ctrl-s:change-prompt(  )+reload($0 --list-sessions)" \
   --bind "ctrl-p:change-prompt(  )+reload($0 --list-projects)" \
+  --bind "ctrl-w:change-prompt(  )+reload($0 --list-worktrees)" \
   --bind "ctrl-d:execute-silent($0 --kill-session {2..})+reload($0 --list-all)" \
 )
 
@@ -116,6 +140,60 @@ selected=$(list_all | fzf \
 # Resolve session name
 if [[ "$selected" == "[active] "* ]]; then
   session="${selected#\[active\] }"
+
+elif [[ "$selected" == *" :: "* ]]; then
+  # Worktree selection: org/repo :: branch
+  local_project="${selected%% :: *}"
+  branch="${selected##* :: }"
+  project="${local_project##*/}"
+  project_root="$CODE_DIR/$local_project"
+  worktree_path="$project_root/worktrees/$branch"
+  session="$project"
+
+  # Ensure tmux session exists for the repo
+  if ! tmux has-session -t "=$session" 2>/dev/null; then
+    tmuxinator start project \
+      "$session" "$project_root" --no-attach
+  fi
+
+  # Check if window for this branch already exists
+  existing_win=$(
+    tmux list-windows -t "=$session" \
+      -F '#{window_index}:#{window_name}' 2>/dev/null \
+      | while IFS= read -r line; do
+          [[ "${line#*:}" == "$branch" ]] && echo "$line" \
+            && break
+        done
+  )
+
+  if [[ -n "$existing_win" ]]; then
+    win_index="${existing_win%%:*}"
+    tmux switch-client -t "=$session"
+    tmux select-window -t "=$session:$win_index"
+  else
+    # Create window with feat layout at worktree path
+    repl="zsh"
+    if [[ -f "$worktree_path/Project.toml" ]]; then
+      repl="julia --project=."
+    elif [[ -f "$worktree_path/DESCRIPTION" ]]; then
+      repl="R"
+    fi
+
+    tmux new-window -t "=$session" -n "$branch" \
+      -c "$worktree_path"
+    tmux select-pane -T "nvim"
+    tmux send-keys "nvim ." Enter
+    tmux split-window -h -c "$worktree_path"
+    tmux select-pane -T "ai:$branch"
+    tmux send-keys "${AGENT_CLI_DEV_TOOL:-claude}" Enter
+    tmux split-window -v -c "$worktree_path"
+    tmux select-pane -T "repl"
+    tmux send-keys "$repl" Enter
+    tmux select-pane -t 0
+    tmux switch-client -t "=$session"
+  fi
+  exit 0
+
 else
   # Project path: create session if needed
   project="${selected##*/}"

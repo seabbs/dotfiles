@@ -84,4 +84,13 @@ jq -n \
   > "$TMP_FILE" \
   && mv "$TMP_FILE" "$STATUS_FILE"
 
+# Deliver inbox messages when session is waiting for input
+if [ "$STATE" = "waiting" ] || [ "$STATE" = "idle" ]; then
+  INBOX_FILE="$HOME/.claude/inbox/$SESSION_ID.md"
+  if [ -f "$INBOX_FILE" ]; then
+    DELIVER="$HOME/code/seabbs/dotfiles/scripts/claude-inbox-deliver.sh"
+    [ -x "$DELIVER" ] && "$DELIVER" "$SESSION_ID" &
+  fi
+fi
+
 exit 0
