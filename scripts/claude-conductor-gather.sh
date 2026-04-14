@@ -10,6 +10,7 @@
 STATUS_DIR="$HOME/.claude/session-monitor"
 HISTORY="$HOME/.claude/history.jsonl"
 SESSIONS_DIR="$HOME/.claude/sessions"
+PROJECTS_DIR="$HOME/.claude/projects"
 
 [ -d "$STATUS_DIR" ] || { echo '{"sessions":[]}'; exit 0; }
 
@@ -75,6 +76,23 @@ for f in "$STATUS_DIR"/*.json; do
       | jq -R -s 'split("\n") | map(select(. != ""))')
   fi
 
+  # Last assistant response from project JSONL
+  # Path encoding: / and . in cwd become -
+  LAST_RESPONSE=""
+  if [ -n "$CWD" ]; then
+    ENCODED=$(printf '%s' "$CWD" | tr '/.' '--')
+    PROJ_FILE="$PROJECTS_DIR/$ENCODED/$SID.jsonl"
+    if [ -f "$PROJ_FILE" ]; then
+      LAST_RESPONSE=$(tail -100 "$PROJ_FILE" \
+        | jq -r 'select(.type == "assistant")
+                 | .message.content[]?
+                 | select(.type == "text")
+                 | .text' 2>/dev/null \
+        | tail -1 \
+        | cut -c1-200)
+    fi
+  fi
+
   # Sort key
   case "$STATE" in
     permission) SORT=1 ;;
@@ -109,6 +127,7 @@ for f in "$STATUS_DIR"/*.json; do
     --arg age "$AGE_STR" \
     --argjson sort "$SORT" \
     --argjson prompts "$PROMPTS" \
+    --arg last_response "$LAST_RESPONSE" \
     -n '$sessions + [{
       session_id: $sid,
       state: $state,
@@ -122,7 +141,8 @@ for f in "$STATUS_DIR"/*.json; do
       tmux_pane: $pane,
       age: $age,
       sort_key: $sort,
-      recent_prompts: $prompts
+      recent_prompts: $prompts,
+      last_response: $last_response
     }]' > /tmp/_conductor_sessions.json
 done
 
