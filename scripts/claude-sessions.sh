@@ -14,43 +14,42 @@ STATUS_DIR="$HOME/.claude/session-monitor"
 
 clean_stale() {
   [ -d "$STATUS_DIR" ] || return 0
+  local files
+  files=("$STATUS_DIR"/*.json)
+  [ -f "${files[0]}" ] || return 0
   local panes
   panes=$(tmux list-panes -a -F '#{pane_id}' 2>/dev/null)
-  for f in "$STATUS_DIR"/*.json; do
-    [ -f "$f" ] || continue
-    local pane
-    pane=$(jq -r '.tmux_pane // empty' "$f")
+  while IFS=$'\t' read -r filepath pane; do
     [ -z "$pane" ] && continue
     if ! printf '%s\n' "$panes" \
         | grep -qF "$pane"; then
-      rm -f "$f"
+      rm -f "$filepath"
     fi
-  done
+  done < <(
+    jq -r '[input_filename, .tmux_pane // ""] | @tsv' "${files[@]}"
+  )
 }
 
 list_sessions() {
   local filter="${1:-}"
   [ -d "$STATUS_DIR" ] || return 0
+  local files
+  files=("$STATUS_DIR"/*.json)
+  [ -f "${files[0]}" ] || return 0
   local now panes
   now=$(date +%s)
   panes=$(tmux list-panes -a -F '#{pane_id}' 2>/dev/null)
 
-  for f in "$STATUS_DIR"/*.json; do
-    [ -f "$f" ] || continue
-
-    local data state project ts tw updated sid
-    data=$(cat "$f")
-    state=$(printf '%s' "$data" | jq -r '.state')
-    project=$(printf '%s' "$data" | jq -r '.project')
-    ts=$(printf '%s' "$data" | jq -r '.tmux_session')
-    tw=$(printf '%s' "$data" | jq -r '.tmux_window')
-    updated=$(printf '%s' "$data" | jq -r '.updated')
-    sid=$(basename "$f" .json)
+  # Single jq call reads every session file in one fork.
+  jq -r '[input_filename, .state, .project, .tmux_session,
+          .tmux_window, .updated,
+          .tmux_pane // ""] | @tsv' "${files[@]}" |
+  while IFS=$'\t' read -r filepath state project ts tw updated pane_id; do
+    local sid age age_str
+    sid=$(basename "$filepath" .json)
+    age=$(( now - updated ))
 
     # Stale detection: pane gone or idle/waiting over 24h
-    local pane_id age age_str
-    pane_id=$(printf '%s' "$data" | jq -r '.tmux_pane // empty')
-    age=$(( now - updated ))
     if [ -n "$pane_id" ] && [ -n "$panes" ]; then
       if ! printf '%s\n' "$panes" \
           | grep -qF "$pane_id"; then
@@ -74,7 +73,7 @@ list_sessions() {
       waiting)    icon="◐" ;;
       idle)       icon="○" ;;
       permission) icon="▲" ;;
-      stale)       icon="✗" ;;
+      stale)      icon="✗" ;;
       *)          icon="?" ;;
     esac
 
@@ -101,7 +100,7 @@ list_sessions() {
       running)    sort_key=2 ;;
       waiting)    sort_key=3 ;;
       idle)       sort_key=4 ;;
-      stale)       sort_key=5 ;;
+      stale)      sort_key=5 ;;
       *)          sort_key=9 ;;
     esac
 
@@ -116,15 +115,14 @@ list_sessions() {
 
 count_sessions() {
   [ -d "$STATUS_DIR" ] || { echo 0; return; }
-  local count=0
-  local permission=0
-  for f in "$STATUS_DIR"/*.json; do
-    [ -f "$f" ] || continue
+  local files
+  files=("$STATUS_DIR"/*.json)
+  [ -f "${files[0]}" ] || { echo 0; return; }
+  local count=0 permission=0
+  while read -r state; do
     count=$(( count + 1 ))
-    local state
-    state=$(jq -r '.state' "$f")
     [ "$state" = "permission" ] && permission=$(( permission + 1 ))
-  done
+  done < <(jq -r '.state' "${files[@]}")
   if [ "$permission" -gt 0 ]; then
     printf "%d (▲%d)" "$count" "$permission"
   else
@@ -137,11 +135,10 @@ switch_to() {
   local f="$STATUS_DIR/$sid.json"
   [ -f "$f" ] || exit 1
 
-  local data pane ts tw
-  data=$(cat "$f")
-  pane=$(printf '%s' "$data" | jq -r '.tmux_pane')
-  ts=$(printf '%s' "$data" | jq -r '.tmux_session')
-  tw=$(printf '%s' "$data" | jq -r '.tmux_window')
+  local pane ts tw
+  IFS=$'\t' read -r pane ts tw < <(
+    jq -r '[.tmux_pane, .tmux_session, .tmux_window] | @tsv' "$f"
+  )
 
   [ -z "$ts" ] && exit 1
   tmux switch-client -t "=$ts"
@@ -151,17 +148,15 @@ switch_to() {
 
 status_bar() {
   [ -d "$STATUS_DIR" ] || return 0
+  local files
+  files=("$STATUS_DIR"/*.json)
+  [ -f "${files[0]}" ] || return 0
   local now panes
   now=$(date +%s)
   panes=$(tmux list-panes -a -F '#{pane_id}' 2>/dev/null)
   local total=0 running=0 permission=0 waiting=0 idle=0
-  for f in "$STATUS_DIR"/*.json; do
-    [ -f "$f" ] || continue
-    local state updated pane_id age
-    state=$(jq -r '.state' "$f")
-    updated=$(jq -r '.updated' "$f")
-    pane_id=$(jq -r '.tmux_pane // empty' "$f")
-    age=$(( now - updated ))
+  while IFS=$'\t' read -r state updated pane_id; do
+    local age=$(( now - updated ))
     # Skip stale: pane gone or stale over 24h
     if [ -n "$pane_id" ] && [ -n "$panes" ]; then
       printf '%s\n' "$panes" \
@@ -176,7 +171,7 @@ status_bar() {
       waiting)    waiting=$(( waiting + 1 )) ;;
       idle)       idle=$(( idle + 1 )) ;;
     esac
-  done
+  done < <(jq -r '[.state, .updated, .tmux_pane // ""] | @tsv' "${files[@]}")
   [ "$total" -eq 0 ] && return 0
 
   # Build segments
@@ -201,16 +196,16 @@ status_bar() {
 
 purge_stale() {
   [ -d "$STATUS_DIR" ] || return 0
+  local files
+  files=("$STATUS_DIR"/*.json)
+  [ -f "${files[0]}" ] || {
+    printf "Purged 0 stale session(s)\n"; return 0;
+  }
   local now panes count=0
   now=$(date +%s)
   panes=$(tmux list-panes -a -F '#{pane_id}' 2>/dev/null)
-  for f in "$STATUS_DIR"/*.json; do
-    [ -f "$f" ] || continue
-    local pane state updated age remove=false
-    pane=$(jq -r '.tmux_pane // empty' "$f")
-    state=$(jq -r '.state' "$f")
-    updated=$(jq -r '.updated' "$f")
-    age=$(( now - updated ))
+  while IFS=$'\t' read -r filepath pane state updated; do
+    local age=$(( now - updated )) remove=false
     # Pane gone
     if [ -n "$pane" ] && [ -n "$panes" ]; then
       printf '%s\n' "$panes" \
@@ -222,10 +217,13 @@ purge_stale() {
       remove=true
     fi
     if [ "$remove" = true ]; then
-      rm -f "$f"
+      rm -f "$filepath"
       count=$(( count + 1 ))
     fi
-  done
+  done < <(
+    jq -r '[input_filename, .tmux_pane // "",
+            .state, .updated] | @tsv' "${files[@]}"
+  )
   printf "Purged %d stale session(s)\n" "$count"
 }
 
