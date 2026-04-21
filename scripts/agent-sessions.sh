@@ -1,16 +1,16 @@
 #!/bin/bash
-# claude-sessions.sh — tmux popup: list and switch to Claude sessions
-# Reads state from ~/.claude/session-monitor/
+# agent-sessions.sh — tmux popup: list and switch to AI CLI agent sessions
+# Reads state from ~/.agent/session-monitor/
 #
 # Usage:
-#   claude-sessions.sh            interactive fzf picker
-#   claude-sessions.sh --list     list sessions (for scripting)
-#   claude-sessions.sh --count    count active sessions
-#   claude-sessions.sh --status   tmux status bar segment
-#   claude-sessions.sh --clean    remove stale entries
-#   claude-sessions.sh --switch ID  switch to session by ID
+#   agent-sessions.sh            interactive fzf picker
+#   agent-sessions.sh --list     list sessions (for scripting)
+#   agent-sessions.sh --count    count active sessions
+#   agent-sessions.sh --status   tmux status bar segment
+#   agent-sessions.sh --clean    remove stale entries
+#   agent-sessions.sh --switch ID  switch to session by ID
 
-STATUS_DIR="$HOME/.claude/session-monitor"
+STATUS_DIR="$HOME/.agent/session-monitor"
 
 clean_stale() {
   [ -d "$STATUS_DIR" ] || return 0
@@ -43,8 +43,8 @@ list_sessions() {
   # Single jq call reads every session file in one fork.
   jq -r '[input_filename, .state, .project, .tmux_session,
           .tmux_window, .updated,
-          .tmux_pane // ""] | @tsv' "${files[@]}" |
-  while IFS=$'\t' read -r filepath state project ts tw updated pane_id; do
+          .tmux_pane // "", .agent // "claude"] | @tsv' "${files[@]}" |
+  while IFS=$'\t' read -r filepath state project ts tw updated pane_id agent; do
     local sid age age_str
     sid=$(basename "$filepath" .json)
     age=$(( now - updated ))
@@ -92,6 +92,14 @@ list_sessions() {
       location="$ts:$tw"
     fi
 
+    # Agent label
+    local agent_label
+    case "$agent" in
+      claude) agent_label="C" ;;
+      gemini) agent_label="G" ;;
+      *)      agent_label="?" ;;
+    esac
+
     # Sort: permission > running > waiting > idle > stale
     # Within same state, sort by recency (most recent first)
     local sort_key
@@ -107,8 +115,8 @@ list_sessions() {
     # Pad updated to fixed width for secondary sort (descending)
     local inv_updated=$(( 9999999999 - updated ))
 
-    printf "%d\t%010d\t%s %-10s\t%-20s\t%-15s\t%s\t%s\n" \
-      "$sort_key" "$inv_updated" "$icon" "$state" \
+    printf "%d\t%010d\t%s [%s] %-10s\t%-20s\t%-15s\t%s\t%s\n" \
+      "$sort_key" "$inv_updated" "$icon" "$agent_label" "$state" \
       "$project" "$location" "$age_str" "$sid"
   done | sort -t$'\t' -k1,1n -k2,2n | cut -f3-
 }
@@ -243,8 +251,8 @@ clean_stale
 sessions=$(list_sessions)
 
 if [ -z "$sessions" ]; then
-  printf "\n  No active Claude sessions.\n"
-  printf "  Sessions are tracked via Claude Code hooks.\n\n"
+  printf "\n  No active agent sessions.\n"
+  printf "  Sessions are tracked via CLI agent hooks.\n\n"
   read -r -n 1
   exit 0
 fi
@@ -253,7 +261,7 @@ selected=$(printf '%s\n' "$sessions" | fzf \
   --no-sort \
   --delimiter=$'\t' \
   --with-nth=1..4 \
-  --border-label ' claude sessions ' \
+  --border-label ' agent sessions ' \
   --prompt ' all  ' \
   --header $'C-r refresh  C-a all  C-p ▲perm  C-o ●run  C-w ◐wait  C-i ○idle  C-x ✗stale  C-d purge' \
   --bind 'tab:down,btab:up' \

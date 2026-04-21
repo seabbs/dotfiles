@@ -6,6 +6,7 @@
   Ctrl-Space G     GitHub dashboard (global)
   Ctrl-Space g     GitHub dashboard (current repo)
   Ctrl-Space A     AI agent popup (ephemeral, current dir)
+  Ctrl-Space a     AI session switcher (list active agents)
   Ctrl-Space T     btop system monitor
   Ctrl-Space t     scratch terminal
   Ctrl-Space C-g   lazygit popup (current dir)

@@ -1,0 +1,44 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "$HOME/code/seabbs/dotfiles/scripts/agent-session-track.sh gemini SessionStart"
+          }
+        ]
+      }
+    ],
+    "SessionEnd": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "$HOME/code/seabbs/dotfiles/scripts/agent-session-track.sh gemini SessionEnd"
+          }
+        ]
+      }
+    ],
+    "BeforeAgent": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "$HOME/code/seabbs/dotfiles/scripts/agent-session-track.sh gemini BeforeAgent"
+          }
+        ]
+      }
+    ],
+    "AfterAgent": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "$HOME/code/seabbs/dotfiles/scripts/agent-session-track.sh gemini AfterAgent"
+          }
+        ]
+      }
+    ]
+  }
+}

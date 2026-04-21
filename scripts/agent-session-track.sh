@@ -1,26 +1,38 @@
 #!/bin/bash
-# claude-session-track.sh — Claude Code hook for session monitoring
-# Writes per-session state to ~/.claude/session-monitor/<id>.json
+# agent-session-track.sh — AI CLI agent hook for session monitoring
+# Writes per-session state to ~/.agent/session-monitor/<id>.json
 #
-# Hook events handled:
-#   SessionStart      → running
-#   SessionEnd        → (removes file)
-#   UserPromptSubmit  → running
-#   PreToolUse        → running
-#   PostToolUse       → running
-#   Stop              → waiting (just finished a turn)
-#   Notification      → permission | idle (done, needs input)
+# Supports:
+#   Claude Code (JSON on stdin)
+#   Gemini CLI (JSON on stdin + optional args: agent event)
 
-STATUS_DIR="$HOME/.claude/session-monitor"
+STATUS_DIR="$HOME/.agent/session-monitor"
 mkdir -p "$STATUS_DIR"
 
 INPUT=$(cat)
-SESSION_ID=$(printf '%s' "$INPUT" \
-  | jq -r '.session_id // empty')
-[ -z "$SESSION_ID" ] && exit 0
 
-EVENT=$(printf '%s' "$INPUT" \
-  | jq -r '.hook_event_name // empty')
+# Extract basic info
+AGENT="${1:-claude}"
+EVENT="${2:-}"
+SESSION_ID=""
+
+if [ "$AGENT" = "claude" ]; then
+  SESSION_ID=$(printf '%s' "$INPUT" | jq -r '.session_id // empty')
+  [ -z "$EVENT" ] && EVENT=$(printf '%s' "$INPUT" | jq -r '.hook_event_name // empty')
+else
+  # Gemini or other
+  SESSION_ID=$(printf '%s' "$INPUT" | jq -r '.session_id // empty')
+  if [ -z "$SESSION_ID" ]; then
+    # Fallback: use tmux pane id to identify session if no ID provided
+    if [ -n "$TMUX_PANE" ]; then
+      SESSION_ID="${AGENT}-${TMUX_PANE#%}"
+    else
+      SESSION_ID="${AGENT}-standalone"
+    fi
+  fi
+fi
+
+[ -z "$SESSION_ID" ] && exit 0
 STATUS_FILE="$STATUS_DIR/$SESSION_ID.json"
 
 # SessionEnd: clean up
@@ -31,6 +43,7 @@ fi
 
 # Map event to state
 case "$EVENT" in
+  # Claude events
   SessionStart|UserPromptSubmit|PreToolUse|PostToolUse)
     STATE="running"
     ;;
@@ -38,18 +51,32 @@ case "$EVENT" in
     STATE="waiting"
     ;;
   Notification)
-    MATCHER=$(printf '%s' "$INPUT" \
-      | jq -r '.notification_type // empty')
+    MATCHER=$(printf '%s' "$INPUT" | jq -r '.notification_type // empty')
     case "$MATCHER" in
       permission_prompt) STATE="permission" ;;
       idle_prompt)       STATE="idle" ;;
       *)                 STATE="waiting" ;;
     esac
     ;;
-  *) exit 0 ;;
+  # Gemini events
+  BeforeAgent)
+    STATE="running"
+    ;;
+  AfterAgent)
+    STATE="waiting"
+    ;;
+  *)
+    # Default to running for start events, waiting for others
+    if [[ "$EVENT" == *"Start"* ]]; then
+      STATE="running"
+    else
+      STATE="waiting"
+    fi
+    ;;
 esac
 
 CWD=$(printf '%s' "$INPUT" | jq -r '.cwd // empty')
+[ -z "$CWD" ] && CWD="$PWD"
 PROJECT=$(basename "$CWD")
 
 # Tmux context
@@ -76,16 +103,18 @@ jq -n \
   --arg ts "$TMUX_SESSION" \
   --arg tw "$TMUX_WINDOW" \
   --arg twn "$TMUX_WINNAME" \
+  --arg agent "$AGENT" \
   --argjson updated "$(date +%s)" \
   '{state:$state,cwd:$cwd,project:$project,
     tmux_pane:$pane,tmux_session:$ts,
     tmux_window:$tw,tmux_window_name:$twn,
+    agent:$agent,
     updated:$updated}' \
   > "$TMP_FILE" \
   && mv "$TMP_FILE" "$STATUS_FILE"
 
-# Deliver inbox messages when session is waiting for input
-if [ "$STATE" = "waiting" ] || [ "$STATE" = "idle" ]; then
+# Deliver inbox messages when session is waiting for input (Claude only for now)
+if [ "$AGENT" = "claude" ] && { [ "$STATE" = "waiting" ] || [ "$STATE" = "idle" ]; }; then
   INBOX_FILE="$HOME/.claude/inbox/$SESSION_ID.md"
   if [ -f "$INBOX_FILE" ]; then
     DELIVER="$HOME/code/seabbs/dotfiles/scripts/claude-inbox-deliver.sh"
