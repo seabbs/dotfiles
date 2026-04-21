@@ -93,6 +93,7 @@
   SHELL: AI COMMANDS
   ----------------------------------------------------------------
   ai             direct CLI agent (no tmux)
+  cai / gai      explicit claude / gemini aliases
   tc <cmd>       tmux + claude session
   commit         commit (haiku)
   review         code review

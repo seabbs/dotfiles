@@ -94,6 +94,8 @@ tc() {
 # Direct CLI alias (no tmux)
 alias ai='${AGENT_CLI_PRIMARY_TOOL}'
 alias ai-auto='${AGENT_CLI_PRIMARY_TOOL} --permission-mode auto'
+alias cai='claude'
+alias gai='gemini'
 
 # General model aliases
 alias haiku='${AGENT_CLI_PRIMARY_TOOL} --model haiku'
