@@ -40,5 +40,10 @@
         ]
       }
     ]
+  },
+  "security": {
+    "auth": {
+      "selectedType": "oauth-personal"
+    }
   }
 }
