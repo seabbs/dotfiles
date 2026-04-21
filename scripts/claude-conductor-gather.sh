@@ -7,7 +7,7 @@
 # Output: JSON object with sessions array, each entry has
 # state, project, cwd, tmux location, age, recent prompts.
 
-STATUS_DIR="$HOME/.claude/session-monitor"
+STATUS_DIR="$HOME/.agent/session-monitor"
 HISTORY="$HOME/.claude/history.jsonl"
 SESSIONS_DIR="$HOME/.claude/sessions"
 PROJECTS_DIR="$HOME/.claude/projects"
@@ -34,6 +34,7 @@ for f in "$STATUS_DIR"/*.json; do
   TW=$(printf '%s' "$DATA" | jq -r '.tmux_window')
   TWN=$(printf '%s' "$DATA" | jq -r '.tmux_window_name')
   UPDATED=$(printf '%s' "$DATA" | jq -r '.updated')
+  AGENT=$(printf '%s' "$DATA" | jq -r '.agent // "claude"')
 
   AGE=$(( NOW - UPDATED ))
 
@@ -127,9 +128,11 @@ for f in "$STATUS_DIR"/*.json; do
     --arg age "$AGE_STR" \
     --argjson sort "$SORT" \
     --argjson prompts "$PROMPTS" \
+    --arg agent "$AGENT" \
     --arg last_response "$LAST_RESPONSE" \
     -n '$sessions + [{
       session_id: $sid,
+      agent: $agent,
       state: $state,
       icon: $icon,
       project: $project,

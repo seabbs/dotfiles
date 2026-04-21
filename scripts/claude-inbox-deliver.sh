@@ -1,6 +1,6 @@
 #!/bin/bash
 # claude-inbox-deliver.sh — deliver queued inbox messages
-# Called by the Stop hook in claude-session-track.sh
+# Called by the Stop hook in agent-session-track.sh
 # when a session finishes a turn and is waiting for input.
 #
 # Reads ~/.claude/inbox/{session-id}.md, injects the
@@ -8,7 +8,7 @@
 # then removes the inbox file.
 
 INBOX_DIR="$HOME/.claude/inbox"
-STATUS_DIR="$HOME/.claude/session-monitor"
+STATUS_DIR="$HOME/.agent/session-monitor"
 
 deliver() {
   local session_id="$1"
