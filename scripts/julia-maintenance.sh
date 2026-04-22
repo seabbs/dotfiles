@@ -21,6 +21,13 @@ log() {
 : > "$LOG_FILE"
 log "julia-maintenance" "$(date '+%Y-%m-%d %H:%M:%S')"
 
+# Repair juliaup self-update dropping the execute bit (seen 2026-03-31).
+JULIAUP_BIN="$HOME/.juliaup/bin/juliaup"
+if [ -f "$JULIAUP_BIN" ] && [ ! -x "$JULIAUP_BIN" ]; then
+  chmod +x "$JULIAUP_BIN"
+  log "juliaup" "restored execute bit"
+fi
+
 # Update juliaup channels
 if command -v juliaup &>/dev/null; then
   juliaup update >> "$LOG_FILE" 2>&1
