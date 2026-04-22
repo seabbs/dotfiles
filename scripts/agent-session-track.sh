@@ -32,12 +32,13 @@ else
   fi
 fi
 
-[ -z "$SESSION_ID" ] && exit 0
+[ -z "$SESSION_ID" ] && { echo "{}"; exit 0; }
 STATUS_FILE="$STATUS_DIR/$SESSION_ID.json"
 
 # SessionEnd: clean up
 if [ "$EVENT" = "SessionEnd" ]; then
   rm -f "$STATUS_FILE"
+  echo "{}"
   exit 0
 fi
 
