@@ -39,11 +39,44 @@
           }
         ]
       }
+    ],
+    "BeforeTool": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "$HOME/code/seabbs/dotfiles/scripts/agent-session-track.sh gemini BeforeTool"
+          }
+        ]
+      }
+    ],
+    "AfterTool": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "$HOME/code/seabbs/dotfiles/scripts/agent-session-track.sh gemini AfterTool"
+          }
+        ]
+      }
+    ],
+    "Notification": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "$HOME/code/seabbs/dotfiles/scripts/agent-session-track.sh gemini Notification"
+          }
+        ]
+      }
     ]
   },
   "security": {
     "auth": {
       "selectedType": "oauth-personal"
     }
+  },
+  "model": {
+    "name": "gemini-3.1-pro-preview"
   }
 }
