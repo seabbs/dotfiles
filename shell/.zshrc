@@ -63,6 +63,16 @@ bench() {
   hyperfine --warmup 1 "${args[@]}"
 }
 
+# Keep the Mac awake for N hours (default 1). Accepts fractional hours.
+awake() {
+  local hours=${1:-1}
+  local seconds
+  seconds=$(awk -v h="$hours" 'BEGIN { printf "%d", h * 3600 }')
+  echo "Staying awake for ${hours}h (${seconds}s)…"
+  caffeinate -t "$seconds"
+}
+alias asleep='pkill caffeinate'
+
 # direnv
 eval "$(direnv hook zsh)"
 

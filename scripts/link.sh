@@ -50,6 +50,17 @@ link "bat/config"                "$HOME/.config/bat/config"
 link "gh/config.yml"             "$HOME/.config/gh/config.yml"
 link "gh/dash.yml"               "$HOME/.config/gh-dash/config.yml"
 
+# Gemini CLI
+link ".gemini/settings.json"     "$HOME/.gemini/settings.json"
+link ".gemini/GEMINI.md"         "$HOME/.gemini/GEMINI.md"
+link ".gemini/commands"          "$HOME/.gemini/commands"
+
+# Link skills library if it exists
+if [ -d "$HOME/code/seabbs/skills" ]; then
+  ln -sfn "$HOME/code/seabbs/skills" "$HOME/.gemini/skills"
+  echo "  $HOME/.gemini/skills -> $HOME/code/seabbs/skills"
+fi
+
 # Television (stock cable channels managed by tv update-channels)
 link "tv/config.toml"               "$HOME/.config/television/config.toml"
 link "tv/cable/all-files.toml"      "$HOME/.config/television/cable/all-files.toml"

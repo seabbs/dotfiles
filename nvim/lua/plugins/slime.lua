@@ -335,18 +335,65 @@ return {
       end,
     })
 
-    -- R: start httpgd plot server
+    -- R: devtools shortcuts + httpgd plot server
     vim.api.nvim_create_autocmd("FileType", {
       pattern = { "r", "rmd", "quarto" },
       callback = function()
-        vim.keymap.set("n", "<leader>ro", function()
-          send_text(
-            "library(httpgd)\nhgd()\nhgd_browse()"
-          )
-        end, {
-          buffer = true,
-          desc = "Start httpgd server",
-        })
+        local function rmap(lhs, cmd, desc)
+          vim.keymap.set("n", lhs, function()
+            send_text(cmd)
+          end, { buffer = true, desc = desc })
+        end
+
+        rmap("<leader>ro",
+          "library(httpgd); hgd(); hgd_browse()",
+          "Start httpgd server")
+        rmap("<leader>rl", "devtools::load_all()",
+          "devtools::load_all()")
+        rmap("<leader>rt", "devtools::test()",
+          "devtools::test()")
+        rmap("<leader>rT",
+          "devtools::test_active_file()",
+          "devtools::test_active_file()")
+        rmap("<leader>rd", "devtools::document()",
+          "devtools::document()")
+        rmap("<leader>rC", "devtools::check()",
+          "devtools::check()")
+        rmap("<leader>ri", "devtools::install()",
+          "devtools::install()")
+      end,
+    })
+
+    -- Julia: Pkg/Revise shortcuts
+    vim.api.nvim_create_autocmd("FileType", {
+      pattern = { "julia" },
+      callback = function()
+        local function jmap(lhs, cmd, desc)
+          vim.keymap.set("n", lhs, function()
+            send_text(cmd)
+          end, { buffer = true, desc = desc })
+        end
+
+        jmap("<leader>rl", "using Revise",
+          "using Revise")
+        jmap("<leader>rt",
+          "using Pkg; Pkg.test()",
+          "Pkg.test()")
+        jmap("<leader>rA",
+          'using Pkg; Pkg.activate(".")',
+          'Pkg.activate(".")')
+        jmap("<leader>ri",
+          "using Pkg; Pkg.instantiate()",
+          "Pkg.instantiate()")
+        jmap("<leader>rs",
+          "using Pkg; Pkg.status()",
+          "Pkg.status()")
+        jmap("<leader>rT",
+          "using TestEnv; TestEnv.activate()",
+          "TestEnv.activate()")
+        jmap("<leader>rE",
+          "using Pkg; Pkg.activate(; temp=true)",
+          "Pkg.activate(temp=true)")
       end,
     })
 

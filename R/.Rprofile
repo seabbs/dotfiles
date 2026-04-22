@@ -5,6 +5,9 @@ local({
   options(repos = c(repos, getOption("repos")))
 })
 
-if (interactive() && Sys.getenv("TERM_PROGRAM") == "vscode") {
+if (interactive() &&
+    Sys.getenv("RSTUDIO") == "" &&
+    nzchar(Sys.getenv("VSCODE_PID"))) {
+  Sys.setenv(TERM_PROGRAM = "vscode")
   source(file.path(Sys.getenv(if (.Platform$OS.type == "windows") "USERPROFILE" else "HOME"), ".vscode-R", "init.R"))
 }
