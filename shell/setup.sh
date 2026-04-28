@@ -14,3 +14,4 @@ brew install btop
 brew install tmuxinator
 brew install go-task
 brew install television
+brew install watch
