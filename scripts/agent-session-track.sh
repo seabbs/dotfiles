@@ -32,38 +32,42 @@ else
   fi
 fi
 
-[ -z "$SESSION_ID" ] && exit 0
+[ -z "$SESSION_ID" ] && { echo "{}"; exit 0; }
 STATUS_FILE="$STATUS_DIR/$SESSION_ID.json"
 
 # SessionEnd: clean up
 if [ "$EVENT" = "SessionEnd" ]; then
   rm -f "$STATUS_FILE"
+  echo "{}"
   exit 0
 fi
 
 # Map event to state
 case "$EVENT" in
-  # Claude events
-  SessionStart|UserPromptSubmit|PreToolUse|PostToolUse)
+  # Running states
+  SessionStart|UserPromptSubmit|PreToolUse|PostToolUse|BeforeAgent|AfterTool)
     STATE="running"
     ;;
-  Stop)
+  # Prompting/Waiting states
+  Stop|AfterAgent)
     STATE="waiting"
+    ;;
+  # Conditional states
+  BeforeTool)
+    TOOL=$(printf '%s' "$INPUT" | jq -r '.tool_name // empty')
+    if [ "$TOOL" = "ask_user" ]; then
+      STATE="waiting"
+    else
+      STATE="running"
+    fi
     ;;
   Notification)
     MATCHER=$(printf '%s' "$INPUT" | jq -r '.notification_type // empty')
     case "$MATCHER" in
-      permission_prompt) STATE="permission" ;;
-      idle_prompt)       STATE="idle" ;;
-      *)                 STATE="waiting" ;;
+      ToolPermission|permission_prompt) STATE="permission" ;;
+      idle_prompt)                      STATE="idle" ;;
+      *)                                STATE="waiting" ;;
     esac
-    ;;
-  # Gemini events
-  BeforeAgent)
-    STATE="running"
-    ;;
-  AfterAgent)
-    STATE="waiting"
     ;;
   *)
     # Default to running for start events, waiting for others
@@ -122,4 +126,6 @@ if [ "$AGENT" = "claude" ] && { [ "$STATE" = "waiting" ] || [ "$STATE" = "idle" 
   fi
 fi
 
+# Hooks expect JSON on stdout
+echo "{}"
 exit 0

@@ -21,9 +21,14 @@ export JULIA_PROJECT=@.
 export PATH="$PATH:$HOME/.local/bin:$HOME/.lmstudio/bin:$HOME/.cargo/bin:$HOME/.julia/bin:$HOME/Library/TinyTeX/bin/universal-darwin"
 
 # >>> juliaup initialize >>>
+
 # !! Contents within this block are managed by juliaup !!
-path=("$HOME/.juliaup/bin" $path)
+
+path=('/Users/lshsa2/.juliaup/bin' $path)
 export PATH
+# Tab completion for juliaup and julia channel selection
+[ -f "/Users/lshsa2/.julia/juliaup/completions/zsh.zsh" ] && source "/Users/lshsa2/.julia/juliaup/completions/zsh.zsh"
+
 # <<< juliaup initialize <<<
 
 source ~/.config/zsh/ai-cli-aliases.zsh
