@@ -270,6 +270,9 @@ return {
           'using Pkg; Pkg.activate("docs"); '
             .. 'Pkg.develop(PackageSpec(path="."))',
           'Pkg.activate("docs")')
+        jmap("<leader>rR",
+          "using Pkg; Pkg.resolve()",
+          "Pkg.resolve()")
       end,
     })
 
