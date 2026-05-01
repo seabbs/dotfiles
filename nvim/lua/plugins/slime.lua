@@ -65,6 +65,20 @@ return {
       "<Plug>SlimeParagraphSend",
       { desc = "Send paragraph to REPL" })
 
+    -- Send paragraph and advance to the next one.
+    vim.keymap.set("n", "<leader>rP", function()
+      vim.api.nvim_feedkeys(
+        vim.api.nvim_replace_termcodes(
+          "<Plug>SlimeParagraphSend", true, false, true
+        ),
+        "m",
+        false
+      )
+      vim.schedule(function()
+        vim.cmd("normal! }")
+      end)
+    end, { desc = "Send paragraph and advance" })
+
     -- Send file
     vim.keymap.set("n", "<leader>rf", function()
       local lines = vim.api.nvim_buf_get_lines(
@@ -252,21 +266,21 @@ return {
           end, { buffer = true, desc = desc })
         end
 
-        rmap("<leader>ro",
+        rmap("<leader>Ro",
           "library(httpgd); hgd(); hgd_browse()",
           "Start httpgd server")
-        rmap("<leader>rl", "devtools::load_all()",
+        rmap("<leader>Rl", "devtools::load_all()",
           "devtools::load_all()")
-        rmap("<leader>rt", "devtools::test()",
+        rmap("<leader>Rt", "devtools::test()",
           "devtools::test()")
-        rmap("<leader>rT",
+        rmap("<leader>RT",
           "devtools::test_active_file()",
           "devtools::test_active_file()")
-        rmap("<leader>rd", "devtools::document()",
+        rmap("<leader>Rd", "devtools::document()",
           "devtools::document()")
-        rmap("<leader>rC", "devtools::check()",
+        rmap("<leader>Rc", "devtools::check()",
           "devtools::check()")
-        rmap("<leader>ri", "devtools::install()",
+        rmap("<leader>Ri", "devtools::install()",
           "devtools::install()")
       end,
     })
@@ -281,31 +295,31 @@ return {
           end, { buffer = true, desc = desc })
         end
 
-        jmap("<leader>rl", "using Revise",
+        jmap("<leader>Rl", "using Revise",
           "using Revise")
-        jmap("<leader>rt",
+        jmap("<leader>Rt",
           "using Pkg; Pkg.test()",
           "Pkg.test()")
-        jmap("<leader>rA",
+        jmap("<leader>RA",
           'using Pkg; Pkg.activate(".")',
           'Pkg.activate(".")')
-        jmap("<leader>ri",
+        jmap("<leader>Ri",
           "using Pkg; Pkg.instantiate()",
           "Pkg.instantiate()")
-        jmap("<leader>rs",
+        jmap("<leader>Rs",
           "using Pkg; Pkg.status()",
           "Pkg.status()")
-        jmap("<leader>rT",
+        jmap("<leader>RT",
           "using TestEnv; TestEnv.activate()",
           "TestEnv.activate()")
-        jmap("<leader>rE",
+        jmap("<leader>RE",
           "using Pkg; Pkg.activate(; temp=true)",
           "Pkg.activate(temp=true)")
-        jmap("<leader>rD",
+        jmap("<leader>RD",
           'using Pkg; Pkg.activate("docs"); '
             .. 'Pkg.develop(PackageSpec(path="."))',
           'Pkg.activate("docs")')
-        jmap("<leader>rR",
+        jmap("<leader>RR",
           "using Pkg; Pkg.resolve()",
           "Pkg.resolve()")
       end,
@@ -319,7 +333,7 @@ return {
     vim.api.nvim_create_autocmd("FileType", {
       pattern = { "julia" },
       callback = function()
-        vim.keymap.set("n", "<leader>ro", function()
+        vim.keymap.set("n", "<leader>Ro", function()
           local nvim_pane = vim.env.TMUX_PANE
           if not nvim_pane then
             vim.notify(
