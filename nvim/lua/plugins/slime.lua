@@ -33,7 +33,7 @@ return {
       send_text(text)
     end
 
-    -- Send line(s): supports count, e.g. 5<leader>sc
+    -- Send line(s): supports count, e.g. 5<leader>rc
     vim.keymap.set("n", "<leader>rc", function()
       local cursor = vim.api.nvim_win_get_cursor(0)[1]
       local count = vim.v.count1
@@ -42,6 +42,19 @@ return {
       )
       send_text(table.concat(lines, "\n"))
     end, { desc = "Send line(s) to REPL" })
+
+    -- Send line(s) and advance past them.
+    vim.keymap.set("n", "<leader>rC", function()
+      local cursor = vim.api.nvim_win_get_cursor(0)[1]
+      local count = vim.v.count1
+      local last = vim.api.nvim_buf_line_count(0)
+      local lines = vim.api.nvim_buf_get_lines(
+        0, cursor - 1, cursor - 1 + count, false
+      )
+      send_text(table.concat(lines, "\n"))
+      local target = math.min(cursor + count, last)
+      vim.api.nvim_win_set_cursor(0, { target, 0 })
+    end, { desc = "Send line(s) and advance" })
 
     -- Send visual selection (use slime's built-in)
     vim.keymap.set("x", "<leader>rc", "<Plug>SlimeRegionSend",
@@ -118,6 +131,17 @@ return {
           desc = "Send code block to REPL",
         })
 
+        vim.keymap.set("n", "<leader>rB", function()
+          local code = quarto.get_code_block()
+          if code ~= "" then
+            send_text(code)
+            quarto.next_block()
+          end
+        end, {
+          buffer = true,
+          desc = "Send code block and advance",
+        })
+
         vim.keymap.set("n", "<leader>ra", function()
           local code = quarto.get_all_code_blocks()
           if code ~= "" then
@@ -168,6 +192,17 @@ return {
         end, {
           buffer = true,
           desc = "Send code block to REPL",
+        })
+
+        vim.keymap.set("n", "<leader>rB", function()
+          local code = literate.get_code_block()
+          if code ~= "" then
+            send_text(code)
+            literate.next_block()
+          end
+        end, {
+          buffer = true,
+          desc = "Send code block and advance",
         })
 
         vim.keymap.set("n", "<leader>ra", function()
