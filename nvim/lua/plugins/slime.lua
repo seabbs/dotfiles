@@ -33,7 +33,7 @@ return {
       send_text(text)
     end
 
-    -- Send line(s): supports count, e.g. 5<leader>sc
+    -- Send line(s): supports count, e.g. 5<leader>rc
     vim.keymap.set("n", "<leader>rc", function()
       local cursor = vim.api.nvim_win_get_cursor(0)[1]
       local count = vim.v.count1
@@ -43,6 +43,19 @@ return {
       send_text(table.concat(lines, "\n"))
     end, { desc = "Send line(s) to REPL" })
 
+    -- Send line(s) and advance past them.
+    vim.keymap.set("n", "<leader>rC", function()
+      local cursor = vim.api.nvim_win_get_cursor(0)[1]
+      local count = vim.v.count1
+      local last = vim.api.nvim_buf_line_count(0)
+      local lines = vim.api.nvim_buf_get_lines(
+        0, cursor - 1, cursor - 1 + count, false
+      )
+      send_text(table.concat(lines, "\n"))
+      local target = math.min(cursor + count, last)
+      vim.api.nvim_win_set_cursor(0, { target, 0 })
+    end, { desc = "Send line(s) and advance" })
+
     -- Send visual selection (use slime's built-in)
     vim.keymap.set("x", "<leader>rc", "<Plug>SlimeRegionSend",
       { desc = "Send selection to REPL" })
@@ -51,6 +64,20 @@ return {
     vim.keymap.set("n", "<leader>rp",
       "<Plug>SlimeParagraphSend",
       { desc = "Send paragraph to REPL" })
+
+    -- Send paragraph and advance to the next one.
+    vim.keymap.set("n", "<leader>rP", function()
+      vim.api.nvim_feedkeys(
+        vim.api.nvim_replace_termcodes(
+          "<Plug>SlimeParagraphSend", true, false, true
+        ),
+        "m",
+        false
+      )
+      vim.schedule(function()
+        vim.cmd("normal! }")
+      end)
+    end, { desc = "Send paragraph and advance" })
 
     -- Send file
     vim.keymap.set("n", "<leader>rf", function()
@@ -118,6 +145,17 @@ return {
           desc = "Send code block to REPL",
         })
 
+        vim.keymap.set("n", "<leader>rB", function()
+          local code = quarto.get_code_block()
+          if code ~= "" then
+            send_text(code)
+            quarto.next_block()
+          end
+        end, {
+          buffer = true,
+          desc = "Send code block and advance",
+        })
+
         vim.keymap.set("n", "<leader>ra", function()
           local code = quarto.get_all_code_blocks()
           if code ~= "" then
@@ -170,6 +208,17 @@ return {
           desc = "Send code block to REPL",
         })
 
+        vim.keymap.set("n", "<leader>rB", function()
+          local code = literate.get_code_block()
+          if code ~= "" then
+            send_text(code)
+            literate.next_block()
+          end
+        end, {
+          buffer = true,
+          desc = "Send code block and advance",
+        })
+
         vim.keymap.set("n", "<leader>ra", function()
           local code = literate.get_all_code_blocks()
           if code ~= "" then
@@ -217,21 +266,21 @@ return {
           end, { buffer = true, desc = desc })
         end
 
-        rmap("<leader>ro",
+        rmap("<leader>Ro",
           "library(httpgd); hgd(); hgd_browse()",
           "Start httpgd server")
-        rmap("<leader>rl", "devtools::load_all()",
+        rmap("<leader>Rl", "devtools::load_all()",
           "devtools::load_all()")
-        rmap("<leader>rt", "devtools::test()",
+        rmap("<leader>Rt", "devtools::test()",
           "devtools::test()")
-        rmap("<leader>rT",
+        rmap("<leader>RT",
           "devtools::test_active_file()",
           "devtools::test_active_file()")
-        rmap("<leader>rd", "devtools::document()",
+        rmap("<leader>Rd", "devtools::document()",
           "devtools::document()")
-        rmap("<leader>rC", "devtools::check()",
+        rmap("<leader>Rc", "devtools::check()",
           "devtools::check()")
-        rmap("<leader>ri", "devtools::install()",
+        rmap("<leader>Ri", "devtools::install()",
           "devtools::install()")
       end,
     })
@@ -246,26 +295,33 @@ return {
           end, { buffer = true, desc = desc })
         end
 
-        jmap("<leader>rl", "using Revise",
+        jmap("<leader>Rl", "using Revise",
           "using Revise")
-        jmap("<leader>rt",
+        jmap("<leader>Rt",
           "using Pkg; Pkg.test()",
           "Pkg.test()")
-        jmap("<leader>rA",
+        jmap("<leader>RA",
           'using Pkg; Pkg.activate(".")',
           'Pkg.activate(".")')
-        jmap("<leader>ri",
+        jmap("<leader>Ri",
           "using Pkg; Pkg.instantiate()",
           "Pkg.instantiate()")
-        jmap("<leader>rs",
+        jmap("<leader>Rs",
           "using Pkg; Pkg.status()",
           "Pkg.status()")
-        jmap("<leader>rT",
+        jmap("<leader>RT",
           "using TestEnv; TestEnv.activate()",
           "TestEnv.activate()")
-        jmap("<leader>rE",
+        jmap("<leader>RE",
           "using Pkg; Pkg.activate(; temp=true)",
           "Pkg.activate(temp=true)")
+        jmap("<leader>RD",
+          'using Pkg; Pkg.activate("docs"); '
+            .. 'Pkg.develop(PackageSpec(path="."))',
+          'Pkg.activate("docs")')
+        jmap("<leader>RR",
+          "using Pkg; Pkg.resolve()",
+          "Pkg.resolve()")
       end,
     })
 
@@ -277,7 +333,7 @@ return {
     vim.api.nvim_create_autocmd("FileType", {
       pattern = { "julia" },
       callback = function()
-        vim.keymap.set("n", "<leader>ro", function()
+        vim.keymap.set("n", "<leader>Ro", function()
           local nvim_pane = vim.env.TMUX_PANE
           if not nvim_pane then
             vim.notify(

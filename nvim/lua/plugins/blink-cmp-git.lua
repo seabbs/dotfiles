@@ -1,7 +1,8 @@
 return {
   "Kaiser-Yang/blink-cmp-git",
   dependencies = { "saghen/blink.cmp" },
-  opts = {},
+  -- Loaded as a blink.cmp source; the upstream module has no setup().
+  config = function() end,
   specs = {
     {
       "saghen/blink.cmp",
