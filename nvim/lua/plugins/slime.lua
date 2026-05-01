@@ -266,6 +266,10 @@ return {
         jmap("<leader>rE",
           "using Pkg; Pkg.activate(; temp=true)",
           "Pkg.activate(temp=true)")
+        jmap("<leader>rD",
+          'using Pkg; Pkg.activate("docs"); '
+            .. 'Pkg.develop(PackageSpec(path="."))',
+          'Pkg.activate("docs")')
       end,
     })
 
