@@ -3,8 +3,8 @@ local function register_stan()
   parsers.stan = {
     install_info = {
       url = "https://github.com/WardBrian/tree-sitter-stan",
-      -- Repo lays the Stan grammar under grammars/stan/.
       location = "grammars/stan",
+      files = { "src/parser.c" },
     },
     filetype = "stan",
   }
@@ -24,8 +24,12 @@ return {
       register_stan()
       -- Re-apply after every parser-table reload (the install path
       -- in v1.0+ wipes the module before reloading and fires this).
+      local grp = vim.api.nvim_create_augroup(
+        "StanParserReg", { clear = true }
+      )
       vim.api.nvim_create_autocmd("User", {
         pattern = "TSUpdate",
+        group = grp,
         callback = register_stan,
       })
     end,

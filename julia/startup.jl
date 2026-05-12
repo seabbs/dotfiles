@@ -18,11 +18,8 @@ atreplinit() do repl
         @eval install_term_stacktrace()
     catch
     end
-    # Only set up display in interactive sessions; scripts get no plot windows
-    if isinteractive()
-        try
-            @eval MuxDisplay.setdisplay!()
-        catch
-        end
+    try
+        @eval MuxDisplay.setdisplay!()
+    catch
     end
 end
