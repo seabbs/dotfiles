@@ -19,3 +19,8 @@ end, { desc = "Molten Commands" })
 vim.keymap.set("n", "<leader>cq", function()
   require("fzf-lua").commands({ query = "Quarto" })
 end, { desc = "Quarto Commands" })
+
+-- Open current file in system default app (Preview for images)
+vim.keymap.set("n", "<leader>fo", function()
+  vim.fn.jobstart({ "open", vim.fn.expand("%:p") }, { detach = true })
+end, { desc = "Open file in system app" })
