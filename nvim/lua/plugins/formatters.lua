@@ -6,6 +6,7 @@ return {
       formatters_by_ft = {
         r = { "air" },
         rmd = { "air" },
+        quarto = { "air" },
       },
     },
   },
