@@ -1,7 +1,7 @@
 const REPL_PACKAGES = [
     :Revise, :Term, :JET, :Cthulhu,
     :CodeTracking, :PrettyPrinting,
-    :BenchmarkTools, :TestEnv,
+    :BenchmarkTools, :TestEnv, :MuxDisplay,
 ]
 
 atreplinit() do repl
@@ -17,5 +17,12 @@ atreplinit() do repl
         @eval install_term_repr()
         @eval install_term_stacktrace()
     catch
+    end
+    # Only set up display in interactive sessions; scripts get no plot windows
+    if isinteractive()
+        try
+            @eval MuxDisplay.setdisplay!()
+        catch
+        end
     end
 end
