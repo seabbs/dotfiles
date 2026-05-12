@@ -1,4 +1,6 @@
 local function register_stan()
+  -- nvim-treesitter v1.0 removed get_parser_configs(); direct table
+  -- assignment to the parsers module is the v1.0 replacement.
   local parsers = require("nvim-treesitter.parsers")
   parsers.stan = {
     install_info = {
