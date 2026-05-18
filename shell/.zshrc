@@ -1,5 +1,21 @@
 source /opt/homebrew/share/zsh-autocomplete/zsh-autocomplete.plugin.zsh
+source /opt/homebrew/share/zsh-autosuggestions/zsh-autosuggestions.zsh
+
+# Vi-style line editing (Esc for normal mode, i/a for insert)
+bindkey -v
+export KEYTIMEOUT=1
 bindkey '^L' clear-screen
+bindkey -M viins '^A' beginning-of-line
+bindkey -M viins '^E' end-of-line
+bindkey -M viins '^R' history-incremental-search-backward
+bindkey -M viins '^P' up-line-or-history
+bindkey -M viins '^N' down-line-or-history
+
+# zsh-autosuggestions accept keys (right-arrow also accepts by default)
+# ^F: accept suggestion (falls through to forward-char if none)
+# ^Y: accept and execute
+bindkey '^F' autosuggest-accept
+bindkey '^Y' autosuggest-execute
 
 # Shell options
 setopt HIST_IGNORE_DUPS
