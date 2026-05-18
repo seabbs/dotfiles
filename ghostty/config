@@ -5,8 +5,8 @@
 font-family = JetBrains Mono
 font-size = 14
 
-# Theme (matches nvim tokyonight)
-theme = TokyoNight Night
+# Theme (matches nvim/tmux catppuccin)
+theme = catppuccin-macchiato
 
 # Window
 window-padding-x = 4
@@ -17,6 +17,7 @@ macos-titlebar-style = tabs
 # Terminal
 shell-integration = zsh
 copy-on-select = clipboard
+mouse-hide-while-typing = true
 
 # Auto-launch tmux home session
 command = /bin/zsh -l -c "tmux new-session -A -s home -c $HOME/code"
