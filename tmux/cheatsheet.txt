@@ -33,7 +33,9 @@
   TMUX SESSIONS
   ----------------------------------------------------------------
   Ctrl-Space f     session switcher (fzf popup)
-                 C-a all  C-s sessions  C-p projects  C-d kill
+                 C-a all  C-s sessions  C-p projects
+                 C-w worktrees  C-e extras  C-d kill
+                 type + Enter (no match) → session at $HOME
   Ctrl-Space \     toggle last session
   Ctrl-Space /     toggle last window
   Ctrl-Space s     session picker (built-in)

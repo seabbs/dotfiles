@@ -9,14 +9,23 @@
 #      or create a new feature branch
 #
 # Keybindings in session picker:
-#   Ctrl-a  show all (sessions + projects)
+#   Ctrl-a  show all (sessions + projects + extras)
 #   Ctrl-s  show active sessions only
 #   Ctrl-p  show projects only
 #   Ctrl-w  show worktrees across all repos
+#   Ctrl-e  show extra roots only (home, notes, …)
 #   Ctrl-d  kill selected session
 #   Enter   switch to / create session
+#           (unmatched query → session at $HOME)
 
 CODE_DIR="${CODE_DIR:-$HOME/code}"
+
+# Extra roots outside $CODE_DIR. Each entry is `name → path`;
+# `name` becomes the tmux session name when picked.
+declare -A EXTRA_ROOTS=(
+  [home]="$HOME"
+  [notes]="$HOME/Library/CloudStorage/GoogleDrive-s.e.abbott12@gmail.com/My Drive/cloud/apps/obsidian/notes"
+)
 
 list_sessions() {
   tmux list-sessions \
@@ -62,9 +71,16 @@ list_worktrees() {
   done
 }
 
+list_extras() {
+  for name in "${!EXTRA_ROOTS[@]}"; do
+    [[ -d "${EXTRA_ROOTS[$name]}" ]] && echo "[dir] $name"
+  done | sort
+}
+
 list_all() {
   list_sessions
   echo "────────────"
+  list_extras
   list_projects
 }
 
@@ -80,6 +96,7 @@ case "${1:-}" in
   --list-sessions) list_sessions; exit 0 ;;
   --list-projects)   list_projects; exit 0 ;;
   --list-worktrees)  list_worktrees; exit 0 ;;
+  --list-extras)     list_extras; exit 0 ;;
   --list-windows)    list_windows "$2"; exit 0 ;;
   --kill-session)
     tmux kill-session -t "=$2" 2>/dev/null
@@ -120,26 +137,58 @@ case "${1:-}" in
 esac
 
 # Step 1: pick a session or project
-selected=$(list_all | fzf \
+result=$(list_all | fzf \
   --no-sort \
   --border-label ' sessions ' \
   --prompt '  ' \
   --header \
-    'C-a all  C-s sessions  C-p projects  C-w worktrees  C-d kill' \
+    'C-a all  C-s sessions  C-p projects  C-w worktrees  C-e extras  C-d kill' \
+  --print-query \
   --bind 'tab:down,btab:up' \
   --bind "ctrl-a:change-prompt(  )+reload($0 --list-all)" \
   --bind "ctrl-s:change-prompt(  )+reload($0 --list-sessions)" \
   --bind "ctrl-p:change-prompt(  )+reload($0 --list-projects)" \
   --bind "ctrl-w:change-prompt(  )+reload($0 --list-worktrees)" \
+  --bind "ctrl-e:change-prompt(  )+reload($0 --list-extras)" \
   --bind "ctrl-d:execute-silent($0 --kill-session {2..})+reload($0 --list-all)" \
 )
+fzf_status=$?
 
-[[ -z "$selected" ]] && exit 0
+# Cancelled with Esc / Ctrl-C
+[[ $fzf_status -eq 130 ]] && exit 0
+
+query=$(echo "$result" | sed -n '1p')
+selected=$(echo "$result" | sed -n '2p')
+
+# Nothing typed and nothing picked
+[[ -z "$selected" && -z "$query" ]] && exit 0
 [[ "$selected" == "────────────" ]] && exit 0
+
+# Unmatched query: ad-hoc session at $HOME named after the query
+if [[ -z "$selected" && -n "$query" ]]; then
+  session=$(echo "$query" | tr -c 'A-Za-z0-9_-' '-' | sed 's/^-*//;s/-*$//')
+  [[ -z "$session" ]] && exit 0
+  if ! tmux has-session -t "=$session" 2>/dev/null; then
+    tmuxinator start project "$session" "$HOME" --no-attach
+  fi
+  tmux switch-client -t "=$session"
+  exit 0
+fi
 
 # Resolve session name
 if [[ "$selected" == "[active] "* ]]; then
   session="${selected#\[active\] }"
+
+elif [[ "$selected" == "[dir] "* ]]; then
+  session="${selected#\[dir\] }"
+  project_root="${EXTRA_ROOTS[$session]}"
+  if [[ -z "$project_root" || ! -d "$project_root" ]]; then
+    exit 0
+  fi
+  if ! tmux has-session -t "=$session" 2>/dev/null; then
+    tmuxinator start project \
+      "$session" "$project_root" --no-attach
+  fi
 
 elif [[ "$selected" == *" :: "* ]]; then
   # Worktree selection: org/repo :: branch
