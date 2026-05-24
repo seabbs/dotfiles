@@ -65,6 +65,15 @@ fi
 link "tv/config.toml"               "$HOME/.config/television/config.toml"
 link "tv/cable/all-files.toml"      "$HOME/.config/television/cable/all-files.toml"
 
+# launchd agents (macOS)
+if [ "$(uname -s)" = "Darwin" ]; then
+  for plist in "$DOTFILES"/launchd/*.plist; do
+    [ -f "$plist" ] || continue
+    link "launchd/$(basename "$plist")" \
+      "$HOME/Library/LaunchAgents/$(basename "$plist")"
+  done
+fi
+
 # Claude Code (delegates to submodule's own link script)
 "$DOTFILES/claude/link.sh"
 
