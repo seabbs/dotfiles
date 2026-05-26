@@ -1,13 +1,15 @@
 #!/bin/bash
 # claude-rate-limit-resume.sh
 # Scan all Claude tmux panes for the weekly/session rate-limit
-# screen. When found, dismiss the /rate-limit-options menu with
-# Escape, then either deliver a queued inbox message for that
-# session or send a generic "resume" nudge.
+# notice. When found and the reset time has passed, optionally
+# dismiss the legacy /rate-limit-options menu, then deliver a
+# queued inbox message for that session or send a generic
+# "resume" nudge.
 #
 # Intended to run on a cron (e.g. every 10 min). Idempotent and
-# safe to run repeatedly — only acts when the rate-limit text
-# is currently displayed.
+# safe to run repeatedly — only acts when the rate-limit notice
+# is currently in the visible tail of the pane (not buried in
+# earlier conversation) and the input box is empty.
 
 set -u
 
@@ -18,15 +20,35 @@ LOG="$HOME/.claude/rate-limit-resume.log"
 
 log() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*" >> "$LOG"; }
 
-# Patterns that mark a Claude pane stuck on the rate-limit
-# selector. All three must match the recent tail of the pane
-# to distinguish the live menu from transient text in logs or
-# conversation history.
-RATE_LIMIT_RE="(weekly limit|session limit).*resets"
+# Structural detection — chosen to survive future wording changes.
+#
+# The Claude CLI renders a limit notice as a tool-result line
+# prefixed with the U+23BF glyph "⎿" (turned dash). Normal
+# assistant chat never uses this prefix, so requiring it filters
+# out historical references like "I'll retry when the limit
+# resets at 6pm." that appear in conversation text.
+#
+# A stuck-pane signature is then:
+#   <tool-result-prefix> ... limit ... <clock-time>
+# on a single line, with the clock time interpreted as the reset
+# target.
+TOOL_RESULT_PREFIX_RE='^[[:space:]]*⎿'
+CLOCK_RE='[0-9]{1,2}(:[0-9]{2})?(am|pm|AM|PM)'
+LIMIT_KEYWORD_RE='[Ll]imit'
+# Optional reset-verb hint, used only to disambiguate when the
+# notice contains more than one clock time. Not required for
+# detection — wording changes here won't break the script.
+RESET_PHRASE_RE="(reset(s|[[:space:]]+at)?|resume[sd]?|available[[:space:]]+(again|at)|try[[:space:]]+again[[:space:]]+(at|in)|back[[:space:]]+at|until)[^0-9]{0,15}${CLOCK_RE}"
+
+# Legacy menu (older CLI versions). Optional — dismissed if
+# present, but no longer required for detection.
 MENU_OPT_RE="❯ 1\. Stop and wait for limit to reset"
 MENU_CONFIRM_RE="Enter to confirm · Esc to cancel"
-# Extracts the reset clock time, e.g. "8am", "1pm", "7:50pm".
-RESET_TIME_RE="resets ([0-9]{1,2}(:[0-9]{2})?(am|pm))"
+
+# How many lines of the pane's visible tail to scan. Stops us
+# re-acting on panes that already resumed — the notice scrolls
+# out of the recent area.
+TAIL_LINES=20
 
 # Returns 0 if the reset time string (e.g. "1pm") is in the
 # past relative to current Europe/London time. Returns 1 if
@@ -68,51 +90,71 @@ session_id_for_pane() {
 
 resume_pane() {
   local pane="$1"
-  # Only look at the current visible screen, not scrollback —
-  # the menu must be live, not buried in earlier output.
-  local content
+  local content tail
   content=$(tmux capture-pane -t "$pane" -p 2>/dev/null) \
     || return 0
+  tail=$(echo "$content" | tail -"$TAIL_LINES")
 
-  # All three patterns must be on the visible screen:
-  # the limit notice, the highlighted menu option, and the
-  # menu confirmation prompt. Together they only co-occur on
-  # the live /rate-limit-options selector.
-  if ! echo "$content" | grep -Eq "$RATE_LIMIT_RE"; then
+  # Detection: a tool-result line in the visible tail that
+  # mentions "limit" and contains a clock time. Both signals on
+  # one ⎿-prefixed line is the structural signature of Claude's
+  # inline limit notice. Filters out chat references and old
+  # notices that scrolled past.
+  local notice_line
+  notice_line=$(echo "$tail" \
+    | grep -E "$TOOL_RESULT_PREFIX_RE" \
+    | grep -E "$LIMIT_KEYWORD_RE" \
+    | grep -Ei "$CLOCK_RE" \
+    | tail -1)
+  if [ -z "$notice_line" ]; then
     return 0
   fi
-  if ! echo "$content" | grep -q "$MENU_OPT_RE"; then
-    return 0
-  fi
-  if ! echo "$content" | grep -q "$MENU_CONFIRM_RE"; then
-    return 0
-  fi
 
-  # Re-verify menu still showing after Escape attempts below.
-  local MENU_RE="$MENU_OPT_RE"
-
-  # Only act once the displayed reset time has actually passed,
-  # otherwise the next API call re-hits the limit immediately.
+  # Extract the clock time. Prefer one following a reset-style
+  # verb (handles lines that mention multiple times); fall back
+  # to the last clock on the notice line.
   local reset_raw
-  reset_raw=$(echo "$content" \
-    | grep -Eo "$RESET_TIME_RE" | tail -1 \
-    | sed -E 's/^resets //')
+  reset_raw=$(echo "$notice_line" \
+    | grep -Eio "$RESET_PHRASE_RE" | tail -1 \
+    | grep -Eo "$CLOCK_RE" | tail -1)
+  if [ -z "$reset_raw" ]; then
+    reset_raw=$(echo "$notice_line" \
+      | grep -Eo "$CLOCK_RE" | tail -1)
+  fi
+  reset_raw=$(echo "$reset_raw" | tr '[:upper:]' '[:lower:]')
   if [ -n "$reset_raw" ] && ! reset_passed "$reset_raw"; then
     log "Pane $pane rate-limited until $reset_raw — waiting"
     return 0
   fi
 
-  log "Rate-limited pane $pane — dismissing menu (reset: ${reset_raw:-unknown})"
-  tmux send-keys -t "$pane" Escape
-  sleep 1
-  tmux send-keys -t "$pane" Escape
-  sleep 1
+  # If the legacy menu is showing, dismiss it. New CLI versions
+  # don't show a menu, so absence is fine.
+  if echo "$content" | grep -q "$MENU_OPT_RE" \
+     && echo "$content" | grep -q "$MENU_CONFIRM_RE"; then
+    log "Pane $pane — dismissing legacy menu"
+    tmux send-keys -t "$pane" Escape
+    sleep 1
+    tmux send-keys -t "$pane" Escape
+    sleep 1
+    content=$(tmux capture-pane -t "$pane" -p 2>/dev/null)
+    if echo "$content" | grep -q "$MENU_OPT_RE"; then
+      log "Pane $pane menu still showing after Escape; skipping"
+      return 0
+    fi
+  fi
 
-  # Confirm the menu is gone before injecting text. If still
-  # present, bail and try next run.
-  content=$(tmux capture-pane -t "$pane" -p 2>/dev/null)
-  if echo "$content" | grep -q "$MENU_RE"; then
-    log "Pane $pane menu still showing after Escape; skipping"
+  # Inspect the input box. The Claude CLI renders it at the
+  # bottom as "❯ <text>" — last "❯ " line in the capture.
+  local last_input input_text
+  last_input=$(echo "$content" \
+    | awk '/^❯/{l=$0} END{print l}')
+  input_text=$(echo "$last_input" \
+    | sed -E 's/^❯[[:space:]]*//; s/[[:space:]]+$//')
+
+  if [ -n "$input_text" ]; then
+    # User left a queued message — just submit it.
+    log "Pane $pane — submitting queued input (reset: ${reset_raw:-unknown})"
+    tmux send-keys -t "$pane" Enter
     return 0
   fi
 
@@ -121,12 +163,12 @@ resume_pane() {
   inbox_file="$INBOX_DIR/$sid.md"
 
   if [ -n "$sid" ] && [ -f "$inbox_file" ]; then
-    log "Pane $pane — delivering queued inbox $sid"
+    log "Pane $pane — delivering queued inbox $sid (reset: ${reset_raw:-unknown})"
     "$DELIVER" "$sid"
     return 0
   fi
 
-  log "Pane $pane — sending generic resume"
+  log "Pane $pane — sending generic resume (reset: ${reset_raw:-unknown})"
   local msg="Rate limit has reset. Please resume where you left off and report status before continuing."
   tmux send-keys -t "$pane" -l "$msg"
   tmux send-keys -t "$pane" Enter
