@@ -17,6 +17,8 @@ INBOX_DIR="$HOME/.claude/inbox"
 STATUS_DIR="$HOME/.agent/session-monitor"
 DELIVER="$HOME/code/seabbs/dotfiles/scripts/claude-inbox-deliver.sh"
 LOG="$HOME/.claude/rate-limit-resume.log"
+COOLDOWN_DIR="$HOME/.claude/rate-limit-cooldown"
+COOLDOWN_SECS=1800  # 30 minutes
 
 log() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*" >> "$LOG"; }
 
@@ -48,7 +50,7 @@ MENU_CONFIRM_RE="Enter to confirm · Esc to cancel"
 # How many lines of the pane's visible tail to scan. Stops us
 # re-acting on panes that already resumed — the notice scrolls
 # out of the recent area.
-TAIL_LINES=20
+TAIL_LINES=5
 
 # Returns 0 if the reset time string (e.g. "1pm") is in the
 # past relative to current Europe/London time. Returns 1 if
@@ -94,6 +96,21 @@ resume_pane() {
   content=$(tmux capture-pane -t "$pane" -p 2>/dev/null) \
     || return 0
   tail=$(echo "$content" | tail -"$TAIL_LINES")
+
+  # Per-pane cooldown. If we poked this pane recently, skip —
+  # Claude is either still processing or just re-hit a fresh
+  # limit, and re-poking won't help.
+  local cooldown_file="$COOLDOWN_DIR/${pane#%}"
+  if [ -f "$cooldown_file" ]; then
+    local last_poke now age
+    last_poke=$(stat -f %m "$cooldown_file" 2>/dev/null || \
+      stat -c %Y "$cooldown_file" 2>/dev/null)
+    now=$(date +%s)
+    age=$((now - last_poke))
+    if [ "$age" -lt "$COOLDOWN_SECS" ]; then
+      return 0
+    fi
+  fi
 
   # Detection: a tool-result line in the visible tail that
   # mentions "limit" and contains a clock time. Both signals on
@@ -150,6 +167,10 @@ resume_pane() {
     | awk '/^❯/{l=$0} END{print l}')
   input_text=$(echo "$last_input" \
     | sed -E 's/^❯[[:space:]]*//; s/[[:space:]]+$//')
+
+  # Mark cooldown before poking so failures still suppress re-fires.
+  mkdir -p "$COOLDOWN_DIR"
+  touch "$cooldown_file"
 
   if [ -n "$input_text" ]; then
     # User left a queued message — just submit it.
