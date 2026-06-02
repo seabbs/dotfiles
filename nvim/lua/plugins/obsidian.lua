@@ -116,6 +116,12 @@ return {
         desc = "New note",
       },
       {
+        "<leader>nx",
+        ":Obsidian extract_note<cr>",
+        mode = "v",
+        desc = "Extract selection to new note",
+      },
+      {
         "<leader>no",
         "<cmd>Obsidian open<cr>",
         desc = "Open in Obsidian",
