@@ -117,7 +117,7 @@ return {
       },
       {
         "<leader>nx",
-        ":Obsidian extract_note<cr>",
+        "<cmd>Obsidian extract_note<cr>",
         mode = "v",
         desc = "Extract selection to new note",
       },
