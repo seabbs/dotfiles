@@ -72,6 +72,67 @@ local function tw_run(args)
   end)
 end
 
+-- Pick a pending task via fzf-lua and call on_pick(task). An optional filter
+-- narrows the list (e.g. only tasks with a linked note).
+local function pick_task(prompt, on_pick, filter)
+  local res = vim.system({ tw, "status:pending", "export" }, { text = true, env = tw_env }):wait()
+  local ok, tasks = pcall(vim.json.decode, res.stdout or "")
+  if not ok or type(tasks) ~= "table" then
+    vim.notify("Could not read tasks from Taskwarrior", vim.log.levels.ERROR)
+    return
+  end
+  local entries, by_line = {}, {}
+  for _, t in ipairs(tasks) do
+    if not filter or filter(t) then
+      local proj = t.project and ("[" .. t.project .. "] ") or ""
+      local line = string.format("%3d  %s%s", t.id or 0, proj, t.description or "")
+      entries[#entries + 1] = line
+      by_line[line] = t
+    end
+  end
+  if #entries == 0 then
+    vim.notify("No matching tasks", vim.log.levels.INFO)
+    return
+  end
+  require("fzf-lua").fzf_exec(entries, {
+    prompt = prompt,
+    actions = {
+      ["default"] = function(selected)
+        local t = selected and by_line[selected[1]]
+        if t then
+          on_pick(t)
+        end
+      end,
+    },
+  })
+end
+
+-- Pick a markdown note from the vault (relative path) and call cb(rel_path)
+local function pick_vault_note(prompt, cb)
+  local root = vault_dir()
+  local rels = {}
+  for _, f in ipairs(vim.fn.globpath(root, "**/*.md", false, true)) do
+    if f:sub(1, #root + 1) == root .. "/" then
+      rels[#rels + 1] = f:sub(#root + 2)
+    end
+  end
+  if #rels == 0 then
+    vim.notify("No notes found in vault", vim.log.levels.WARN)
+    return
+  end
+  require("fzf-lua").fzf_exec(rels, {
+    prompt = prompt,
+    actions = {
+      ["default"] = function(selected)
+        local note = selected and selected[1]
+        if note then
+          cb(note)
+        end
+      end,
+    },
+  })
+end
+
 -- Open the Taskwarrior TUI in a floating terminal
 vim.keymap.set("n", "<leader>nk", function()
   Snacks.terminal(tw_tui, {
@@ -107,79 +168,39 @@ vim.keymap.set("n", "<leader>nC", function()
   tw_run(args)
 end, { desc = "Tasks: capture current line" })
 
--- Jump from a task to its linked note, opened in nvim (fzf-lua picker)
+-- Jump from a task to its linked note, opened in nvim
 vim.keymap.set("n", "<leader>nj", function()
-  local res = vim.system({ tw, "status:pending", "export" }, { text = true, env = tw_env }):wait()
-  local ok, tasks = pcall(vim.json.decode, res.stdout or "")
-  if not ok or type(tasks) ~= "table" then
-    vim.notify("Could not read tasks from Taskwarrior", vim.log.levels.ERROR)
-    return
-  end
-  local entries, by_line = {}, {}
-  for _, t in ipairs(tasks) do
-    if t.note and t.note ~= "" then
-      local proj = t.project and ("[" .. t.project .. "] ") or ""
-      local line = string.format("%3d  %s%s", t.id or 0, proj, t.description or "")
-      entries[#entries + 1] = line
-      by_line[line] = t.note
+  pick_task("Task note> ", function(t)
+    local path = vault_dir() .. "/" .. t.note
+    if vim.fn.filereadable(path) == 0 then
+      vim.notify("Note not found: " .. path, vim.log.levels.WARN)
+      return
     end
-  end
-  if #entries == 0 then
-    vim.notify("No tasks have a linked note", vim.log.levels.INFO)
-    return
-  end
-  require("fzf-lua").fzf_exec(entries, {
-    prompt = "Task note> ",
-    actions = {
-      ["default"] = function(selected)
-        local note = selected and by_line[selected[1]]
-        if not note then
-          return
-        end
-        local path = vault_dir() .. "/" .. note
-        if vim.fn.filereadable(path) == 0 then
-          vim.notify("Note not found: " .. path, vim.log.levels.WARN)
-          return
-        end
-        vim.cmd("edit " .. vim.fn.fnameescape(path))
-      end,
-    },
-  })
+    vim.cmd("edit " .. vim.fn.fnameescape(path))
+  end, function(t)
+    return t.note and t.note ~= ""
+  end)
 end, { desc = "Tasks: open linked note" })
 
--- Link the current note to an existing task (sets the `note` UDA via picker)
+-- Link the current note to an existing task (pick the task)
 vim.keymap.set("n", "<leader>nL", function()
   local note = note_rel_path()
   if not note or note == "" then
     vim.notify("No file in this buffer to link", vim.log.levels.WARN)
     return
   end
-  local res = vim.system({ tw, "status:pending", "export" }, { text = true, env = tw_env }):wait()
-  local ok, tasks = pcall(vim.json.decode, res.stdout or "")
-  if not ok or type(tasks) ~= "table" then
-    vim.notify("Could not read tasks from Taskwarrior", vim.log.levels.ERROR)
-    return
-  end
-  local entries, id_by_line = {}, {}
-  for _, t in ipairs(tasks) do
-    local proj = t.project and ("[" .. t.project .. "] ") or ""
-    local line = string.format("%3d  %s%s", t.id or 0, proj, t.description or "")
-    entries[#entries + 1] = line
-    id_by_line[line] = t.id
-  end
-  if #entries == 0 then
-    vim.notify("No pending tasks to link to", vim.log.levels.INFO)
-    return
-  end
-  require("fzf-lua").fzf_exec(entries, {
-    prompt = "Link " .. note .. " to> ",
-    actions = {
-      ["default"] = function(selected)
-        local id = selected and id_by_line[selected[1]]
-        if id then
-          tw_run({ tostring(id), "modify", "note:" .. note })
-        end
-      end,
-    },
-  })
+  pick_task("Link " .. note .. " to> ", function(t)
+    tw_run({ tostring(t.id), "modify", "note:" .. note })
+  end)
 end, { desc = "Tasks: link current note to a task" })
+
+-- Attach a note to a task: pick the task, then pick the vault note
+vim.keymap.set("n", "<leader>nA", function()
+  pick_task("Attach note to task> ", function(t)
+    vim.schedule(function()
+      pick_vault_note("Note for task " .. (t.id or "") .. "> ", function(note)
+        tw_run({ tostring(t.id), "modify", "note:" .. note })
+      end)
+    end)
+  end)
+end, { desc = "Tasks: attach a note to a task" })
