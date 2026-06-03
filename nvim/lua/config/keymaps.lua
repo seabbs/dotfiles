@@ -47,6 +47,20 @@ local function vault_dir()
   )
 end
 
+-- Path of the current buffer relative to the vault root (for the `note` UDA),
+-- so it resolves back via vault_dir(); falls back to the basename.
+local function note_rel_path()
+  local full = vim.fn.expand("%:p")
+  if full == "" then
+    return nil
+  end
+  local root = vault_dir()
+  if full:sub(1, #root + 1) == root .. "/" then
+    return full:sub(#root + 2)
+  end
+  return vim.fn.expand("%:t")
+end
+
 -- Run `tw` and notify with its output
 local function tw_run(args)
   vim.system(vim.list_extend({ tw }, args), { text = true, env = tw_env }, function(res)
@@ -86,7 +100,7 @@ vim.keymap.set("n", "<leader>nC", function()
     return
   end
   local args = vim.list_extend({ "add", "+inbox" }, vim.split(desc, " ", { trimempty = true }))
-  local note = vim.fn.expand("%:t")
+  local note = note_rel_path()
   if note ~= "" then
     table.insert(args, "note:" .. note)
   end
@@ -132,3 +146,40 @@ vim.keymap.set("n", "<leader>nj", function()
     },
   })
 end, { desc = "Tasks: open linked note" })
+
+-- Link the current note to an existing task (sets the `note` UDA via picker)
+vim.keymap.set("n", "<leader>nL", function()
+  local note = note_rel_path()
+  if not note or note == "" then
+    vim.notify("No file in this buffer to link", vim.log.levels.WARN)
+    return
+  end
+  local res = vim.system({ tw, "status:pending", "export" }, { text = true, env = tw_env }):wait()
+  local ok, tasks = pcall(vim.json.decode, res.stdout or "")
+  if not ok or type(tasks) ~= "table" then
+    vim.notify("Could not read tasks from Taskwarrior", vim.log.levels.ERROR)
+    return
+  end
+  local entries, id_by_line = {}, {}
+  for _, t in ipairs(tasks) do
+    local proj = t.project and ("[" .. t.project .. "] ") or ""
+    local line = string.format("%3d  %s%s", t.id or 0, proj, t.description or "")
+    entries[#entries + 1] = line
+    id_by_line[line] = t.id
+  end
+  if #entries == 0 then
+    vim.notify("No pending tasks to link to", vim.log.levels.INFO)
+    return
+  end
+  require("fzf-lua").fzf_exec(entries, {
+    prompt = "Link " .. note .. " to> ",
+    actions = {
+      ["default"] = function(selected)
+        local id = selected and id_by_line[selected[1]]
+        if id then
+          tw_run({ tostring(id), "modify", "note:" .. note })
+        end
+      end,
+    },
+  })
+end, { desc = "Tasks: link current note to a task" })
