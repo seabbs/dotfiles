@@ -45,5 +45,8 @@
     "auth": {
       "selectedType": "oauth-personal"
     }
+  },
+  "model": {
+    "name": "gemini-3.1-pro-preview"
   }
 }
