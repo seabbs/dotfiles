@@ -28,6 +28,35 @@ end, { desc = "Open file in system app" })
 -- Taskwarrior (binary is keg-only as `task`; reached via the shim)
 local tw = vim.fn.expand("~/.local/share/tw-shim/task")
 local tw_tui = vim.fn.expand("~/code/seabbs/dotfiles/scripts/taskwarrior-tui.sh")
+-- Set TASKRC explicitly so the keymaps work even when nvim is launched
+-- outside a shell that sourced taskwarrior.zsh.
+local tw_env = { TASKRC = vim.fn.expand("~/.config/task/taskrc") }
+
+-- Resolve the Obsidian vault root (where `note:` paths are relative to)
+local function vault_dir()
+  local ok, obsidian = pcall(require, "obsidian")
+  if ok and obsidian.get_client then
+    local cok, client = pcall(obsidian.get_client)
+    if cok and client and client.dir then
+      return tostring(client.dir)
+    end
+  end
+  return vim.fn.expand(
+    "~/Library/CloudStorage/GoogleDrive-s.e.abbott12@gmail.com/"
+      .. "My Drive/cloud/apps/obsidian/notes"
+  )
+end
+
+-- Run `tw` and notify with its output
+local function tw_run(args)
+  vim.system(vim.list_extend({ tw }, args), { text = true, env = tw_env }, function(res)
+    vim.schedule(function()
+      vim.notify(vim.trim((res.stdout or "") .. (res.stderr or "")), vim.log.levels.INFO, {
+        title = "Taskwarrior",
+      })
+    end)
+  end)
+end
 
 -- Open the Taskwarrior TUI in a floating terminal
 vim.keymap.set("n", "<leader>nk", function()
@@ -42,14 +71,7 @@ vim.keymap.set("n", "<leader>nc", function()
     if not input or input == "" then
       return
     end
-    local args = vim.list_extend({ tw, "add" }, vim.split(input, " ", { trimempty = true }))
-    vim.system(args, { text = true }, function(res)
-      vim.schedule(function()
-        vim.notify(vim.trim((res.stdout or "") .. (res.stderr or "")), vim.log.levels.INFO, {
-          title = "Taskwarrior",
-        })
-      end)
-    end)
+    tw_run(vim.list_extend({ "add" }, vim.split(input, " ", { trimempty = true })))
   end)
 end, { desc = "Tasks: capture" })
 
@@ -63,16 +85,50 @@ vim.keymap.set("n", "<leader>nC", function()
     vim.notify("Nothing on this line to capture", vim.log.levels.WARN)
     return
   end
+  local args = vim.list_extend({ "add", "+inbox" }, vim.split(desc, " ", { trimempty = true }))
   local note = vim.fn.expand("%:t")
-  local args = vim.list_extend({ tw, "add", "+inbox" }, vim.split(desc, " ", { trimempty = true }))
   if note ~= "" then
     table.insert(args, "note:" .. note)
   end
-  vim.system(args, { text = true }, function(res)
-    vim.schedule(function()
-      vim.notify(vim.trim((res.stdout or "") .. (res.stderr or "")), vim.log.levels.INFO, {
-        title = "Taskwarrior",
-      })
-    end)
-  end)
+  tw_run(args)
 end, { desc = "Tasks: capture current line" })
+
+-- Jump from a task to its linked note, opened in nvim (fzf-lua picker)
+vim.keymap.set("n", "<leader>nj", function()
+  local res = vim.system({ tw, "status:pending", "export" }, { text = true, env = tw_env }):wait()
+  local ok, tasks = pcall(vim.json.decode, res.stdout or "")
+  if not ok or type(tasks) ~= "table" then
+    vim.notify("Could not read tasks from Taskwarrior", vim.log.levels.ERROR)
+    return
+  end
+  local entries, by_line = {}, {}
+  for _, t in ipairs(tasks) do
+    if t.note and t.note ~= "" then
+      local proj = t.project and ("[" .. t.project .. "] ") or ""
+      local line = string.format("%3d  %s%s", t.id or 0, proj, t.description or "")
+      entries[#entries + 1] = line
+      by_line[line] = t.note
+    end
+  end
+  if #entries == 0 then
+    vim.notify("No tasks have a linked note", vim.log.levels.INFO)
+    return
+  end
+  require("fzf-lua").fzf_exec(entries, {
+    prompt = "Task note> ",
+    actions = {
+      ["default"] = function(selected)
+        local note = selected and by_line[selected[1]]
+        if not note then
+          return
+        end
+        local path = vault_dir() .. "/" .. note
+        if vim.fn.filereadable(path) == 0 then
+          vim.notify("Note not found: " .. path, vim.log.levels.WARN)
+          return
+        end
+        vim.cmd("edit " .. vim.fn.fnameescape(path))
+      end,
+    },
+  })
+end, { desc = "Tasks: open linked note" })
