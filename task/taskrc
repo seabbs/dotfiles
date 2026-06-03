@@ -1,0 +1,44 @@
+# Taskwarrior configuration
+# Managed in dotfiles: task/taskrc -> ~/.config/task/taskrc
+# Reached via TASKRC (set in shell/taskwarrior.zsh) because the `task`
+# binary on PATH is go-task; Taskwarrior is invoked as `tw` / via the shim.
+
+# Data store (its own location, not symlinked - this is the live database)
+data.location=~/.local/share/task
+
+# Don't show the onboarding/news prompt
+news.version=3.50.0
+
+# Bare `tw` shows the actionable list
+default.command=next
+
+# ISO 8601 dates everywhere
+dateformat=Y-M-D
+dateformat.info=Y-M-D
+dateformat.report=Y-M-D
+dateformat.annotation=Y-M-D
+weekstart=monday
+
+# Confirm before editing more than this many tasks at once
+bulk=5
+
+# -----------------------------------------------------------------------------
+# Link a task to an Obsidian note for context
+# -----------------------------------------------------------------------------
+# Store a vault-relative path or an obsidian:// URI, e.g.
+#   tw add 'Draft intro' project:papers.nowcasting note:'dailies/2026-03-16.md'
+uda.note.type=string
+uda.note.label=Note
+
+# -----------------------------------------------------------------------------
+# Contexts (focus filters) - switch with `tw context <name>`, clear with
+# `tw context none`. .write tags are applied automatically to new tasks.
+# -----------------------------------------------------------------------------
+context.work.read=+work or project:epinowcast or project:epiforecasts or project:papers
+context.work.write=+work
+context.papers.read=project:papers or +reading
+context.papers.write=project:papers
+context.epinowcast.read=project:epinowcast
+context.epinowcast.write=project:epinowcast
+context.reading.read=+reading
+context.reading.write=+reading

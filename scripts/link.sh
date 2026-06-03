@@ -17,6 +17,7 @@ echo "Linking dotfiles from $DOTFILES"
 # Shell
 link "shell/.zshrc"              "$HOME/.zshrc"
 link "shell/ai-cli-aliases.zsh"  "$HOME/.config/zsh/ai-cli-aliases.zsh"
+link "shell/taskwarrior.zsh"     "$HOME/.config/zsh/taskwarrior.zsh"
 
 # Neovim
 link "nvim"                      "$HOME/.config/nvim"
@@ -64,6 +65,22 @@ fi
 # Television (stock cable channels managed by tv update-channels)
 link "tv/config.toml"               "$HOME/.config/television/config.toml"
 link "tv/cable/all-files.toml"      "$HOME/.config/television/cable/all-files.toml"
+
+# Taskwarrior (binary is keg-only; `task` on PATH stays go-task)
+link "task/taskrc"               "$HOME/.config/task/taskrc"
+if command -v brew >/dev/null 2>&1 && brew list task >/dev/null 2>&1; then
+  # Shim so tools shelling out to `task` (e.g. taskwarrior-tui) hit Taskwarrior
+  mkdir -p "$HOME/.local/share/tw-shim"
+  ln -sfn "$(brew --prefix task)/bin/task" "$HOME/.local/share/tw-shim/task"
+  echo "  $HOME/.local/share/tw-shim/task -> $(brew --prefix task)/bin/task"
+  # Make sure go-task keeps ownership of the `task` command
+  if brew list go-task >/dev/null 2>&1 &&
+     ! readlink "$(brew --prefix)/bin/task" 2>/dev/null | grep -q '/go-task/'; then
+    brew unlink task >/dev/null 2>&1 || true
+    brew link --overwrite go-task >/dev/null 2>&1 || true
+    echo "  restored go-task as 'task'"
+  fi
+fi
 
 # launchd agents (macOS)
 if [ "$(uname -s)" = "Darwin" ]; then

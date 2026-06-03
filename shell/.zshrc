@@ -43,6 +43,7 @@ export PATH
 # <<< juliaup initialize <<<
 
 source ~/.config/zsh/ai-cli-aliases.zsh
+source ~/.config/zsh/taskwarrior.zsh
 
 # fzf integration (kept for piping: cmd | fzf)
 source <(fzf --zsh)
