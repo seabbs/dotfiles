@@ -113,8 +113,9 @@ case "${1:-}" in
         -p '#{pane_current_path}' 2>/dev/null
     )
     root=$(
-      git -C "$root" rev-parse --show-toplevel \
-        2>/dev/null || echo "$root"
+      git -C "$root" worktree list 2>/dev/null \
+        | awk 'NR==1 {print $1}' \
+        || echo "$root"
     )
     # If worktree exists, use feat-done to clean up
     if [[ -d "$root/worktrees/$win_name" ]]; then
@@ -274,15 +275,16 @@ match=$(echo "$result" | sed -n '2p')
 # Escape with no input
 [[ -z "$query" && -z "$match" ]] && exit 0
 
-# Helper: resolve project root from session
+# Helper: resolve project root from session (main repo, not a worktree)
 get_project_root() {
   local root
   root=$(
     tmux display-message -t "=$session:1" \
       -p '#{pane_current_path}' 2>/dev/null
   )
-  git -C "$root" rev-parse --show-toplevel \
-    2>/dev/null || echo "$root"
+  git -C "$root" worktree list 2>/dev/null \
+    | awk 'NR==1 {print $1}' \
+    || echo "$root"
 }
 
 if [[ -n "$match" ]]; then
