@@ -285,19 +285,21 @@ proj() {
       repl="R"
     fi
 
-    local t="$project:$branch"
-    tmux new-window -t "=$project" -n "$branch" -c "$wt"
-    tmux select-pane -t "$t.0" -T "nvim"
-    tmux send-keys -t "$t.0" "nvim ." Enter
-    tmux split-window -t "$t" -h -c "$wt"
-    tmux select-pane -t "$t.1" -T "ai:$branch"
-    tmux send-keys -t "$t.1" \
-      "${AGENT_CLI_DEV_TOOL}" Enter
-    tmux split-window -t "$t.1" -v -c "$wt"
-    tmux select-pane -t "$t.2" -T "repl"
-    tmux send-keys -t "$t.2" "$repl" Enter
-    tmux select-pane -t "$t.0"
-    tmux select-window -t "$t"
+    # Track panes by id so layout is immune to pane-base-index
+    local p0 p1 p2
+    p0=$(tmux new-window -t "=$project" -n "$branch" -c "$wt" \
+      -P -F '#{pane_id}')
+    tmux select-pane -t "$p0" -T "nvim"
+    tmux send-keys -t "$p0" "nvim ." Enter
+    p1=$(tmux split-window -t "$p0" -h -c "$wt" \
+      -P -F '#{pane_id}')
+    tmux select-pane -t "$p1" -T "ai:$branch"
+    tmux send-keys -t "$p1" "${AGENT_CLI_DEV_TOOL}" Enter
+    p2=$(tmux split-window -t "$p1" -v -c "$wt" \
+      -P -F '#{pane_id}')
+    tmux select-pane -t "$p2" -T "repl"
+    tmux send-keys -t "$p2" "$repl" Enter
+    tmux select-pane -t "$p0"
   fi
 
   _enter_session "=$project"
@@ -337,7 +339,9 @@ prsesh() {
   session=$(echo "$session" | sed 's/[^a-zA-Z0-9_-]/_/g')
 
   # Check out the PR into its own worktree if needed
+  local reused=true
   if [[ ! -d "$wt" ]]; then
+    reused=false
     mkdir -p "$root/worktrees"
     if git -C "$root" show-ref --verify --quiet \
       "refs/heads/$branch"; then
@@ -352,6 +356,12 @@ prsesh() {
       fi
     fi
     _sync_worktree_files "$root" "$wt" &
+  fi
+
+  # Pull a reused worktree so it reflects new commits on the PR
+  if $reused; then
+    git -C "$wt" pull --ff-only 2>/dev/null \
+      || echo "Note: '$branch' could not fast-forward (diverged?)" >&2
   fi
 
   # Start a dedicated session rooted at the worktree (nvim/ai/repl)
@@ -425,25 +435,27 @@ feat() {
     repl="R"
   fi
 
-  # Create new window with standard layout
-  tmux new-window -n "$branch" -c "$worktree_path"
+  # Create new window with standard layout; track the nvim pane by id
+  local nvim_pane
+  nvim_pane=$(tmux new-window -n "$branch" -c "$worktree_path" \
+    -P -F '#{pane_id}')
 
-  # Pane 0: nvim (left)
+  # nvim (left)
   tmux select-pane -T "nvim"
   tmux send-keys "nvim ." Enter
 
-  # Pane 1: ai (top-right)
+  # ai (top-right)
   tmux split-window -h -c "$worktree_path"
   tmux select-pane -T "ai:$branch"
   tmux send-keys "${AGENT_CLI_DEV_TOOL}" Enter
 
-  # Pane 2: REPL (bottom-right)
+  # REPL (bottom-right)
   tmux split-window -v -c "$worktree_path"
   tmux select-pane -T "repl"
   tmux send-keys "$repl" Enter
 
   # Return focus to nvim
-  tmux select-pane -t 0
+  tmux select-pane -t "$nvim_pane"
 }
 
 # Clean up a feature worktree and close its window
@@ -796,17 +808,19 @@ agent-to-proj() {
     repl="R"
   fi
 
-  # Rename current pane
-  tmux select-pane -T "ai:main"
+  # Track panes by id so layout is immune to pane-base-index
+  local ai_pane nvim_pane
+  ai_pane=$(tmux display-message -p '#{pane_id}')
+  tmux select-pane -t "$ai_pane" -T "ai:main"
 
   # Add nvim pane to the left
-  tmux split-window -hb -c "$work_dir"
-  tmux select-pane -T "nvim"
-  tmux send-keys "nvim ." Enter
+  nvim_pane=$(tmux split-window -hb -c "$work_dir" \
+    -P -F '#{pane_id}')
+  tmux select-pane -t "$nvim_pane" -T "nvim"
+  tmux send-keys -t "$nvim_pane" "nvim ." Enter
 
   # Add REPL pane below ai
-  tmux select-pane -t 1  # Go back to ai pane
-  tmux split-window -v -c "$work_dir"
+  tmux split-window -t "$ai_pane" -v -c "$work_dir"
   tmux select-pane -T "repl"
   tmux send-keys "$repl" Enter
 
@@ -814,7 +828,7 @@ agent-to-proj() {
   tmux select-layout main-vertical
 
   # Focus nvim
-  tmux select-pane -t 0
+  tmux select-pane -t "$nvim_pane"
 
   # Optionally rename session to remove agent- prefix
   echo "Converted to project layout. Rename session with: tmux rename-session $project"
