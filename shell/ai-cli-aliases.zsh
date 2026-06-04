@@ -218,6 +218,22 @@ gm() {
 # tmux workflow functions
 # =============================================================================
 
+# Enter an existing tmux session.
+# When called from inside tmux (e.g. the gh-dash popup, which passes
+# GHD_CLIENT=#{client_tty}) switch the calling client so the session opens
+# behind the popup instead of nesting a new client inside it. From a bare
+# shell, attach as a new client.
+_enter_session() {
+  local target="$1"
+  if [[ -n "$GHD_CLIENT" ]]; then
+    tmux switch-client -c "$GHD_CLIENT" -t "$target"
+  elif [[ -n "$TMUX" ]]; then
+    tmux switch-client -t "$target"
+  else
+    tmux attach -t "$target"
+  fi
+}
+
 # Start a project session with tmuxinator
 # Usage: proj <project-name>
 # Supports partial name matching (e.g., proj epi -> epinowcast)
@@ -245,18 +261,10 @@ proj() {
     project_root="$CODE_DIR/$project_path"
   fi
 
-  # Start session if it doesn't exist
-  local needs_attach=false
-  if tmux has-session -t "=$project" 2>/dev/null; then
-    needs_attach=true
-  elif [[ -n "$branch" ]]; then
-    # Start detached so we can add feature window first
+  # Ensure the session exists (start detached; we enter it ourselves below)
+  if ! tmux has-session -t "=$project" 2>/dev/null; then
     tmuxinator start project \
       "$project" "$project_root" --no-attach
-    needs_attach=true
-  else
-    tmuxinator start project "$project" "$project_root"
-    return
   fi
 
   # Create feature worktree window if branch specified
@@ -292,9 +300,7 @@ proj() {
     tmux select-window -t "$t"
   fi
 
-  if $needs_attach; then
-    tmux attach -t "=$project"
-  fi
+  _enter_session "=$project"
 }
 
 # Create a new feature worktree as a window in the current session
@@ -579,15 +585,14 @@ agent() {
     work_dir="${git_root:-$PWD}"
   fi
 
-  # Check if session already exists
-  if tmux has-session -t "=$session_name" 2>/dev/null; then
-    echo "Attaching to existing agent session: $session_name"
-    tmux attach -t "=$session_name"
-  else
+  # Ensure the session exists (start detached; we enter it ourselves below)
+  if ! tmux has-session -t "=$session_name" 2>/dev/null; then
     echo "Creating agent session: $session_name"
     echo "Working directory: $work_dir"
-    tmux new-session -s "$session_name" -c "$work_dir" "${AGENT_CLI_DEV_TOOL}"
+    tmux new-session -d -s "$session_name" -c "$work_dir" \
+      "${AGENT_CLI_DEV_TOOL}"
   fi
+  _enter_session "=$session_name"
 }
 
 # Create a new worktree window in agent session
