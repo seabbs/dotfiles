@@ -88,14 +88,11 @@ defaults:
 keybindings:
     prs:
         - key: p
-          name: open project
-          command: zsh -ic "proj {{.RepoName}}"
+          name: open PR session
+          command: zsh -ic "prsesh {{.RepoName}} {{.PrNumber}}"
         - key: a
           name: open agent
           command: zsh -ic "agent {{.RepoName}}"
-        - key: w
-          name: open PR worktree session
-          command: zsh -ic "prsesh {{.RepoName}} {{.PrNumber}}"
         - key: C
           name: code review
           command: >
