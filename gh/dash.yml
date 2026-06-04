@@ -123,8 +123,8 @@ keybindings:
             --add-reviewer "$reviewer"
     issues:
         - key: p
-          name: open project
-          command: zsh -ic "proj {{.RepoName}}"
+          name: open issue session
+          command: zsh -ic "issuesesh {{.RepoName}} {{.IssueNumber}}"
         - key: a
           name: open agent
           command: zsh -ic "agent {{.RepoName}}"
