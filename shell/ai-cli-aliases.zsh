@@ -201,6 +201,12 @@ _sync_worktree_files() {
 # Git helpers
 # =============================================================================
 
+# Return the main worktree root even when called from inside a worktree.
+# git rev-parse --show-toplevel returns the worktree dir, not the main repo.
+_git_main_root() {
+  git worktree list 2>/dev/null | awk 'NR==1 {print $1}'
+}
+
 # Switch to main and pull latest (stashes and restores uncommitted changes)
 gm() {
   local stashed=false
@@ -479,9 +485,9 @@ feat() {
     return 1
   fi
 
-  # Get project root (navigate up to find .git)
+  # Get project root (always resolves to main repo, not a worktree subdir)
   local root
-  root=$(git rev-parse --show-toplevel 2>/dev/null)
+  root=$(_git_main_root)
   if [[ -z "$root" ]]; then
     echo "Error: Not in a git repository"
     return 1
@@ -514,7 +520,7 @@ feat-done() {
   fi
 
   local root
-  root=$(git rev-parse --show-toplevel 2>/dev/null)
+  root=$(_git_main_root)
   if [[ -z "$root" ]]; then
     echo "Error: Not in a git repository"
     return 1
@@ -535,7 +541,7 @@ feat-done() {
 # List all feature worktrees
 feat-list() {
   local root
-  root=$(git rev-parse --show-toplevel 2>/dev/null)
+  root=$(_git_main_root)
   if [[ -z "$root" ]]; then
     echo "Error: Not in a git repository"
     return 1
@@ -690,7 +696,7 @@ agent() {
   elif [[ -n "$input" ]]; then
     # agent <name> - check for worktree in current repo, else project
     local git_root
-    git_root=$(git rev-parse --show-toplevel 2>/dev/null)
+    git_root=$(_git_main_root)
 
     if [[ -n "$git_root" && -d "$git_root/worktrees/$input" ]]; then
       # Exact worktree match in current repo
@@ -711,7 +717,7 @@ agent() {
   else
     # agent - use current project
     local git_root
-    git_root=$(git rev-parse --show-toplevel 2>/dev/null)
+    git_root=$(_git_main_root)
 
     if [[ -n "$git_root" ]]; then
       project=$(basename "$git_root")
@@ -719,7 +725,7 @@ agent() {
       project=$(basename "$PWD")
     fi
     session_name="agent-${project}"
-    work_dir="${git_root:-$PWD}"
+    work_dir="${PWD}"
   fi
 
   # Ensure the session exists (start detached; we enter it ourselves below)
@@ -744,9 +750,9 @@ agent-feat() {
     return 1
   fi
 
-  # Get project root
+  # Get project root (always resolves to main repo, not a worktree subdir)
   local root
-  root=$(git rev-parse --show-toplevel 2>/dev/null)
+  root=$(_git_main_root)
   if [[ -z "$root" ]]; then
     echo "Error: Not in a git repository"
     return 1
@@ -798,7 +804,7 @@ agent-feat-done() {
   fi
 
   local root
-  root=$(git rev-parse --show-toplevel 2>/dev/null)
+  root=$(_git_main_root)
   if [[ -z "$root" ]]; then
     echo "Error: Not in a git repository"
     return 1
