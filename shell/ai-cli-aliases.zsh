@@ -303,6 +303,86 @@ proj() {
   _enter_session "=$project"
 }
 
+# Open a pull request branch in its own worktree session.
+# Usage: prsesh <org/repo> <pr-number>
+# Checks out the PR (forks included) into a worktree under the repo
+# and starts a dedicated tmux session for it.
+prsesh() {
+  local repo="$1"
+  local num="$2"
+  if [[ -z "$repo" || -z "$num" ]]; then
+    echo "Usage: prsesh <org/repo> <pr-number>"
+    return 1
+  fi
+
+  # Resolve the local repo checkout
+  local project_path
+  project_path=$(_find_project "$repo")
+  if [[ $? -ne 0 ]]; then
+    return 1
+  fi
+  local root="$CODE_DIR/$project_path"
+
+  # Look up the PR branch name
+  local branch
+  branch=$(gh pr view "$num" -R "$repo" \
+    --json headRefName -q .headRefName 2>/dev/null)
+  if [[ -z "$branch" ]]; then
+    echo "Error: could not resolve PR #$num on $repo" >&2
+    return 1
+  fi
+
+  local wt="$root/worktrees/$branch"
+  local session="${project_path##*/}-${branch}"
+  session=$(echo "$session" | sed 's/[^a-zA-Z0-9_-]/_/g')
+
+  # Check out the PR into its own worktree if needed
+  if [[ ! -d "$wt" ]]; then
+    mkdir -p "$root/worktrees"
+    if git -C "$root" show-ref --verify --quiet \
+      "refs/heads/$branch"; then
+      git -C "$root" worktree add "$wt" "$branch" || return 1
+    else
+      git -C "$root" worktree add --detach "$wt" \
+        >/dev/null || return 1
+      if ! ( cd "$wt" && gh pr checkout "$num" ); then
+        echo "Error: gh pr checkout $num failed" >&2
+        git -C "$root" worktree remove --force "$wt" 2>/dev/null
+        return 1
+      fi
+    fi
+    _sync_worktree_files "$root" "$wt" &
+  fi
+
+  # Start a dedicated session rooted at the worktree (nvim/ai/repl)
+  if ! tmux has-session -t "=$session" 2>/dev/null; then
+    local repl="zsh"
+    if [[ -f "$wt/Project.toml" ]]; then
+      repl="julia --project=."
+    elif [[ -f "$wt/DESCRIPTION" ]]; then
+      repl="R"
+    fi
+
+    # Track panes by id so layout is immune to pane-base-index
+    local p0 p1 p2
+    p0=$(tmux new-session -d -P -F '#{pane_id}' \
+      -s "$session" -c "$wt" -n main)
+    tmux select-pane -t "$p0" -T "nvim"
+    tmux send-keys -t "$p0" "nvim ." Enter
+    p1=$(tmux split-window -t "$p0" -h -c "$wt" \
+      -P -F '#{pane_id}')
+    tmux select-pane -t "$p1" -T "ai:$branch"
+    tmux send-keys -t "$p1" "${AGENT_CLI_DEV_TOOL}" Enter
+    p2=$(tmux split-window -t "$p1" -v -c "$wt" \
+      -P -F '#{pane_id}')
+    tmux select-pane -t "$p2" -T "repl"
+    tmux send-keys -t "$p2" "$repl" Enter
+    tmux select-pane -t "$p0"
+  fi
+
+  _enter_session "=$session"
+}
+
 # Create a new feature worktree as a window in the current session
 # Usage: feat <branch-name> [base-branch]
 feat() {
