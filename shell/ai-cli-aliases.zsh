@@ -234,6 +234,49 @@ _enter_session() {
   fi
 }
 
+# Build the standard nvim / ai / repl layout from a first (nvim) pane.
+# Panes are tracked by id so this is immune to pane-base-index.
+# Usage: _build_panes <nvim-pane-id> <dir> <ai-title> [repl-cmd]
+_build_panes() {
+  local p0="$1"
+  local dir="$2"
+  local ai_title="$3"
+  local repl="$4"
+  if [[ -z "$repl" ]]; then
+    repl="zsh"
+    if [[ -f "$dir/Project.toml" ]]; then
+      repl="julia --project=."
+    elif [[ -f "$dir/DESCRIPTION" ]]; then
+      repl="R"
+    fi
+  fi
+
+  local p1 p2
+  tmux select-pane -t "$p0" -T "nvim"
+  tmux send-keys -t "$p0" "nvim ." Enter
+  p1=$(tmux split-window -t "$p0" -h -c "$dir" -P -F '#{pane_id}')
+  tmux select-pane -t "$p1" -T "$ai_title"
+  tmux send-keys -t "$p1" "${AGENT_CLI_DEV_TOOL}" Enter
+  p2=$(tmux split-window -t "$p1" -v -c "$dir" -P -F '#{pane_id}')
+  tmux select-pane -t "$p2" -T "repl"
+  tmux send-keys -t "$p2" "$repl" Enter
+  tmux select-pane -t "$p0"
+}
+
+# Create a detached nvim / ai / repl session if it does not exist.
+# Usage: _ensure_session <session> <dir> <ai-title>
+_ensure_session() {
+  local session="$1"
+  local dir="$2"
+  local ai_title="$3"
+  if ! tmux has-session -t "=$session" 2>/dev/null; then
+    local p0
+    p0=$(tmux new-session -d -P -F '#{pane_id}' \
+      -s "$session" -c "$dir" -n main)
+    _build_panes "$p0" "$dir" "$ai_title"
+  fi
+}
+
 # Start a project session with tmuxinator
 # Usage: proj <project-name>
 # Supports partial name matching (e.g., proj epi -> epinowcast)
@@ -278,28 +321,10 @@ proj() {
       _sync_worktree_files "$root" "$wt" &
     fi
 
-    local repl="zsh"
-    if [[ -f "$wt/Project.toml" ]]; then
-      repl="julia --project=."
-    elif [[ -f "$wt/DESCRIPTION" ]]; then
-      repl="R"
-    fi
-
-    # Track panes by id so layout is immune to pane-base-index
-    local p0 p1 p2
+    local p0
     p0=$(tmux new-window -t "=$project" -n "$branch" -c "$wt" \
       -P -F '#{pane_id}')
-    tmux select-pane -t "$p0" -T "nvim"
-    tmux send-keys -t "$p0" "nvim ." Enter
-    p1=$(tmux split-window -t "$p0" -h -c "$wt" \
-      -P -F '#{pane_id}')
-    tmux select-pane -t "$p1" -T "ai:$branch"
-    tmux send-keys -t "$p1" "${AGENT_CLI_DEV_TOOL}" Enter
-    p2=$(tmux split-window -t "$p1" -v -c "$wt" \
-      -P -F '#{pane_id}')
-    tmux select-pane -t "$p2" -T "repl"
-    tmux send-keys -t "$p2" "$repl" Enter
-    tmux select-pane -t "$p0"
+    _build_panes "$p0" "$wt" "ai:$branch"
   fi
 
   _enter_session "=$project"
@@ -365,31 +390,75 @@ prsesh() {
   fi
 
   # Start a dedicated session rooted at the worktree (nvim/ai/repl)
-  if ! tmux has-session -t "=$session" 2>/dev/null; then
-    local repl="zsh"
-    if [[ -f "$wt/Project.toml" ]]; then
-      repl="julia --project=."
-    elif [[ -f "$wt/DESCRIPTION" ]]; then
-      repl="R"
-    fi
+  _ensure_session "$session" "$wt" "ai:$branch"
+  _enter_session "=$session"
+}
 
-    # Track panes by id so layout is immune to pane-base-index
-    local p0 p1 p2
-    p0=$(tmux new-session -d -P -F '#{pane_id}' \
-      -s "$session" -c "$wt" -n main)
-    tmux select-pane -t "$p0" -T "nvim"
-    tmux send-keys -t "$p0" "nvim ." Enter
-    p1=$(tmux split-window -t "$p0" -h -c "$wt" \
-      -P -F '#{pane_id}')
-    tmux select-pane -t "$p1" -T "ai:$branch"
-    tmux send-keys -t "$p1" "${AGENT_CLI_DEV_TOOL}" Enter
-    p2=$(tmux split-window -t "$p1" -v -c "$wt" \
-      -P -F '#{pane_id}')
-    tmux select-pane -t "$p2" -T "repl"
-    tmux send-keys -t "$p2" "$repl" Enter
-    tmux select-pane -t "$p0"
+# Open an issue's linked branch in its own worktree session.
+# Usage: issuesesh <org/repo> <issue-number>
+# Reuses the branch GitHub links to the issue, or creates one with
+# `gh issue develop`, then opens a dedicated session for it.
+issuesesh() {
+  local repo="$1"
+  local num="$2"
+  if [[ -z "$repo" || -z "$num" ]]; then
+    echo "Usage: issuesesh <org/repo> <issue-number>"
+    return 1
   fi
 
+  # Resolve the local repo checkout
+  local project_path
+  project_path=$(_find_project "$repo")
+  if [[ $? -ne 0 ]]; then
+    return 1
+  fi
+  local root="$CODE_DIR/$project_path"
+
+  # Reuse an existing linked branch, else create one on GitHub
+  local branch
+  branch=$(gh issue develop --list "$num" -R "$repo" 2>/dev/null \
+    | head -1 | awk '{print $1}')
+  if [[ -z "$branch" ]]; then
+    echo "Creating linked branch for issue #$num..."
+    if ! gh issue develop "$num" -R "$repo" >/dev/null 2>&1; then
+      echo "Error: gh issue develop $num failed" >&2
+      return 1
+    fi
+    branch=$(gh issue develop --list "$num" -R "$repo" 2>/dev/null \
+      | head -1 | awk '{print $1}')
+  fi
+  if [[ -z "$branch" ]]; then
+    echo "Error: could not resolve linked branch for #$num" >&2
+    return 1
+  fi
+
+  local wt="$root/worktrees/$branch"
+  local session="${project_path##*/}-${branch}"
+  session=$(echo "$session" | sed 's/[^a-zA-Z0-9_-]/_/g')
+
+  # Add a worktree for the linked branch if needed
+  local reused=true
+  if [[ ! -d "$wt" ]]; then
+    reused=false
+    mkdir -p "$root/worktrees"
+    git -C "$root" fetch origin "$branch" 2>/dev/null
+    if git -C "$root" show-ref --verify --quiet \
+      "refs/heads/$branch"; then
+      git -C "$root" worktree add "$wt" "$branch" || return 1
+    else
+      git -C "$root" worktree add --track -b "$branch" \
+        "$wt" "origin/$branch" || return 1
+    fi
+    _sync_worktree_files "$root" "$wt" &
+  fi
+
+  # Pull a reused worktree so it reflects new commits on the branch
+  if $reused; then
+    git -C "$wt" pull --ff-only 2>/dev/null \
+      || echo "Note: '$branch' could not fast-forward (diverged?)" >&2
+  fi
+
+  _ensure_session "$session" "$wt" "ai:$branch"
   _enter_session "=$session"
 }
 
@@ -427,35 +496,11 @@ feat() {
     _sync_worktree_files "$root" "$worktree_path" &
   fi
 
-  # Detect REPL type
-  local repl="zsh"
-  if [[ -f "$worktree_path/Project.toml" ]]; then
-    repl="julia --project=."
-  elif [[ -f "$worktree_path/DESCRIPTION" ]]; then
-    repl="R"
-  fi
-
-  # Create new window with standard layout; track the nvim pane by id
+  # Create new window with the standard nvim/ai/repl layout
   local nvim_pane
   nvim_pane=$(tmux new-window -n "$branch" -c "$worktree_path" \
     -P -F '#{pane_id}')
-
-  # nvim (left)
-  tmux select-pane -T "nvim"
-  tmux send-keys "nvim ." Enter
-
-  # ai (top-right)
-  tmux split-window -h -c "$worktree_path"
-  tmux select-pane -T "ai:$branch"
-  tmux send-keys "${AGENT_CLI_DEV_TOOL}" Enter
-
-  # REPL (bottom-right)
-  tmux split-window -v -c "$worktree_path"
-  tmux select-pane -T "repl"
-  tmux send-keys "$repl" Enter
-
-  # Return focus to nvim
-  tmux select-pane -t "$nvim_pane"
+  _build_panes "$nvim_pane" "$worktree_path" "ai:$branch"
 }
 
 # Clean up a feature worktree and close its window
