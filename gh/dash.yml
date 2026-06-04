@@ -39,7 +39,11 @@ repo:
     prsRefetchIntervalSeconds: 60
 defaults:
     preview:
-        open: true
+        # Keep closed: under tmux (TERM=tmux-256color) the terminal swallows
+        # gh-dash's OSC 11 background query, so its markdown style is never
+        # initialised and rendering a PR preview panics (nil deref in
+        # GetMarkdownRenderer). Toggle open in-session at your own risk.
+        open: false
         width: 50
     prsLimit: 20
     prApproveComment: LGTM
