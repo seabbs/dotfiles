@@ -93,6 +93,9 @@ keybindings:
         - key: a
           name: open agent
           command: zsh -ic "agent {{.RepoName}}"
+        - key: w
+          name: open PR worktree session
+          command: zsh -ic "prsesh {{.RepoName}} {{.PrNumber}}"
         - key: C
           name: code review
           command: >
