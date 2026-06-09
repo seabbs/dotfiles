@@ -17,4 +17,12 @@ if [[ -n "$sysglibc" ]] &&
   brew install glibc
 fi
 
+# Put Homebrew on PATH for non-interactive shells too (zsh sources .zshenv
+# for every invocation), so tools like mosh-server are found when connecting
+# over ssh/mosh, not just in interactive sessions.
+if ! grep -q "brew shellenv" "$HOME/.zshenv" 2>/dev/null; then
+  echo 'eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"' \
+    >> "$HOME/.zshenv"
+fi
+
 bash scripts/common-tools.sh
