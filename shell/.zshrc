@@ -1,5 +1,16 @@
-source /opt/homebrew/share/zsh-autocomplete/zsh-autocomplete.plugin.zsh
-source /opt/homebrew/share/zsh-autosuggestions/zsh-autosuggestions.zsh
+# Homebrew prefix: Apple Silicon, Intel mac, or Linuxbrew
+for _brew in /opt/homebrew/bin/brew /usr/local/bin/brew \
+  /home/linuxbrew/.linuxbrew/bin/brew; do
+  [[ -x "$_brew" ]] && eval "$("$_brew" shellenv)" && break
+done
+unset _brew
+
+# zsh plugins from Homebrew (guarded so a fresh box doesn't error)
+for _p in zsh-autocomplete/zsh-autocomplete.plugin.zsh \
+  zsh-autosuggestions/zsh-autosuggestions.zsh; do
+  [[ -f "$HOMEBREW_PREFIX/share/$_p" ]] && source "$HOMEBREW_PREFIX/share/$_p"
+done
+unset _p
 
 # Vi-style line editing (Esc for normal mode, i/a for insert)
 bindkey -v
@@ -29,6 +40,13 @@ eval "$(starship init zsh)"
 alias python=python3
 alias pip=pip3
 alias R=radian
+
+# Tailscale CLI on macOS lives inside the App Store bundle; a symlink
+# breaks bundle resolution, so alias to the real path instead.
+if [[ "$OSTYPE" == darwin* && -x \
+  "/Applications/Tailscale.app/Contents/MacOS/Tailscale" ]]; then
+  alias tailscale="/Applications/Tailscale.app/Contents/MacOS/Tailscale"
+fi
 export EDITOR="nvim"
 export JULIA_NUM_THREADS=auto
 export JULIA_PROJECT=@.
