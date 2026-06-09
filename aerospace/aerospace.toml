@@ -92,6 +92,13 @@ alt-w = '''exec-and-forget /Applications/Ghostty.app/Contents/MacOS/ghostty -e b
 '
 '''
 
+# ----- Connect to archie agents hub (direct, no local tmux so no nesting) -----
+alt-a = '''exec-and-forget /Applications/Ghostty.app/Contents/MacOS/ghostty -e bash -c '
+  export PATH="/opt/homebrew/bin:$PATH"
+  mosh archie
+'
+'''
+
 # ----- Clipboard URL opener -----
 alt-o = '''exec-and-forget bash -c '
   url=$(pbpaste)
