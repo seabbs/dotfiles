@@ -116,6 +116,14 @@ alias ghbot='gh auth switch --user seabbs-bot'
 alias ghme='gh auth switch --user seabbs'
 alias dashboard='GH_TOKEN=$(gh auth token --user seabbs) gh dash'
 
+# Agents hub (archie): every interactive shell drops into the persistent
+# tmux "home" session, mirroring how ghostty auto-launches tmux locally.
+# Guarded to archie only and skipped inside tmux, so it never nests and
+# never affects the mac. Works for both ssh and mosh logins.
+if [[ -o interactive && -z "$TMUX" && "${HOST%%.*}" == "archie" ]]; then
+  tmux new-session -A -s home -c "$HOME/code"
+fi
+
 # Added by LM Studio CLI (lms)
 export PATH="$PATH:/Users/lshsa2/.lmstudio/bin"
 # End of LM Studio CLI section
