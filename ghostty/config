@@ -6,7 +6,7 @@ font-family = JetBrains Mono
 font-size = 14
 
 # Theme (matches nvim/tmux catppuccin)
-theme = catppuccin-macchiato
+theme = Catppuccin Macchiato
 
 # Window
 window-padding-x = 4
