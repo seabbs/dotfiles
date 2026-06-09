@@ -6,19 +6,15 @@ if [[ "$(uname)" == "Darwin" ]]; then
   brew install --cask r
 else
   brew install r
-  # Linuxbrew's R Makeconf can hardcode a gcc version that differs from the
-  # gcc Homebrew actually installed, which breaks package compilation. Alias
-  # the expected compiler names to the installed gcc so R can build packages.
+  # brew R's Makeconf expects a specific distro gcc (e.g. gcc-12) that
+  # matches the system assembler. brew's own gcc is too new for older
+  # binutils (its asm fails to assemble), so install the matching distro
+  # compilers from apt instead.
   makeconf="$(brew --prefix r)/lib/R/etc/Makeconf"
   want=$(grep -oE '^CC = gcc-[0-9]+' "$makeconf" | grep -oE '[0-9]+$')
-  have=$(ls "$(brew --prefix)"/bin/gcc-* 2>/dev/null \
-    | grep -oE '[0-9]+$' | sort -n | tail -1)
-  if [[ -n "$want" && -n "$have" && "$want" != "$have" ]]; then
-    for v in gcc g++ gfortran; do
-      ln -sf "$(brew --prefix)/bin/${v}-${have}" \
-        "$(brew --prefix)/bin/${v}-${want}"
-    done
-    echo "Aliased gcc-${want} -> gcc-${have} for R package compilation"
+  if [[ -n "$want" ]] && ! command -v "gcc-${want}" >/dev/null; then
+    sudo apt-get install -y \
+      "gcc-${want}" "g++-${want}" "gfortran-${want}"
   fi
 fi
 
