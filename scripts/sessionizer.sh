@@ -27,12 +27,31 @@ declare -A EXTRA_ROOTS=(
   [notes]="$HOME/Library/CloudStorage/GoogleDrive-s.e.abbott12@gmail.com/My Drive/cloud/apps/obsidian/notes"
 )
 
+# Remote hub hosts to span (space-separated ssh aliases), overridable via env.
+HUB_HOSTS="${HUB_HOSTS:-archie}"
+# Host scope for cross-machine listing: all | home | <hub host>. Cycled with
+# C-r in the picker, reset to "all" on each launch.
+HOST_STATE="${TMPDIR:-/tmp}/sessionizer-host"
+host_scope() { cat "$HOST_STATE" 2>/dev/null || echo all; }
+self_host() { hostname -s; }
+# Hub hosts other than the current machine.
+remote_hubs() {
+  local h
+  for h in $HUB_HOSTS; do [[ "$h" != "$(self_host)" ]] && echo "$h"; done
+}
+
+# Active sessions merged across home + hub hosts (deduped by name; the host is
+# shown when picking a window in step 2). Respects the current host scope.
 list_sessions() {
-  tmux list-sessions \
-    -F '#{session_activity} #{session_name}' \
-    2>/dev/null \
-    | sort -rn \
-    | awk '{print "[active] " $2}'
+  local scope h; scope="$(host_scope)"
+  {
+    [[ "$scope" == "all" || "$scope" == "home" ]] && tmux list-sessions \
+      -F '#{session_name}' 2>/dev/null
+    for h in $(remote_hubs); do
+      [[ "$scope" == "all" || "$scope" == "$h" ]] && ssh "$h" \
+        "tmux list-sessions -F '#{session_name}'" 2>/dev/null
+    done
+  } | sort -u | awk 'NF {print "[active] " $1}'
 }
 
 list_projects() {
@@ -77,26 +96,23 @@ list_extras() {
   done | sort
 }
 
-# Windows on the archie agents hub (skipped when running on archie itself).
-list_archie() {
-  [[ "$(hostname -s)" == "archie" ]] && return 0
-  ssh archie \
-    "tmux list-windows -a -F '#{session_name}:#{window_index} #{window_name}'" \
-    2>/dev/null | sed 's/^/[archie] /'
-}
-
 list_all() {
   list_sessions
-  list_archie
   echo "────────────"
   list_extras
   list_projects
 }
 
 list_windows() {
-  local session="$1"
-  tmux list-windows -t "=$session" \
-    -F '#{window_index}:#{window_name}' 2>/dev/null
+  local session="$1" scope h; scope="$(host_scope)"
+  [[ "$scope" == "all" || "$scope" == "home" ]] && tmux list-windows \
+    -t "=$session" -F '#{window_index}:#{window_name}' 2>/dev/null \
+    | sed 's/^/[home] /'
+  for h in $(remote_hubs); do
+    [[ "$scope" == "all" || "$scope" == "$h" ]] && ssh "$h" \
+      "tmux list-windows -t '=$session' -F '#{window_index}:#{window_name}'" \
+      2>/dev/null | sed "s/^/[$h] /"
+  done
 }
 
 # Handle flags for fzf reload
@@ -106,7 +122,18 @@ case "${1:-}" in
   --list-projects)   list_projects; exit 0 ;;
   --list-worktrees)  list_worktrees; exit 0 ;;
   --list-extras)     list_extras; exit 0 ;;
-  --list-archie)     list_archie; exit 0 ;;
+  --cycle-host)
+    cur="$(host_scope)"
+    order=(all home $(remote_hubs))
+    n=all
+    for i in "${!order[@]}"; do
+      [[ "${order[$i]}" == "$cur" ]] && \
+        n="${order[$(( (i + 1) % ${#order[@]} ))]}" && break
+    done
+    echo "$n" > "$HOST_STATE"
+    printf 'change-prompt(%s ❯ )+reload(%s --list-all)' "$n" "$0"
+    exit 0
+    ;;
   --list-windows)    list_windows "$2"; exit 0 ;;
   --kill-session)
     tmux kill-session -t "=$2" 2>/dev/null
@@ -147,18 +174,21 @@ case "${1:-}" in
     ;;
 esac
 
+# A fresh launch spans all hosts.
+echo all > "$HOST_STATE"
+
 # Step 1: pick a session or project
 result=$(list_all | fzf \
   --no-sort \
   --border-label ' sessions ' \
   --prompt '  ' \
   --header \
-    'C-a all  C-s sessions  C-r archie  C-p projects  C-w worktrees  C-e extras  C-d kill' \
+    'C-a all  C-s sessions  C-r host  C-p projects  C-w worktrees  C-e extras  C-d kill' \
   --print-query \
   --bind 'tab:down,btab:up' \
   --bind "ctrl-a:change-prompt(  )+reload($0 --list-all)" \
   --bind "ctrl-s:change-prompt(  )+reload($0 --list-sessions)" \
-  --bind "ctrl-r:change-prompt(  )+reload($0 --list-archie)" \
+  --bind "ctrl-r:transform($0 --cycle-host)" \
   --bind "ctrl-p:change-prompt(  )+reload($0 --list-projects)" \
   --bind "ctrl-w:change-prompt(  )+reload($0 --list-worktrees)" \
   --bind "ctrl-e:change-prompt(  )+reload($0 --list-extras)" \
@@ -188,27 +218,7 @@ if [[ -z "$selected" && -n "$query" ]]; then
 fi
 
 # Resolve session name
-if [[ "$selected" == "[archie] "* ]]; then
-  # archie window: switch archie's tmux to it, then focus the archie ghostty
-  # window (opening one via mosh if none is up). No local step-2 window pick.
-  entry="${selected#\[archie\] }"
-  target="${entry%% *}"          # session:index
-  asession="${target%:*}"
-  ssh archie \
-    "tmux switch-client -t '$asession' \; select-window -t '$target'" \
-    2>/dev/null || true
-  AS=/opt/homebrew/bin/aerospace
-  win=$("$AS" list-windows --all 2>/dev/null \
-    | grep -i ghostty | grep -i archie | head -1 | cut -d'|' -f1 | tr -d ' ')
-  if [[ -n "$win" ]]; then
-    "$AS" focus --window-id "$win"
-  else
-    /Applications/Ghostty.app/Contents/MacOS/ghostty \
-      -e bash -c 'export PATH="/opt/homebrew/bin:$PATH"; mosh archie'
-  fi
-  exit 0
-
-elif [[ "$selected" == "[active] "* ]]; then
+if [[ "$selected" == "[active] "* ]]; then
   session="${selected#\[active\] }"
 
 elif [[ "$selected" == "[dir] "* ]]; then
@@ -296,7 +306,7 @@ result=$(list_windows "$session" | fzf \
   --header 'Enter=select  C-d=kill  C-l=linked view  Type=new' \
   --print-query \
   --bind 'tab:down,btab:up' \
-  --bind "ctrl-d:execute-silent($0 --kill-window $session {1})+reload($0 --list-windows $session)" \
+  --bind "ctrl-d:execute-silent($0 --kill-window $session {2})+reload($0 --list-windows $session)" \
   --bind "ctrl-l:execute-silent($0 --link-session $session)+abort" \
 )
 
@@ -319,10 +329,30 @@ get_project_root() {
 }
 
 if [[ -n "$match" ]]; then
-  # Matched an existing window: switch to it
+  # Matched an existing window: route by its host tag ([home]/[hub]).
+  host_tag="${match%%] *}"; host_tag="${host_tag#[}"
+  match="${match#\[*\] }"
   win_index="${match%%:*}"
-  tmux switch-client -t "=$session"
-  tmux select-window -t "=$session:$win_index"
+  if [[ "$host_tag" == "home" ]]; then
+    tmux switch-client -t "=$session"
+    tmux select-window -t "=$session:$win_index"
+  else
+    # Remote: switch that host's tmux, then focus its ghostty window (whose
+    # title shows the host) or open one via mosh.
+    ssh "$host_tag" \
+      "tmux switch-client -t '=$session' \; select-window -t '=$session:$win_index'" \
+      2>/dev/null || true
+    AS=/opt/homebrew/bin/aerospace
+    awin=$("$AS" list-windows --all 2>/dev/null \
+      | grep -i ghostty | grep -i "$host_tag" | head -1 \
+      | cut -d'|' -f1 | tr -d ' ')
+    if [[ -n "$awin" ]]; then
+      "$AS" focus --window-id "$awin"
+    else
+      /Applications/Ghostty.app/Contents/MacOS/ghostty \
+        -e bash -c "export PATH=\"/opt/homebrew/bin:\$PATH\"; mosh $host_tag"
+    fi
+  fi
 else
   # No match: ask what kind of window to create
   win_type=$(printf "feature branch\nbare terminal" \
