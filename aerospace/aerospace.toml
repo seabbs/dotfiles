@@ -95,6 +95,11 @@ alt-w = '''exec-and-forget /Applications/Ghostty.app/Contents/MacOS/ghostty -e b
 # ----- Jump to archie agents hub: focus its window or open one (no nesting) -----
 alt-a = 'exec-and-forget $HOME/code/seabbs/dotfiles/scripts/aerospace-archie.sh'
 
+# ----- Dedicated home finders (fire above tmux, so they work everywhere) -----
+# Ctrl+Cmd+F = cross-machine window finder, Ctrl+Cmd+A = agent finder.
+cmd-ctrl-f = 'exec-and-forget $HOME/code/seabbs/dotfiles/scripts/home-finder.sh windows'
+cmd-ctrl-a = 'exec-and-forget $HOME/code/seabbs/dotfiles/scripts/home-finder.sh agents'
+
 # ----- Clipboard URL opener -----
 alt-o = '''exec-and-forget bash -c '
   url=$(pbpaste)
