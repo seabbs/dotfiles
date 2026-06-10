@@ -12,6 +12,30 @@
 
 STATUS_DIR="$HOME/.agent/session-monitor"
 
+# Remote hub hosts to span (space-separated ssh aliases), overridable via env.
+HUB_HOSTS="${HUB_HOSTS:-archie}"
+HOST_STATE="${TMPDIR:-/tmp}/agent-host"
+RA='~/code/seabbs/dotfiles/scripts/agent-sessions.sh'
+host_scope() { cat "$HOST_STATE" 2>/dev/null || echo all; }
+self_host() { hostname -s; }
+remote_hubs() {
+  local h
+  for h in $HUB_HOSTS; do [ "$h" != "$(self_host)" ] && echo "$h"; done
+}
+
+# Agents merged across home + hub hosts, tagged [home]/[hub], scope-aware.
+list_hosts() {
+  local filter="${1:-}" scope h; scope="$(host_scope)"
+  if [ "$scope" = "all" ] || [ "$scope" = "home" ]; then
+    list_sessions "$filter" | sed 's/^/[home] /'
+  fi
+  for h in $(remote_hubs); do
+    if [ "$scope" = "all" ] || [ "$scope" = "$h" ]; then
+      ssh "$h" "$RA --list $filter" 2>/dev/null | sed "s/^/[$h] /"
+    fi
+  done
+}
+
 clean_stale() {
   [ -d "$STATUS_DIR" ] || return 0
   local files
@@ -238,6 +262,19 @@ purge_stale() {
 # Sub-commands
 case "${1:-}" in
   --list)   list_sessions "$2"; exit 0 ;;
+  --list-hosts) list_hosts "$2"; exit 0 ;;
+  --cycle-host)
+    cur="$(host_scope)"
+    order=(all home $(remote_hubs))
+    n=all
+    for i in "${!order[@]}"; do
+      [ "${order[$i]}" = "$cur" ] && \
+        n="${order[$(( (i + 1) % ${#order[@]} ))]}" && break
+    done
+    echo "$n" > "$HOST_STATE"
+    printf 'change-prompt(%s ❯ )+reload(%s --list-hosts)' "$n" "$0"
+    exit 0
+    ;;
   --count)  count_sessions; exit 0 ;;
   --status) status_bar; exit 0 ;;
   --clean)  clean_stale; exit 0 ;;
@@ -248,7 +285,8 @@ esac
 # Interactive: clean stale, then fzf picker
 clean_stale
 
-sessions=$(list_sessions)
+echo all > "$HOST_STATE"
+sessions=$(list_hosts)
 
 if [ -z "$sessions" ]; then
   printf "\n  No active agent sessions.\n"
@@ -263,21 +301,36 @@ selected=$(printf '%s\n' "$sessions" | fzf \
   --with-nth=1..4 \
   --border-label ' agent sessions ' \
   --prompt ' all  ' \
-  --header $'C-r refresh  C-a all  C-p ▲perm  C-o ●run  C-w ◐wait  C-i ○idle  C-x ✗stale  C-d purge' \
+  --header $'C-s host  C-r refresh  C-a all  C-p ▲perm  C-o ●run  C-w ◐wait  C-i ○idle  C-x ✗stale  C-d purge' \
   --bind 'tab:down,btab:up' \
-  --bind "ctrl-r:reload($0 --list)" \
-  --bind "ctrl-a:change-prompt( all  )+reload($0 --list)" \
-  --bind "ctrl-p:change-prompt( ▲ perm  )+reload($0 --list permission)" \
-  --bind "ctrl-o:change-prompt( ● run  )+reload($0 --list running)" \
-  --bind "ctrl-w:change-prompt( ◐ wait  )+reload($0 --list waiting)" \
-  --bind "ctrl-i:change-prompt( ○ idle  )+reload($0 --list idle)" \
-  --bind "ctrl-x:change-prompt( ✗ stale  )+reload($0 --list stale)" \
-  --bind "ctrl-d:execute-silent($0 --purge)+reload($0 --list)" \
+  --bind "ctrl-s:transform($0 --cycle-host)" \
+  --bind "ctrl-r:reload($0 --list-hosts)" \
+  --bind "ctrl-a:change-prompt( all  )+reload($0 --list-hosts)" \
+  --bind "ctrl-p:change-prompt( ▲ perm  )+reload($0 --list-hosts permission)" \
+  --bind "ctrl-o:change-prompt( ● run  )+reload($0 --list-hosts running)" \
+  --bind "ctrl-w:change-prompt( ◐ wait  )+reload($0 --list-hosts waiting)" \
+  --bind "ctrl-i:change-prompt( ○ idle  )+reload($0 --list-hosts idle)" \
+  --bind "ctrl-x:change-prompt( ✗ stale  )+reload($0 --list-hosts stale)" \
+  --bind "ctrl-d:execute-silent($0 --purge)+reload($0 --list-hosts)" \
 )
 
 [ -z "$selected" ] && exit 0
 
-# Session ID is the last tab-separated field
-sid=$(printf '%s' "$selected" \
-  | awk -F'\t' '{print $NF}')
-switch_to "$sid"
+# Route by host tag ([home]/[hub]); sid is the last tab-separated field.
+host_tag=$(printf '%s' "$selected" | sed -E 's/^\[([^]]+)\].*/\1/')
+sid=$(printf '%s' "$selected" | awk -F'\t' '{print $NF}')
+if [ "$host_tag" = "home" ]; then
+  switch_to "$sid"
+else
+  ssh "$host_tag" "$RA --switch '$sid'" 2>/dev/null || true
+  AS=/opt/homebrew/bin/aerospace
+  awin=$("$AS" list-windows --all 2>/dev/null \
+    | grep -i ghostty | grep -i "$host_tag" | head -1 \
+    | cut -d'|' -f1 | tr -d ' ')
+  if [ -n "$awin" ]; then
+    "$AS" focus --window-id "$awin"
+  else
+    /Applications/Ghostty.app/Contents/MacOS/ghostty \
+      -e bash -c "export PATH=\"/opt/homebrew/bin:\$PATH\"; mosh $host_tag"
+  fi
+fi
