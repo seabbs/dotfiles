@@ -2,11 +2,16 @@ XAuthLocation /opt/X11/bin/xauth
 TCPKeepAlive yes
 ServerAliveInterval 30
 
-# Personal Linux agents hub, reached over Tailscale (MagicDNS name)
+# Personal Linux agents hub, reached over Tailscale (MagicDNS name).
+# Multiplex connections so frequent calls (e.g. the status-bar agent monitor)
+# reuse one fast connection instead of a fresh handshake each time.
 Host archie
         HostName archie
         User seabbs
         Compression yes
+        ControlMaster auto
+        ControlPath ~/.ssh/cm-%r@%h:%p
+        ControlPersist 10m
 
 Host lshtm
         User lshsa2
