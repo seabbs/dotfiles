@@ -19,6 +19,7 @@ win=$("$AS" list-windows --all 2>/dev/null \
   | grep -i ghostty | grep -iv archie | head -1 | cut -d'|' -f1 | tr -d ' ')
 [ -n "$win" ] && "$AS" focus --window-id "$win"
 
-# Show the finder popup on the local tmux client (whatever session it is on).
-client=$("$TMUX" list-clients -F '#{client_name}' 2>/dev/null | head -1)
+# Show the finder popup on the most-recently-used local tmux client.
+client=$("$TMUX" list-clients -F '#{client_activity} #{client_name}' 2>/dev/null \
+  | sort -rn | head -1 | cut -d' ' -f2)
 [ -n "$client" ] && "$TMUX" display-popup -c "$client" -w 60% -h 60% -E "$script"
