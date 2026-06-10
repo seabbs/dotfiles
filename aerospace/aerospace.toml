@@ -76,8 +76,11 @@ alt-t = '''exec-and-forget osascript -e '
 # ----- Break window to new workspace -----
 alt-b = 'exec-and-forget $HOME/code/seabbs/dotfiles/scripts/aerospace-break-window.sh'
 
-# ----- fzf window finder (Alt+f = tmux prefix+f) -----
-alt-f = '''exec-and-forget /Applications/Ghostty.app/Contents/MacOS/ghostty -e bash -c '
+# ----- Cross-machine window finder (Alt+f, fires above tmux) -----
+alt-f = 'exec-and-forget $HOME/code/seabbs/dotfiles/scripts/home-finder.sh windows'
+
+# ----- macOS window switcher (moved here from Alt+f) -----
+alt-shift-f = '''exec-and-forget /Applications/Ghostty.app/Contents/MacOS/ghostty -e bash -c '
   export PATH="/opt/homebrew/bin:$PATH"
   win=$(aerospace list-windows --all \
     | fzf --prompt="Window> " --no-sort) \
@@ -92,13 +95,11 @@ alt-w = '''exec-and-forget /Applications/Ghostty.app/Contents/MacOS/ghostty -e b
 '
 '''
 
-# ----- Jump to archie agents hub: focus its window or open one (no nesting) -----
-alt-a = 'exec-and-forget $HOME/code/seabbs/dotfiles/scripts/aerospace-archie.sh'
+# ----- Cross-machine agent finder (Alt+a, fires above tmux) -----
+alt-a = 'exec-and-forget $HOME/code/seabbs/dotfiles/scripts/home-finder.sh agents'
 
-# ----- Dedicated home finders (fire above tmux, so they work everywhere) -----
-# Ctrl+Cmd+F = cross-machine window finder, Ctrl+Cmd+A = agent finder.
-cmd-ctrl-f = 'exec-and-forget $HOME/code/seabbs/dotfiles/scripts/home-finder.sh windows'
-cmd-ctrl-a = 'exec-and-forget $HOME/code/seabbs/dotfiles/scripts/home-finder.sh agents'
+# ----- Jump straight to the archie window (moved here from Alt+a) -----
+alt-shift-a = 'exec-and-forget $HOME/code/seabbs/dotfiles/scripts/aerospace-archie.sh'
 
 # ----- Clipboard URL opener -----
 alt-o = '''exec-and-forget bash -c '
