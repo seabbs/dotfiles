@@ -92,12 +92,8 @@ alt-w = '''exec-and-forget /Applications/Ghostty.app/Contents/MacOS/ghostty -e b
 '
 '''
 
-# ----- Connect to archie agents hub (direct, no local tmux so no nesting) -----
-alt-a = '''exec-and-forget /Applications/Ghostty.app/Contents/MacOS/ghostty -e bash -c '
-  export PATH="/opt/homebrew/bin:$PATH"
-  mosh archie
-'
-'''
+# ----- Jump to archie agents hub: focus its window or open one (no nesting) -----
+alt-a = 'exec-and-forget $HOME/code/seabbs/dotfiles/scripts/aerospace-archie.sh'
 
 # ----- Clipboard URL opener -----
 alt-o = '''exec-and-forget bash -c '
