@@ -40,18 +40,19 @@ remote_hubs() {
   for h in $HUB_HOSTS; do [[ "$h" != "$(self_host)" ]] && echo "$h"; done
 }
 
-# Active sessions merged across home + hub hosts (deduped by name; the host is
-# shown when picking a window in step 2). Respects the current host scope.
+# Active sessions merged across home + hub hosts, most-recently-active first
+# and deduped by name (the host is shown when picking a window in step 2).
+# Respects the current host scope.
 list_sessions() {
   local scope h; scope="$(host_scope)"
   {
     [[ "$scope" == "all" || "$scope" == "home" ]] && tmux list-sessions \
-      -F '#{session_name}' 2>/dev/null
+      -F '#{session_activity} #{session_name}' 2>/dev/null
     for h in $(remote_hubs); do
       [[ "$scope" == "all" || "$scope" == "$h" ]] && ssh "$h" \
-        "tmux list-sessions -F '#{session_name}'" 2>/dev/null
+        "tmux list-sessions -F '#{session_activity} #{session_name}'" 2>/dev/null
     done
-  } | sort -u | awk 'NF {print "[active] " $1}'
+  } | sort -rn | awk 'NF && !seen[$2]++ {print "[active] " $2}'
 }
 
 list_projects() {
