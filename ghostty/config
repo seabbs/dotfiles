@@ -19,8 +19,5 @@ shell-integration = zsh
 copy-on-select = clipboard
 mouse-hide-while-typing = true
 
-# Tabs act like machines: the first tab on launch is this machine (home tmux);
-# any new tab (cmd+t) opens the archie hub (mosh). Switch with cmd+1 / cmd+2
-# (or ctrl+tab). New local sessions live as tmux windows inside the home tab.
-initial-command = /bin/zsh -l -c "tmux new-session -A -s home -c $HOME/code"
-command = /bin/zsh -l -c "mosh archie"
+# Auto-launch tmux home session
+command = /bin/zsh -l -c "tmux new-session -A -s home -c $HOME/code"
