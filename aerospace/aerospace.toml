@@ -96,10 +96,8 @@ alt-w = '''exec-and-forget /Applications/Ghostty.app/Contents/MacOS/ghostty -e b
 '''
 
 # ----- Cross-machine agent finder (Alt+a, fires above tmux) -----
+# (Direct archie-window jump dropped; alt-f's finder opens/focuses archie.)
 alt-a = 'exec-and-forget $HOME/code/seabbs/dotfiles/scripts/home-finder.sh agents'
-
-# ----- Jump straight to the archie window (moved here from Alt+a) -----
-alt-shift-a = 'exec-and-forget $HOME/code/seabbs/dotfiles/scripts/aerospace-archie.sh'
 
 # ----- Clipboard URL opener -----
 alt-o = '''exec-and-forget bash -c '
