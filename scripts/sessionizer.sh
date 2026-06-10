@@ -77,8 +77,17 @@ list_extras() {
   done | sort
 }
 
+# Windows on the archie agents hub (skipped when running on archie itself).
+list_archie() {
+  [[ "$(hostname -s)" == "archie" ]] && return 0
+  ssh archie \
+    "tmux list-windows -a -F '#{session_name}:#{window_index} #{window_name}'" \
+    2>/dev/null | sed 's/^/[archie] /'
+}
+
 list_all() {
   list_sessions
+  list_archie
   echo "────────────"
   list_extras
   list_projects
@@ -97,6 +106,7 @@ case "${1:-}" in
   --list-projects)   list_projects; exit 0 ;;
   --list-worktrees)  list_worktrees; exit 0 ;;
   --list-extras)     list_extras; exit 0 ;;
+  --list-archie)     list_archie; exit 0 ;;
   --list-windows)    list_windows "$2"; exit 0 ;;
   --kill-session)
     tmux kill-session -t "=$2" 2>/dev/null
@@ -143,11 +153,12 @@ result=$(list_all | fzf \
   --border-label ' sessions ' \
   --prompt '  ' \
   --header \
-    'C-a all  C-s sessions  C-p projects  C-w worktrees  C-e extras  C-d kill' \
+    'C-a all  C-s sessions  C-r archie  C-p projects  C-w worktrees  C-e extras  C-d kill' \
   --print-query \
   --bind 'tab:down,btab:up' \
   --bind "ctrl-a:change-prompt(  )+reload($0 --list-all)" \
   --bind "ctrl-s:change-prompt(  )+reload($0 --list-sessions)" \
+  --bind "ctrl-r:change-prompt(  )+reload($0 --list-archie)" \
   --bind "ctrl-p:change-prompt(  )+reload($0 --list-projects)" \
   --bind "ctrl-w:change-prompt(  )+reload($0 --list-worktrees)" \
   --bind "ctrl-e:change-prompt(  )+reload($0 --list-extras)" \
@@ -177,7 +188,27 @@ if [[ -z "$selected" && -n "$query" ]]; then
 fi
 
 # Resolve session name
-if [[ "$selected" == "[active] "* ]]; then
+if [[ "$selected" == "[archie] "* ]]; then
+  # archie window: switch archie's tmux to it, then focus the archie ghostty
+  # window (opening one via mosh if none is up). No local step-2 window pick.
+  entry="${selected#\[archie\] }"
+  target="${entry%% *}"          # session:index
+  asession="${target%:*}"
+  ssh archie \
+    "tmux switch-client -t '$asession' \; select-window -t '$target'" \
+    2>/dev/null || true
+  AS=/opt/homebrew/bin/aerospace
+  win=$("$AS" list-windows --all 2>/dev/null \
+    | grep -i ghostty | grep -i archie | head -1 | cut -d'|' -f1 | tr -d ' ')
+  if [[ -n "$win" ]]; then
+    "$AS" focus --window-id "$win"
+  else
+    /Applications/Ghostty.app/Contents/MacOS/ghostty \
+      -e bash -c 'export PATH="/opt/homebrew/bin:$PATH"; mosh archie'
+  fi
+  exit 0
+
+elif [[ "$selected" == "[active] "* ]]; then
   session="${selected#\[active\] }"
 
 elif [[ "$selected" == "[dir] "* ]]; then
