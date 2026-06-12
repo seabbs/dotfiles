@@ -100,7 +100,7 @@ alt-w = '''exec-and-forget /Applications/Ghostty.app/Contents/MacOS/ghostty -e b
 alt-a = 'exec-and-forget $HOME/code/seabbs/dotfiles/scripts/home-finder.sh agents'
 
 # ----- Toggle last home <-> last hub (archie) session (fires above tmux) -----
-alt-backtick = 'exec-and-forget $HOME/code/seabbs/dotfiles/scripts/toggle-hub-home.sh'
+alt-g = 'exec-and-forget $HOME/code/seabbs/dotfiles/scripts/toggle-hub-home.sh'
 
 # ----- Clipboard URL opener -----
 alt-o = '''exec-and-forget bash -c '
