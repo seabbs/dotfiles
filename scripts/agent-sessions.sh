@@ -322,15 +322,12 @@ sid=$(printf '%s' "$selected" | awk -F'\t' '{print $NF}')
 if [ "$host_tag" = "home" ]; then
   switch_to "$sid"
 else
-  ssh "$host_tag" "$RA --switch '$sid'" 2>/dev/null || true
-  AS=/opt/homebrew/bin/aerospace
-  awin=$("$AS" list-windows --all 2>/dev/null \
-    | grep -i ghostty | grep -i "$host_tag" | head -1 \
-    | cut -d'|' -f1 | tr -d ' ')
-  if [ -n "$awin" ]; then
-    "$AS" focus --window-id "$awin"
-  else
-    /Applications/Ghostty.app/Contents/MacOS/ghostty \
-      -e bash -c "export PATH=\"/opt/homebrew/bin:\$PATH\"; mosh $host_tag"
+  # Remote hub: switch to its nested mosh session here (created on demand and
+  # flagged @hub for auto-passthrough), then jump that host's agent session.
+  if ! tmux has-session -t "=$host_tag" 2>/dev/null; then
+    tmux new-session -d -s "$host_tag" "/bin/zsh -lc 'mosh $host_tag'"
+    tmux set-option -t "=$host_tag" @hub 1
   fi
+  tmux switch-client -t "=$host_tag"
+  ssh "$host_tag" "$RA --switch '$sid'" 2>/dev/null || true
 fi
