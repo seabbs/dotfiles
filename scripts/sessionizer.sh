@@ -31,7 +31,10 @@ declare -A EXTRA_ROOTS=(
 HUB_HOSTS="${HUB_HOSTS:-archie}"
 # Host scope for cross-machine listing: all | home | <hub host>. Cycled with
 # C-r in the picker, reset to "all" on each launch.
-HOST_STATE="${TMPDIR:-/tmp}/sessionizer-host"
+HOST_STATE="$HOME/.cache/sessionizer-host"
+mkdir -p "$HOME/.cache" 2>/dev/null
+dbg() { [ -n "${SESSIONIZER_DEBUG:-}" ] && \
+  echo "$(date '+%T') $*" >> /tmp/sessionizer-debug.log; }
 host_scope() { cat "$HOST_STATE" 2>/dev/null || echo all; }
 self_host() { hostname -s; }
 # Hub hosts other than the current machine.
@@ -120,6 +123,7 @@ list_windows() {
 # session here. $1=hub  $2=session name  $3=working dir on the hub (e.g. ~).
 create_hub_session() {
   local hub="$1" sname="$2" dir="$3" repo="${4:-}"
+  dbg "create_hub_session hub=$hub sname=$sname dir=$dir repo=$repo"
   # Clone the repo on demand if it is not on the hub yet (gh credential helper
   # on the hub covers private repos).
   if [[ -n "$repo" ]]; then
@@ -245,6 +249,7 @@ if [[ -z "$selected" && -n "$query" ]]; then
   session=$(echo "$query" | tr -c 'A-Za-z0-9_-' '-' | sed 's/^-*//;s/-*$//')
   [[ -z "$session" ]] && exit 0
   hub="$(hub_scope)"
+  dbg "unmatched query=$query session=$session scope=$(host_scope) hub=$hub"
   if [[ -n "$hub" ]]; then
     create_hub_session "$hub" "$session" '~'
     exit 0
@@ -332,6 +337,7 @@ else
   session="$project"
 
   hub="$(hub_scope)"
+  dbg "project selected=$selected session=$session scope=$(host_scope) hub=$hub"
   if [[ -n "$hub" ]]; then
     create_hub_session "$hub" "$session" "~/code/$selected" "$selected"
     exit 0

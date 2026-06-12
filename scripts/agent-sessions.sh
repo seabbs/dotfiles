@@ -14,7 +14,8 @@ STATUS_DIR="$HOME/.agent/session-monitor"
 
 # Remote hub hosts to span (space-separated ssh aliases), overridable via env.
 HUB_HOSTS="${HUB_HOSTS:-archie}"
-HOST_STATE="${TMPDIR:-/tmp}/agent-host"
+HOST_STATE="$HOME/.cache/agent-host"
+mkdir -p "$HOME/.cache" 2>/dev/null
 RA='~/code/seabbs/dotfiles/scripts/agent-sessions.sh'
 host_scope() { cat "$HOST_STATE" 2>/dev/null || echo all; }
 self_host() { hostname -s; }
