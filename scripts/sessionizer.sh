@@ -119,7 +119,14 @@ list_windows() {
 # Create a session on a hub host (if missing) and jump into its nested mosh
 # session here. $1=hub  $2=session name  $3=working dir on the hub (e.g. ~).
 create_hub_session() {
-  local hub="$1" sname="$2" dir="$3"
+  local hub="$1" sname="$2" dir="$3" repo="${4:-}"
+  # Clone the repo on demand if it is not on the hub yet (gh credential helper
+  # on the hub covers private repos).
+  if [[ -n "$repo" ]]; then
+    ssh "$hub" \
+      "[ -d $dir ] || git clone https://github.com/$repo.git $dir" \
+      2>/dev/null || true
+  fi
   ssh "$hub" \
     "tmux has-session -t '=$sname' 2>/dev/null \
        || tmuxinator start project '$sname' '$dir' --no-attach" \
@@ -326,7 +333,7 @@ else
 
   hub="$(hub_scope)"
   if [[ -n "$hub" ]]; then
-    create_hub_session "$hub" "$session" "~/code/$selected"
+    create_hub_session "$hub" "$session" "~/code/$selected" "$selected"
     exit 0
   fi
   if ! tmux has-session -t "=$session" 2>/dev/null; then
