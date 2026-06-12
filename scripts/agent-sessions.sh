@@ -280,6 +280,11 @@ case "${1:-}" in
   --clean)  clean_stale; exit 0 ;;
   --purge)  purge_stale; exit 0 ;;
   --switch) switch_to "$2"; exit 0 ;;
+  --target)
+    [ -f "$STATUS_DIR/$2.json" ] \
+      && jq -r '.tmux_session // empty' "$STATUS_DIR/$2.json"
+    exit 0
+    ;;
 esac
 
 # Interactive: clean stale, then fzf picker
@@ -322,12 +327,17 @@ sid=$(printf '%s' "$selected" | awk -F'\t' '{print $NF}')
 if [ "$host_tag" = "home" ]; then
   switch_to "$sid"
 else
-  # Remote hub: switch to its nested mosh session here (created on demand and
-  # flagged @hub for auto-passthrough), then jump that host's agent session.
-  if ! tmux has-session -t "=$host_tag" 2>/dev/null; then
-    tmux new-session -d -s "$host_tag" "/bin/zsh -lc 'mosh $host_tag'"
-    tmux set-option -t "=$host_tag" @hub 1
+  # Remote hub: nested mosh session, created on demand (flagged @hub).
+  if tmux has-session -t "=$host_tag" 2>/dev/null; then
+    ssh "$host_tag" "$RA --switch '$sid'" 2>/dev/null || true
+  else
+    # First time: select the agent's window on the host, then attach that
+    # session directly via mosh so we land on it, not the host's home session.
+    tsession=$(ssh "$host_tag" "$RA --target '$sid'" 2>/dev/null)
+    ssh "$host_tag" "$RA --switch '$sid'" 2>/dev/null || true
+    tmux new-session -d -s "$host_tag" \
+      "/bin/zsh -lc 'mosh $host_tag -- tmux attach -t ${tsession:-home}'"
+    tmux set-option -t "$host_tag" @hub 1
   fi
   tmux switch-client -t "=$host_tag"
-  ssh "$host_tag" "$RA --switch '$sid'" 2>/dev/null || true
 fi
