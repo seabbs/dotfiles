@@ -49,28 +49,34 @@ remote_hubs() {
 list_sessions() {
   local scope h; scope="$(host_scope)"
   {
+    # Local block first (current machine ranks first), each block ordered by
+    # last activity; dedup keeps the local copy.
     [[ "$scope" == "all" || "$scope" == "home" ]] && tmux list-sessions \
-      -F '#{session_activity} #{session_name}' 2>/dev/null
+      -F '#{session_activity} #{session_name}' 2>/dev/null | sort -rn
     for h in $(remote_hubs); do
       [[ "$scope" == "all" || "$scope" == "$h" ]] && ssh "$h" \
-        "tmux list-sessions -F '#{session_activity} #{session_name}'" 2>/dev/null
+        "tmux list-sessions -F '#{session_activity} #{session_name}'" \
+        2>/dev/null | sort -rn
     done
-  } | sort -rn | awk 'NF && !seen[$2]++ {print "[active] " $2}'
+  } | awk 'NF && !seen[$2]++ {print "[active] " $2}'
 }
 
 list_projects() {
+  local dirs=() org_dir org proj_dir proj
   for org_dir in "$CODE_DIR"/*/; do
     org=$(basename "$org_dir")
     [[ "$org" == "archive" ]] && continue
-    for proj_dir in "$org_dir"/*/; do
-      [[ ! -d "$proj_dir" ]] && continue
+    for proj_dir in "$org_dir"*/; do
+      [[ -d "$proj_dir" ]] || continue
       proj=$(basename "$proj_dir")
-      [[ "$proj" == "worktrees" ]] && continue
-      [[ "$proj" == worktree-* ]] && continue
-      [[ "$proj" == .* ]] && continue
-      echo "$org/$proj"
+      [[ "$proj" == "worktrees" || "$proj" == worktree-* || "$proj" == .* ]] \
+        && continue
+      dirs+=("$proj_dir")
     done
   done
+  [[ ${#dirs[@]} -gt 0 ]] || return 0
+  # Order by last modified (most-recent first); ls -t works on mac and linux.
+  ls -dt "${dirs[@]}" 2>/dev/null | sed "s|^$CODE_DIR/||; s|/\$||"
 }
 
 list_worktrees() {
@@ -109,13 +115,14 @@ list_all() {
 
 list_windows() {
   local session="$1" scope h; scope="$(host_scope)"
+  local fmt='#{window_activity} #{window_index}:#{window_name}'
   [[ "$scope" == "all" || "$scope" == "home" ]] && tmux list-windows \
-    -t "=$session" -F '#{window_index}:#{window_name}' 2>/dev/null \
-    | sed 's/^/[home] /'
+    -t "=$session" -F "$fmt" 2>/dev/null \
+    | sort -rn | cut -d' ' -f2- | sed 's/^/[home] /'
   for h in $(remote_hubs); do
     [[ "$scope" == "all" || "$scope" == "$h" ]] && ssh "$h" \
-      "tmux list-windows -t '=$session' -F '#{window_index}:#{window_name}'" \
-      2>/dev/null | sed "s/^/[$h] /"
+      "tmux list-windows -t '=$session' -F '$fmt'" \
+      2>/dev/null | sort -rn | cut -d' ' -f2- | sed "s/^/[$h] /"
   done
 }
 
