@@ -116,6 +116,30 @@ list_windows() {
   done
 }
 
+# Create a session on a hub host (if missing) and jump into its nested mosh
+# session here. $1=hub  $2=session name  $3=working dir on the hub (e.g. ~).
+create_hub_session() {
+  local hub="$1" sname="$2" dir="$3"
+  ssh "$hub" \
+    "tmux has-session -t '=$sname' 2>/dev/null \
+       || tmuxinator start project '$sname' '$dir' --no-attach" \
+    2>/dev/null || true
+  if tmux has-session -t "=$hub" 2>/dev/null; then
+    ssh "$hub" "tmux switch-client -t '=$sname'" 2>/dev/null || true
+  else
+    tmux new-session -d -s "$hub" \
+      "/bin/zsh -lc 'mosh $hub -- tmux attach -t $sname'"
+    tmux set-option -t "$hub" @hub 1
+  fi
+  tmux switch-client -t "=$hub"
+}
+
+# The hub host currently filtered to (empty unless C-r is on a specific hub).
+hub_scope() {
+  local scope; scope="$(host_scope)"; local h
+  for h in $(remote_hubs); do [ "$scope" = "$h" ] && { echo "$h"; return; }; done
+}
+
 # Handle flags for fzf reload
 case "${1:-}" in
   --list-all)      list_all; exit 0 ;;
@@ -208,10 +232,16 @@ selected=$(echo "$result" | sed -n '2p')
 [[ -z "$selected" && -z "$query" ]] && exit 0
 [[ "$selected" == "────────────" ]] && exit 0
 
-# Unmatched query: ad-hoc session at $HOME named after the query
+# Unmatched query: ad-hoc session named after the query. If filtered to a hub,
+# create it there; otherwise locally at $HOME.
 if [[ -z "$selected" && -n "$query" ]]; then
   session=$(echo "$query" | tr -c 'A-Za-z0-9_-' '-' | sed 's/^-*//;s/-*$//')
   [[ -z "$session" ]] && exit 0
+  hub="$(hub_scope)"
+  if [[ -n "$hub" ]]; then
+    create_hub_session "$hub" "$session" '~'
+    exit 0
+  fi
   if ! tmux has-session -t "=$session" 2>/dev/null; then
     tmuxinator start project "$session" "$HOME" --no-attach
   fi
@@ -288,11 +318,17 @@ elif [[ "$selected" == *" :: "* ]]; then
   exit 0
 
 else
-  # Project path: create session if needed
+  # Project path: create session if needed. If filtered to a hub, create it
+  # there (same repo path under the hub's ~/code) and jump in.
   project="${selected##*/}"
   project_root="$CODE_DIR/$selected"
   session="$project"
 
+  hub="$(hub_scope)"
+  if [[ -n "$hub" ]]; then
+    create_hub_session "$hub" "$session" "~/code/$selected"
+    exit 0
+  fi
   if ! tmux has-session -t "=$session" 2>/dev/null; then
     tmuxinator start project \
       "$session" "$project_root" --no-attach
@@ -340,17 +376,24 @@ if [[ -n "$match" ]]; then
     tmux switch-client -t "=$session"
     tmux select-window -t "=$session:$win_index"
   else
-    # Remote hub: switch to its nested mosh session here (created on demand and
-    # flagged @hub for auto-passthrough), then drive that host's tmux to the
-    # chosen window. It lives inside this tmux — no separate window.
-    if ! tmux has-session -t "=$host_tag" 2>/dev/null; then
-      tmux new-session -d -s "$host_tag" "/bin/zsh -lc 'mosh $host_tag'"
-      tmux set-option -t "=$host_tag" @hub 1
+    # Remote hub: switch to its nested mosh session here (created on demand,
+    # flagged @hub for auto-passthrough). It lives inside this tmux.
+    if tmux has-session -t "=$host_tag" 2>/dev/null; then
+      # Existing connection: drive its attached client to the chosen window.
+      ssh "$host_tag" \
+        "tmux switch-client -t '=$session' \; select-window -t '=$session:$win_index'" \
+        2>/dev/null || true
+    else
+      # First time: pre-select the target window on the host, then attach that
+      # session directly via mosh (bypassing the home auto-attach) so we land
+      # on the exact window, not the host's home session.
+      ssh "$host_tag" "tmux select-window -t '=$session:$win_index'" \
+        2>/dev/null || true
+      tmux new-session -d -s "$host_tag" \
+        "/bin/zsh -lc 'mosh $host_tag -- tmux attach -t $session'"
+      tmux set-option -t "$host_tag" @hub 1
     fi
     tmux switch-client -t "=$host_tag"
-    ssh "$host_tag" \
-      "tmux switch-client -t '=$session' \; select-window -t '=$session:$win_index'" \
-      2>/dev/null || true
   fi
 else
   # No match: ask what kind of window to create
