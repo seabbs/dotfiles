@@ -307,10 +307,9 @@ selected=$(printf '%s\n' "$sessions" | fzf \
   --with-nth=1..4 \
   --border-label ' agent sessions ' \
   --prompt ' all  ' \
-  --header $'C-s host  C-r refresh  C-a all  C-p ▲perm  C-o ●run  C-w ◐wait  C-i ○idle  C-x ✗stale  C-d purge' \
+  --header $'C-r host  C-a all  C-p ▲perm  C-o ●run  C-w ◐wait  C-i ○idle  C-x ✗stale  C-d purge' \
   --bind 'tab:down,btab:up' \
-  --bind "ctrl-s:transform($0 --cycle-host)" \
-  --bind "ctrl-r:reload($0 --list-hosts)" \
+  --bind "ctrl-r:transform($0 --cycle-host)" \
   --bind "ctrl-a:change-prompt( all  )+reload($0 --list-hosts)" \
   --bind "ctrl-p:change-prompt( ▲ perm  )+reload($0 --list-hosts permission)" \
   --bind "ctrl-o:change-prompt( ● run  )+reload($0 --list-hosts running)" \
