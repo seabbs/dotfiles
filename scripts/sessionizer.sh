@@ -338,21 +338,17 @@ if [[ -n "$match" ]]; then
     tmux switch-client -t "=$session"
     tmux select-window -t "=$session:$win_index"
   else
-    # Remote: switch that host's tmux, then focus its ghostty window (whose
-    # title shows the host) or open one via mosh.
+    # Remote hub: switch to its nested mosh session here (created on demand and
+    # flagged @hub for auto-passthrough), then drive that host's tmux to the
+    # chosen window. It lives inside this tmux — no separate window.
+    if ! tmux has-session -t "=$host_tag" 2>/dev/null; then
+      tmux new-session -d -s "$host_tag" "/bin/zsh -lc 'mosh $host_tag'"
+      tmux set-option -t "=$host_tag" @hub 1
+    fi
+    tmux switch-client -t "=$host_tag"
     ssh "$host_tag" \
       "tmux switch-client -t '=$session' \; select-window -t '=$session:$win_index'" \
       2>/dev/null || true
-    AS=/opt/homebrew/bin/aerospace
-    awin=$("$AS" list-windows --all 2>/dev/null \
-      | grep -i ghostty | grep -i "$host_tag" | head -1 \
-      | cut -d'|' -f1 | tr -d ' ')
-    if [[ -n "$awin" ]]; then
-      "$AS" focus --window-id "$awin"
-    else
-      /Applications/Ghostty.app/Contents/MacOS/ghostty \
-        -e bash -c "export PATH=\"/opt/homebrew/bin:\$PATH\"; mosh $host_tag"
-    fi
   fi
 else
   # No match: ask what kind of window to create
