@@ -132,7 +132,8 @@ case "${1:-}" in
         n="${order[$(( (i + 1) % ${#order[@]} ))]}" && break
     done
     echo "$n" > "$HOST_STATE"
-    printf 'change-prompt(%s ❯ )+reload(%s --list-all)' "$n" "$0"
+    reload="${2:---list-all}"
+    printf 'change-prompt(%s ❯ )+reload(%s %s)' "$n" "$0" "$reload"
     exit 0
     ;;
   --list-windows)    list_windows "$2"; exit 0 ;;
@@ -304,9 +305,10 @@ result=$(list_windows "$session" | fzf \
   --no-sort \
   --border-label " $session " \
   --prompt '  ' \
-  --header 'Enter=select  C-d=kill  C-l=linked view  Type=new' \
+  --header 'Enter=select  C-r host  C-d=kill  C-l=linked view  Type=new' \
   --print-query \
   --bind 'tab:down,btab:up' \
+  --bind "ctrl-r:transform($0 --cycle-host \"--list-windows $session\")" \
   --bind "ctrl-d:execute-silent($0 --kill-window $session {2})+reload($0 --list-windows $session)" \
   --bind "ctrl-l:execute-silent($0 --link-session $session)+abort" \
 )
