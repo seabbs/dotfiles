@@ -120,7 +120,8 @@ alias dashboard='GH_TOKEN=$(gh auth token --user seabbs) gh dash'
 # tmux "home" session, mirroring how ghostty auto-launches tmux locally.
 # Guarded to archie only and skipped inside tmux, so it never nests and
 # never affects the mac. Works for both ssh and mosh logins.
-if [[ -o interactive && -z "$TMUX" && "${HOST%%.*}" == "archie" ]]; then
+if [[ -o interactive && -z "$TMUX" && -z "$NO_AUTO_TMUX" \
+   && "${HOST%%.*}" == "archie" ]]; then
   tmux new-session -A -s home -c "$HOME/code"
 fi
 
