@@ -18,7 +18,22 @@ HOST_STATE="$HOME/.cache/agent-host"
 mkdir -p "$HOME/.cache" 2>/dev/null
 RA='~/code/seabbs/dotfiles/scripts/agent-sessions.sh'
 host_scope() { cat "$HOST_STATE" 2>/dev/null || echo all; }
-self_host() { hostname -s; }
+SELF_HOST="$(hostname -s)"
+self_host() { printf '%s' "$SELF_HOST"; }
+# Cache a remote command's output (instant), refresh in background. See
+# sessionizer.sh for the rationale.
+CACHE_DIR="$HOME/.cache/sessionizer"
+mkdir -p "$CACHE_DIR" 2>/dev/null
+remote_cached() {
+  local host="$1" key="$2" cmd="$3"
+  local cache="$CACHE_DIR/$host-$key" lock
+  [ -f "$cache" ] && cat "$cache"
+  lock="$cache.lock"
+  if mkdir "$lock" 2>/dev/null; then
+    ( ssh "$host" "$cmd" >"$cache.tmp" 2>/dev/null && mv "$cache.tmp" "$cache"
+      rmdir "$lock" ) >/dev/null 2>&1 &
+  fi
+}
 remote_hubs() {
   local h
   for h in $HUB_HOSTS; do [ "$h" != "$(self_host)" ] && echo "$h"; done
@@ -39,7 +54,8 @@ list_hosts() {
   fi
   for h in $(remote_hubs); do
     if [ "$scope" = "all" ] || [ "$scope" = "$h" ]; then
-      ssh "$h" "$RA --list $filter" 2>/dev/null | sed "s/^/[$h] /"
+      remote_cached "$h" "agents-${filter:-all}" "$RA --list $filter" \
+        | sed "s/^/[$h] /"
     fi
   done
 }
