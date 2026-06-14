@@ -183,6 +183,9 @@ case "${1:-}" in
   --list-windows)    list_windows "$2"; exit 0 ;;
   --kill-session)
     tmux kill-session -t "=$2" 2>/dev/null
+    for _h in $(remote_hubs); do
+      ssh "$_h" "tmux kill-session -t '=$2'" 2>/dev/null
+    done
     exit 0
     ;;
   --kill-window)
