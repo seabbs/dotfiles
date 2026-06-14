@@ -48,17 +48,19 @@ remote_hubs() {
 # Respects the current host scope.
 list_sessions() {
   local scope h; scope="$(host_scope)"
+  local fmt='#{session_activity}|#{session_name}|#{@hub}'
   {
     # Local block first (current machine ranks first), each block ordered by
-    # last activity; dedup keeps the local copy.
+    # last activity; dedup keeps the local copy. @hub connection sessions (the
+    # nested mosh sessions) are excluded — they are gateways, not work.
     [[ "$scope" == "all" || "$scope" == "home" ]] && tmux list-sessions \
-      -F '#{session_activity} #{session_name}' 2>/dev/null | sort -rn
+      -F "$fmt" 2>/dev/null | awk -F'|' '$3!="1"' | sort -rn -t'|' -k1
     for h in $(remote_hubs); do
       [[ "$scope" == "all" || "$scope" == "$h" ]] && ssh "$h" \
-        "tmux list-sessions -F '#{session_activity} #{session_name}'" \
-        2>/dev/null | sort -rn
+        "tmux list-sessions -F '$fmt'" 2>/dev/null \
+        | awk -F'|' '$3!="1"' | sort -rn -t'|' -k1
     done
-  } | awk 'NF && !seen[$2]++ {print "[active] " $2}'
+  } | awk -F'|' 'NF && $2 && !seen[$2]++ {print "[active] " $2}'
 }
 
 list_projects() {

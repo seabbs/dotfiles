@@ -29,19 +29,31 @@
   Ctrl-Space c     new window
   Ctrl-Space D     dev layout (nvim | ai / repl)
   Ctrl-Space 1..9  switch to window N
+  Ctrl-Space n     next window
 
   TMUX SESSIONS
   ----------------------------------------------------------------
-  Ctrl-Space f     session switcher (fzf popup)
-                 C-a all  C-s sessions  C-p projects
+  Ctrl-Space f     session switcher (fzf popup, home + archie)
+                 C-a all  C-s sessions  C-r host  C-p projects
                  C-w worktrees  C-e extras  C-d kill
-                 type + Enter (no match) → session at $HOME
+                 type/pick while C-r=archie → created on archie
   Ctrl-Space \     toggle last session
   Ctrl-Space /     toggle last window
   Ctrl-Space s     session picker (built-in)
   Ctrl-Space w     window/session tree
   Ctrl-Space (/)   prev/next session
   Ctrl-Space r     reload tmux.conf
+
+  MACHINES — HOME <-> ARCHIE  (Alt = above tmux, works anywhere)
+  ----------------------------------------------------------------
+  Alt-f            window finder across home + archie, then jump
+  Alt-a            agent finder across home + archie, then jump
+  Alt-g            toggle last home <-> last archie session
+  Alt-/            flip back to the previous window (e.g. home)
+                 in the finders: C-r cycles host all/home/archie
+                 in an archie session keys auto-pass through to
+                 archie; the home status bar hides meanwhile
+  Ctrl-Space f/a   same finders in-tmux (when not passed through)
 
   TMUX URLS & TEXT GRABBING
   ----------------------------------------------------------------
