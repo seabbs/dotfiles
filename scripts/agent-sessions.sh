@@ -25,9 +25,9 @@ remote_hubs() {
 }
 # Mark a local session as a dormant hub gateway (passthrough + hidden bar).
 flag_hub() {
+  # Prefix stays active so prefix+f/a here run the HOME finder (hub sessions
+  # are mac tmux sessions); status off hides the outer bar.
   tmux set-option -t "$1" @hub 1
-  tmux set-option -t "$1" prefix None
-  tmux set-option -t "$1" key-table off
   tmux set-option -t "$1" status off
 }
 
