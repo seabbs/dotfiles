@@ -144,17 +144,21 @@ list_all() {
 list_windows() {
   local session="$1" scope h llbl; scope="$(host_scope)"; llbl="$(local_label)"
   local fmt='#{window_activity} #{window_index}:#{window_name}'
-  # Local windows first (stream instantly), each block by last activity; remote
-  # windows stream in after the ssh.
-  [[ "$scope" == "all" || "$scope" == "$llbl" || "$scope" == "home" ]] && \
-    tmux list-windows -t "=$session" -F "$fmt" 2>/dev/null \
-      | sort -rn | cut -d' ' -f2- | sed "s/^/[$llbl] /"
-  for h in $(remote_hubs); do
-    [[ "$scope" == "all" || "$scope" == "$h" ]] && \
-      remote_cached "$h" "windows-$session" \
-        "tmux list-windows -t '=$session' -F '$fmt'" \
-        | sort -rn | cut -d' ' -f2- | sed "s/^/[$h] /"
-  done
+  # Collect local + remote (cached, so instant) windows tagged with their host,
+  # then sort all of them together by last activity so home and archie windows
+  # interleave by recency rather than grouping home-then-archie. The activity
+  # timestamp leads each line for the sort and is stripped afterwards.
+  {
+    [[ "$scope" == "all" || "$scope" == "$llbl" || "$scope" == "home" ]] && \
+      tmux list-windows -t "=$session" -F "$fmt" 2>/dev/null \
+        | sed "s/ / [$llbl] /"
+    for h in $(remote_hubs); do
+      [[ "$scope" == "all" || "$scope" == "$h" ]] && \
+        remote_cached "$h" "windows-$session" \
+          "tmux list-windows -t '=$session' -F '$fmt'" \
+          | sed "s/ / [$h] /"
+    done
+  } | sort -rn -k1,1 | cut -d' ' -f2-
 }
 
 # Mark a local session as a dormant hub gateway: @hub for listing/exclusion,
