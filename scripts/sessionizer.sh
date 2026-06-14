@@ -36,7 +36,8 @@ mkdir -p "$HOME/.cache" 2>/dev/null
 dbg() { [ -n "${SESSIONIZER_DEBUG:-}" ] && \
   echo "$(date '+%T') $*" >> /tmp/sessionizer-debug.log; }
 host_scope() { cat "$HOST_STATE" 2>/dev/null || echo all; }
-self_host() { hostname -s; }
+SELF_HOST="$(hostname -s)"
+self_host() { printf '%s' "$SELF_HOST"; }
 # Hub hosts other than the current machine.
 remote_hubs() {
   local h
@@ -50,22 +51,40 @@ local_label() {
   echo "$l"
 }
 
+# Print the cached output of a remote tmux command instantly (last-known), and
+# refresh the cache in the background so it is current next time. Turns the
+# blocking ssh into a non-blocking cache lookup. $1=host $2=key $3=tmux command.
+CACHE_DIR="$HOME/.cache/sessionizer"
+mkdir -p "$CACHE_DIR" 2>/dev/null
+remote_cached() {
+  local host="$1" key="$2" cmd="$3"
+  local cache="$CACHE_DIR/$host-$key" lock
+  [ -f "$cache" ] && cat "$cache"
+  lock="$cache.lock"
+  if mkdir "$lock" 2>/dev/null; then
+    ( ssh "$host" "$cmd" >"$cache.tmp" 2>/dev/null && mv "$cache.tmp" "$cache"
+      rmdir "$lock" ) >/dev/null 2>&1 &
+  fi
+}
+
 # Active sessions merged across home + hub hosts, most-recently-active first
 # and deduped by name (the host is shown when picking a window in step 2).
 # Respects the current host scope.
 list_sessions() {
-  local scope h; scope="$(host_scope)"
+  local scope llbl h; scope="$(host_scope)"; llbl="$(local_label)"
   local fmt='#{session_activity}|#{session_name}|#{@hub}'
   {
-    # Local block first (current machine ranks first), each block ordered by
-    # last activity; dedup keeps the local copy. @hub connection sessions (the
-    # nested mosh sessions) are excluded — they are gateways, not work.
-    [[ "$scope" == "all" || "$scope" == "home" ]] && tmux list-sessions \
-      -F "$fmt" 2>/dev/null | awk -F'|' '$3!="1"' | sort -rn -t'|' -k1
-    for h in $(remote_hubs); do
-      [[ "$scope" == "all" || "$scope" == "$h" ]] && ssh "$h" \
-        "tmux list-sessions -F '$fmt'" 2>/dev/null \
+    # Local block first (current machine ranks first), each block by last
+    # activity; dedup keeps the local copy; @hub gateway sessions excluded.
+    # Local is fresh; remote comes from a cache refreshed in the background, so
+    # the finder never blocks on ssh.
+    [[ "$scope" == "all" || "$scope" == "$llbl" || "$scope" == "home" ]] && \
+      tmux list-sessions -F "$fmt" 2>/dev/null \
         | awk -F'|' '$3!="1"' | sort -rn -t'|' -k1
+    for h in $(remote_hubs); do
+      [[ "$scope" == "all" || "$scope" == "$h" ]] && \
+        remote_cached "$h" "sessions" "tmux list-sessions -F '$fmt'" \
+          | awk -F'|' '$3!="1"' | sort -rn -t'|' -k1
     done
   } | awk -F'|' 'NF && $2 && !seen[$2]++ {print "[active] " $2}'
 }
@@ -124,19 +143,18 @@ list_all() {
 
 list_windows() {
   local session="$1" scope h llbl; scope="$(host_scope)"; llbl="$(local_label)"
-  # Tag each window with its machine, then sort all of them together by last
-  # activity (global recency, not grouped by host).
-  {
-    [[ "$scope" == "all" || "$scope" == "$llbl" || "$scope" == "home" ]] && \
-      tmux list-windows -t "=$session" \
-        -F "#{window_activity}|[$llbl] #{window_index}:#{window_name}" 2>/dev/null
-    for h in $(remote_hubs); do
-      [[ "$scope" == "all" || "$scope" == "$h" ]] && ssh "$h" \
-        "tmux list-windows -t '=$session' \
-           -F '#{window_activity}|[$h] #{window_index}:#{window_name}'" \
-        2>/dev/null
-    done
-  } | sort -rn -t'|' -k1 | cut -d'|' -f2-
+  local fmt='#{window_activity} #{window_index}:#{window_name}'
+  # Local windows first (stream instantly), each block by last activity; remote
+  # windows stream in after the ssh.
+  [[ "$scope" == "all" || "$scope" == "$llbl" || "$scope" == "home" ]] && \
+    tmux list-windows -t "=$session" -F "$fmt" 2>/dev/null \
+      | sort -rn | cut -d' ' -f2- | sed "s/^/[$llbl] /"
+  for h in $(remote_hubs); do
+    [[ "$scope" == "all" || "$scope" == "$h" ]] && \
+      remote_cached "$h" "windows-$session" \
+        "tmux list-windows -t '=$session' -F '$fmt'" \
+        | sort -rn | cut -d' ' -f2- | sed "s/^/[$h] /"
+  done
 }
 
 # Mark a local session as a dormant hub gateway: @hub for listing/exclusion,
