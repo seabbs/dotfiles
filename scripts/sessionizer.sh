@@ -143,9 +143,11 @@ list_windows() {
 # plus per-session options so the outer tmux passes everything through and
 # hides its status bar whenever this session is viewed.
 flag_hub() {
+  # @hub marks it for listing/exclusion; status off hides the outer bar (the
+  # inner remote tmux shows its own). Prefix stays active: a hub session is a
+  # mac tmux session, so prefix+f / prefix+a here run the HOME finder. The
+  # inner remote tmux is reached via the finder or send-prefix (double C-Space).
   tmux set-option -t "$1" @hub 1
-  tmux set-option -t "$1" prefix None
-  tmux set-option -t "$1" key-table off
   tmux set-option -t "$1" status off
 }
 
