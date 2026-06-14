@@ -302,7 +302,17 @@ case "${1:-}" in
   --count)  count_sessions; exit 0 ;;
   --status) status_bar; exit 0 ;;
   --clean)  clean_stale; exit 0 ;;
-  --purge)  purge_stale; exit 0 ;;
+  --purge)
+    # Purge stale agents locally and on every hub, then refresh each hub's
+    # cache so the purged entries disappear from the picker immediately.
+    purge_stale
+    for _h in $(remote_hubs); do
+      ssh "$_h" "$RA --purge" 2>/dev/null
+      rm -f "$CACHE_DIR/$_h"-agents-* 2>/dev/null
+      ssh "$_h" "$RA --list" >"$CACHE_DIR/$_h-agents-all" 2>/dev/null
+    done
+    exit 0
+    ;;
   --switch) switch_to "$2"; exit 0 ;;
   --target)
     [ -f "$STATUS_DIR/$2.json" ] \
