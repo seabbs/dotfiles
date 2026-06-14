@@ -29,6 +29,8 @@ declare -A EXTRA_ROOTS=(
 
 # Remote hub hosts to span (space-separated ssh aliases), overridable via env.
 HUB_HOSTS="${HUB_HOSTS:-archie}"
+# This script's path on a hub, for routing kill/create actions there over ssh.
+RS='~/code/seabbs/dotfiles/scripts/sessionizer.sh'
 # Host scope for cross-machine listing: all | home | <hub host>. Cycled with
 # C-r in the picker, reset to "all" on each launch.
 HOST_STATE="$HOME/.cache/sessionizer-host"
@@ -205,6 +207,35 @@ hub_scope() {
   for h in $(remote_hubs); do [ "$scope" = "$h" ] && { echo "$h"; return; }; done
 }
 
+# Kill a window on the local tmux, cleaning up its git worktree if it is one.
+kill_window_local() {
+  local session="$1" win_ref="$2" win_index win_name root
+  win_index="${win_ref%%:*}"; win_name="${win_ref#*:}"
+  root=$(tmux display-message -t "=$session:1" -p '#{pane_current_path}' \
+    2>/dev/null)
+  root=$(git -C "$root" worktree list 2>/dev/null | awk 'NR==1 {print $1}' \
+    || echo "$root")
+  if [[ -d "$root/worktrees/$win_name" ]]; then
+    zsh -ic "cd $root && feat-done $win_name" 2>/dev/null
+  else
+    tmux kill-window -t "=$session:$win_index" 2>/dev/null
+  fi
+}
+
+# Switch the active client into a hub's nested mosh session, creating the
+# connection on demand (flagged @hub). $1=hub  $2=session name on the hub.
+jump_to_hub_session() {
+  local hub="$1" session="$2"
+  if tmux has-session -t "=$hub" 2>/dev/null; then
+    ssh "$hub" "tmux switch-client -t '=$session'" 2>/dev/null || true
+  else
+    tmux new-session -d -s "$hub" \
+      "/bin/zsh -lc 'mosh $hub -- tmux attach -t $session'"
+    flag_hub "$hub"
+  fi
+  tmux switch-client -t "=$hub"
+}
+
 # Handle flags for fzf reload
 case "${1:-}" in
   --list-all)      list_all; exit 0 ;;
@@ -227,37 +258,30 @@ case "${1:-}" in
     ;;
   --list-windows)    list_windows "$2"; exit 0 ;;
   --kill-session)
+    # Kill on the local tmux and on every hub, refreshing each hub's session
+    # cache so the killed session disappears from the picker immediately.
     tmux kill-session -t "=$2" 2>/dev/null
     for _h in $(remote_hubs); do
       ssh "$_h" "tmux kill-session -t '=$2'" 2>/dev/null
+      ssh "$_h" "tmux list-sessions -F '#{session_activity}|#{session_name}|#{@hub}'" \
+        >"$CACHE_DIR/$_h-sessions" 2>/dev/null
     done
     exit 0
     ;;
   --kill-window)
-    session="$2"
-    win_ref="$3"
-    win_index="${win_ref%%:*}"
-    win_name="${win_ref#*:}"
-    # Get project root to check for worktree
-    root=$(
-      tmux display-message -t "=$session:1" \
-        -p '#{pane_current_path}' 2>/dev/null
-    )
-    root=$(
-      git -C "$root" worktree list 2>/dev/null \
-        | awk 'NR==1 {print $1}' \
-        || echo "$root"
-    )
-    # If worktree exists, use feat-done to clean up
-    if [[ -d "$root/worktrees/$win_name" ]]; then
-      zsh -ic "cd $root && feat-done $win_name" \
-        2>/dev/null
+    # Route by the window's host tag: local kill, or kill on the hub (then
+    # refresh that hub's window cache so the reload reflects it).
+    session="$2"; tag="${3#[}"; tag="${tag%]}"; win_ref="$4"
+    if [[ "$tag" == "$(local_label)" ]]; then
+      kill_window_local "$session" "$win_ref"
     else
-      tmux kill-window -t "=$session:$win_index" \
-        2>/dev/null
+      ssh "$tag" "$RS --kill-window-local '$session' '$win_ref'" 2>/dev/null
+      ssh "$tag" "tmux list-windows -t '=$session' -F '#{window_activity} #{window_index}:#{window_name}'" \
+        >"$CACHE_DIR/$tag-windows-$session" 2>/dev/null
     fi
     exit 0
     ;;
+  --kill-window-local) kill_window_local "$2" "$3"; exit 0 ;;
   --link-session)
     session="$2"
     # Create a grouped session with a unique name
@@ -415,7 +439,7 @@ result=$(list_windows "$session" | fzf \
   --print-query \
   --bind 'tab:down,btab:up' \
   --bind "ctrl-r:transform($0 --cycle-host \"--list-windows $session\")" \
-  --bind "ctrl-d:execute-silent($0 --kill-window $session {2})+reload($0 --list-windows $session)" \
+  --bind "ctrl-d:execute-silent($0 --kill-window $session {1} {2})+reload($0 --list-windows $session)" \
   --bind "ctrl-l:execute-silent($0 --link-session $session)+abort" \
 )
 
@@ -476,6 +500,27 @@ else
   )
 
   [[ -z "$win_type" ]] && exit 0
+
+  # If the picker is filtered to a hub, create the window/feature THERE (in the
+  # hub's copy of the session) and jump into it, rather than locally.
+  hub="$(hub_scope)"
+  if [[ -n "$hub" ]]; then
+    root=$(ssh "$hub" \
+      "tmux display-message -t '=$session:1' -p '#{pane_current_path}'" \
+      2>/dev/null)
+    if [[ "$win_type" == "bare terminal" ]]; then
+      ssh "$hub" "tmux new-window -t '=$session' -n '$query' -c '$root'" \
+        2>/dev/null
+    else
+      ssh "$hub" \
+        "tmux new-window -t '=$session' -n _launcher -c '$root' \
+           \"zsh -ic 'feat $query; exit'\"" 2>/dev/null
+    fi
+    rm -f "$CACHE_DIR/$hub-windows-$session" 2>/dev/null
+    jump_to_hub_session "$hub" "$session"
+    exit 0
+  fi
+
   project_root=$(get_project_root)
   tmux switch-client -t "=$session"
 
