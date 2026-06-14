@@ -42,6 +42,13 @@ remote_hubs() {
   local h
   for h in $HUB_HOSTS; do [[ "$h" != "$(self_host)" ]] && echo "$h"; done
 }
+# Label for the current machine's own sessions: "home" on the mac, otherwise
+# the hub's own name (so on archie its sessions read [archie], not [home]).
+local_label() {
+  local l="home" h
+  for h in $HUB_HOSTS; do [[ "$h" == "$(self_host)" ]] && l="$h"; done
+  echo "$l"
+}
 
 # Active sessions merged across home + hub hosts, most-recently-active first
 # and deduped by name (the host is shown when picking a window in step 2).
@@ -116,16 +123,20 @@ list_all() {
 }
 
 list_windows() {
-  local session="$1" scope h; scope="$(host_scope)"
-  local fmt='#{window_activity} #{window_index}:#{window_name}'
-  [[ "$scope" == "all" || "$scope" == "home" ]] && tmux list-windows \
-    -t "=$session" -F "$fmt" 2>/dev/null \
-    | sort -rn | cut -d' ' -f2- | sed 's/^/[home] /'
-  for h in $(remote_hubs); do
-    [[ "$scope" == "all" || "$scope" == "$h" ]] && ssh "$h" \
-      "tmux list-windows -t '=$session' -F '$fmt'" \
-      2>/dev/null | sort -rn | cut -d' ' -f2- | sed "s/^/[$h] /"
-  done
+  local session="$1" scope h llbl; scope="$(host_scope)"; llbl="$(local_label)"
+  # Tag each window with its machine, then sort all of them together by last
+  # activity (global recency, not grouped by host).
+  {
+    [[ "$scope" == "all" || "$scope" == "$llbl" || "$scope" == "home" ]] && \
+      tmux list-windows -t "=$session" \
+        -F "#{window_activity}|[$llbl] #{window_index}:#{window_name}" 2>/dev/null
+    for h in $(remote_hubs); do
+      [[ "$scope" == "all" || "$scope" == "$h" ]] && ssh "$h" \
+        "tmux list-windows -t '=$session' \
+           -F '#{window_activity}|[$h] #{window_index}:#{window_name}'" \
+        2>/dev/null
+    done
+  } | sort -rn -t'|' -k1 | cut -d'|' -f2-
 }
 
 # Mark a local session as a dormant hub gateway: @hub for listing/exclusion,
@@ -407,7 +418,7 @@ if [[ -n "$match" ]]; then
   host_tag="${match%%] *}"; host_tag="${host_tag#[}"
   match="${match#\[*\] }"
   win_index="${match%%:*}"
-  if [[ "$host_tag" == "home" ]]; then
+  if [[ "$host_tag" == "$(local_label)" ]]; then
     tmux switch-client -t "=$session"
     tmux select-window -t "=$session:$win_index"
   else
