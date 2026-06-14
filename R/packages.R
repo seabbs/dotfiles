@@ -25,6 +25,6 @@ remotes::install_github("stan-dev/loo")
 install.packages("rstan")
 install.packages("roxygen2")
 
-tinytex::install_tinytex()
+if (!tinytex::is_tinytex()) try(tinytex::install_tinytex())
 
 cmdstanr::install_cmdstan()
