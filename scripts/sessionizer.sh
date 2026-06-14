@@ -128,6 +128,16 @@ list_windows() {
   done
 }
 
+# Mark a local session as a dormant hub gateway: @hub for listing/exclusion,
+# plus per-session options so the outer tmux passes everything through and
+# hides its status bar whenever this session is viewed.
+flag_hub() {
+  tmux set-option -t "$1" @hub 1
+  tmux set-option -t "$1" prefix None
+  tmux set-option -t "$1" key-table off
+  tmux set-option -t "$1" status off
+}
+
 # Create a session on a hub host (if missing) and jump into its nested mosh
 # session here. $1=hub  $2=session name  $3=working dir on the hub (e.g. ~).
 create_hub_session() {
@@ -149,7 +159,7 @@ create_hub_session() {
   else
     tmux new-session -d -s "$hub" \
       "/bin/zsh -lc 'mosh $hub -- tmux attach -t $sname'"
-    tmux set-option -t "$hub" @hub 1
+    flag_hub "$hub"
   fi
   tmux switch-client -t "=$hub"
 }
@@ -416,7 +426,7 @@ if [[ -n "$match" ]]; then
         2>/dev/null || true
       tmux new-session -d -s "$host_tag" \
         "/bin/zsh -lc 'mosh $host_tag -- tmux attach -t $session'"
-      tmux set-option -t "$host_tag" @hub 1
+      flag_hub "$host_tag"
     fi
     tmux switch-client -t "=$host_tag"
   fi

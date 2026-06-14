@@ -23,6 +23,13 @@ remote_hubs() {
   local h
   for h in $HUB_HOSTS; do [ "$h" != "$(self_host)" ] && echo "$h"; done
 }
+# Mark a local session as a dormant hub gateway (passthrough + hidden bar).
+flag_hub() {
+  tmux set-option -t "$1" @hub 1
+  tmux set-option -t "$1" prefix None
+  tmux set-option -t "$1" key-table off
+  tmux set-option -t "$1" status off
+}
 
 # Agents merged across home + hub hosts, tagged [home]/[hub], scope-aware.
 list_hosts() {
@@ -337,7 +344,7 @@ else
     ssh "$host_tag" "$RA --switch '$sid'" 2>/dev/null || true
     tmux new-session -d -s "$host_tag" \
       "/bin/zsh -lc 'mosh $host_tag -- tmux attach -t ${tsession:-home}'"
-    tmux set-option -t "$host_tag" @hub 1
+    flag_hub "$host_tag"
   fi
   tmux switch-client -t "=$host_tag"
 fi

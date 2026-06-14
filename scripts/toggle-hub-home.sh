@@ -27,6 +27,9 @@ else
     hub=$(echo "${HUB_HOSTS:-archie}" | awk '{print $1}')
     "$TMUX" new-session -d -s "$hub" "/bin/zsh -lc 'mosh $hub'"
     "$TMUX" set-option -t "$hub" @hub 1
+    "$TMUX" set-option -t "$hub" prefix None
+    "$TMUX" set-option -t "$hub" key-table off
+    "$TMUX" set-option -t "$hub" status off
     target="$hub"
   fi
 fi
