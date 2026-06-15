@@ -13,5 +13,6 @@ win=$("$AS" list-windows --all 2>/dev/null \
 if [ -n "${win:-}" ]; then
   "$AS" focus --window-id "$win"
 else
-  "$GH" -e bash -c 'export PATH="/opt/homebrew/bin:$PATH"; mosh archie'
+  "$GH" -e bash -c \
+    'export PATH="/opt/homebrew/bin:$PATH"; mosh --predict=experimental archie'
 fi

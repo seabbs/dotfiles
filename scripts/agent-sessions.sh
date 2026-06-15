@@ -30,8 +30,11 @@ remote_cached() {
   [ -f "$cache" ] && cat "$cache"
   lock="$cache.lock"
   if mkdir "$lock" 2>/dev/null; then
-    ( ssh "$host" "$cmd" >"$cache.tmp" 2>/dev/null && mv "$cache.tmp" "$cache"
-      rmdir "$lock" ) >/dev/null 2>&1 &
+    # Bound the refresh: a degraded link must not hang holding the lock and
+    # block every later refresh. ServerAlive kills a dead connection quickly.
+    ( ssh -o ConnectTimeout=8 -o ServerAliveInterval=5 -o ServerAliveCountMax=2 \
+        "$host" "$cmd" >"$cache.tmp" 2>/dev/null && mv "$cache.tmp" "$cache"
+      rm -f "$cache.tmp"; rmdir "$lock" ) >/dev/null 2>&1 &
   fi
 }
 remote_hubs() {
@@ -369,7 +372,7 @@ else
     tsession=$(ssh "$host_tag" "$RA --target '$sid'" 2>/dev/null)
     ssh "$host_tag" "$RA --switch '$sid'" 2>/dev/null || true
     tmux new-session -d -s "$host_tag" \
-      "/bin/zsh -lc 'mosh $host_tag -- tmux attach -t ${tsession:-home}'"
+      "/bin/zsh -lc 'mosh --predict=experimental $host_tag -- tmux attach -t ${tsession:-home}'"
     flag_hub "$host_tag"
   fi
   tmux switch-client -t "=$host_tag"

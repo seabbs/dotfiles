@@ -28,21 +28,27 @@ mtime=$(stat -f %m "$SC" 2>/dev/null || echo 0)
 [ $(( now - mtime )) -lt "$THROTTLE" ] && exit 0
 
 # One background refresh warms all three caches over the multiplexed ssh. The
-# lock prevents pile-up; ConnectTimeout bounds it if archie is unreachable.
-# Atomic writes (unique .tmp per process) so a concurrent finder refresh of the
-# same cache file can never see a half-written file.
+# lock prevents pile-up; the ssh options bound it if archie is slow/unreachable
+# (a degraded home uplink can make even a connect take several seconds, so the
+# timeout is generous but ServerAlive still kills a truly dead link). Atomic
+# writes (unique .tmp per process) so a concurrent finder refresh of the same
+# cache file can never see a half-written file; any temp left by a failed ssh is
+# swept at the end of the run so they cannot accumulate.
+SSH_OPTS=(-o ConnectTimeout=8 -o ServerAliveInterval=5 -o ServerAliveCountMax=2
+          -o BatchMode=yes)
 if mkdir "$SC.lock" 2>/dev/null; then
   (
     t=$$
-    ssh -o ConnectTimeout=2 -o BatchMode=yes "$HUB" "$R --status" \
+    ssh "${SSH_OPTS[@]}" "$HUB" "$R --status" \
       >"$SC.$t" 2>/dev/null && mv "$SC.$t" "$SC"
-    ssh -o ConnectTimeout=2 -o BatchMode=yes "$HUB" \
+    ssh "${SSH_OPTS[@]}" "$HUB" \
       "tmux list-sessions -F '#{session_activity}|#{session_name}|#{@hub}'" \
       >"$FC/$HUB-sessions.$t" 2>/dev/null \
       && mv "$FC/$HUB-sessions.$t" "$FC/$HUB-sessions"
-    ssh -o ConnectTimeout=2 -o BatchMode=yes "$HUB" "$R --list" \
+    ssh "${SSH_OPTS[@]}" "$HUB" "$R --list" \
       >"$FC/$HUB-agents-all.$t" 2>/dev/null \
       && mv "$FC/$HUB-agents-all.$t" "$FC/$HUB-agents-all"
+    rm -f "$SC.$t" "$FC/$HUB-sessions.$t" "$FC/$HUB-agents-all.$t"
     rmdir "$SC.lock"
   ) >/dev/null 2>&1 &
 fi
