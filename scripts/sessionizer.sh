@@ -63,6 +63,14 @@ remote_cached() {
   local cache="$CACHE_DIR/$host-$key" lock
   [ -f "$cache" ] && cat "$cache"
   lock="$cache.lock"
+  # Steal a stale lock: a refresh killed mid-flight (popup closed, SIGKILL)
+  # leaves the lock dir behind, blocking every later refresh forever. Expire
+  # any lock older than 30s so the cache self-heals (cross-platform stat).
+  if [ -d "$lock" ]; then
+    local lmt
+    lmt=$(stat -f %m "$lock" 2>/dev/null || stat -c %Y "$lock" 2>/dev/null || echo 0)
+    [ "$(( $(date +%s) - lmt ))" -ge 30 ] && rmdir "$lock" 2>/dev/null
+  fi
   if mkdir "$lock" 2>/dev/null; then
     # Bound the refresh: a degraded link must not hang holding the lock and
     # block every later refresh. ServerAlive kills a dead connection quickly.
