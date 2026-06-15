@@ -1,0 +1,11 @@
+[metadata]
+name = "julia-history"
+description = "Julia REPL command history"
+requirements = []
+
+[source]
+command = "grep '^\t' ~/.julia/logs/repl_history.jl | sed 's/^\t//' | sed '1!G;h;$!d'"
+display = "{0}"
+output = "{0}"
+no_sort = true
+frecency = false
