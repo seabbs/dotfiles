@@ -1,5 +1,7 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # tmux session switcher / project launcher
+# Needs bash 4+ (declare -A); macOS /bin/bash is 3.2, so resolve via env to pick
+# up a modern bash (e.g. Homebrew's) from PATH.
 # Uses fzf to pick from active sessions + project dirs,
 # then switches or creates via tmuxinator.
 #
@@ -186,6 +188,25 @@ flag_hub() {
   tmux set-option -t "$1" status off
 }
 
+# A hub gateway whose mosh pane has died — or one resurrect restored after a
+# reboot (the session name comes back, but its mosh pane and @hub flag are
+# runtime-only and do not) — still answers has-session, so callers would wrongly
+# reuse a dead shell. A live gateway always carries @hub (set by flag_hub);
+# anything named like a hub without it is a husk. Drop it so a fresh, live
+# gateway is recreated on demand. $1 = hub host.
+drop_dead_gateway() {
+  tmux has-session -t "=$1" 2>/dev/null || return 0
+  # Read @hub via an exact-name match in list-sessions: display-message -t
+  # "=name" does not resolve a session-only target here (it falls back to
+  # another session and reads an empty @hub, which would wrongly condemn a live
+  # gateway). list-sessions -F is how the rest of this script reads @hub.
+  local flag
+  flag=$(tmux list-sessions -F '#{session_name}	#{@hub}' 2>/dev/null \
+    | awk -F'\t' -v s="$1" '$1==s {print $2; exit}')
+  [ "$flag" = "1" ] && return 0
+  tmux kill-session -t "=$1" 2>/dev/null
+}
+
 # Create a session on a hub host (if missing) and jump into its nested mosh
 # session here. $1=hub  $2=session name  $3=working dir on the hub (e.g. ~).
 create_hub_session() {
@@ -202,6 +223,7 @@ create_hub_session() {
     "tmux has-session -t '=$sname' 2>/dev/null \
        || tmuxinator start project '$sname' '$dir' --no-attach" \
     2>/dev/null || true
+  drop_dead_gateway "$hub"
   if tmux has-session -t "=$hub" 2>/dev/null; then
     ssh "$hub" "tmux switch-client -t '=$sname'" 2>/dev/null || true
   else
@@ -237,6 +259,7 @@ kill_window_local() {
 # connection on demand (flagged @hub). $1=hub  $2=session name on the hub.
 jump_to_hub_session() {
   local hub="$1" session="$2"
+  drop_dead_gateway "$hub"
   if tmux has-session -t "=$hub" 2>/dev/null; then
     ssh "$hub" "tmux switch-client -t '=$session'" 2>/dev/null || true
   else
@@ -247,6 +270,123 @@ jump_to_hub_session() {
   tmux switch-client -t "=$hub"
 }
 
+# Resolve a session's project root (main repo, not a worktree).
+get_project_root() {
+  local session="$1" root
+  root=$(
+    tmux display-message -t "=$session:1" \
+      -p '#{pane_current_path}' 2>/dev/null
+  )
+  git -C "$root" worktree list 2>/dev/null \
+    | awk 'NR==1 {print $1}' \
+    || echo "$root"
+}
+
+# Step 2 as a standalone unit: pick (or create) a window in $1, cross-host.
+# Used by the inline project flow and by --switch-window (prefix s), which
+# jumps straight here for the current session, skipping the project picker.
+# Windows are listed by last activity (most-recent first) across all hosts.
+pick_window() {
+  local session="$1"
+  local result query match host_tag win_index win_type hub root project_root
+  [[ -z "$session" ]] && return 0
+
+  result=$(list_windows "$session" | fzf \
+    --no-sort \
+    --border-label " $session " \
+    --prompt '  ' \
+    --header 'Enter=select  C-r host  C-d=kill  C-l=linked view  Type=new' \
+    --print-query \
+    --bind 'tab:down,btab:up' \
+    --bind "ctrl-r:transform($0 --cycle-host \"--list-windows $session\")" \
+    --bind "ctrl-d:execute-silent($0 --kill-window $session {1} {2})+reload($0 --list-windows $session)" \
+    --bind "ctrl-l:execute-silent($0 --link-session $session)+abort" \
+  )
+
+  query=$(echo "$result" | sed -n '1p')
+  match=$(echo "$result" | sed -n '2p')
+
+  # Escape with no input
+  [[ -z "$query" && -z "$match" ]] && return 0
+
+  if [[ -n "$match" ]]; then
+    # Matched an existing window: route by its host tag ([home]/[hub]).
+    host_tag="${match%%] *}"; host_tag="${host_tag#[}"
+    match="${match#\[*\] }"
+    win_index="${match%%:*}"
+    if [[ "$host_tag" == "$(local_label)" ]]; then
+      tmux switch-client -t "=$session"
+      tmux select-window -t "=$session:$win_index"
+    else
+      # Remote hub: switch to its nested mosh session here (created on demand,
+      # flagged @hub for auto-passthrough). It lives inside this tmux.
+      drop_dead_gateway "$host_tag"
+      if tmux has-session -t "=$host_tag" 2>/dev/null; then
+        # Existing connection: drive its attached client to the chosen window.
+        ssh "$host_tag" \
+          "tmux switch-client -t '=$session' \; select-window -t '=$session:$win_index'" \
+          2>/dev/null || true
+      else
+        # First time: pre-select the target window on the host, then attach that
+        # session directly via mosh (bypassing the home auto-attach) so we land
+        # on the exact window, not the host's home session.
+        ssh "$host_tag" "tmux select-window -t '=$session:$win_index'" \
+          2>/dev/null || true
+        tmux new-session -d -s "$host_tag" \
+          "/bin/zsh -lc 'mosh --predict=experimental $host_tag -- tmux attach -t $session'"
+        flag_hub "$host_tag"
+      fi
+      tmux switch-client -t "=$host_tag"
+    fi
+  else
+    # No match: ask what kind of window to create
+    win_type=$(printf "feature branch\nbare terminal" \
+      | fzf \
+        --no-sort \
+        --border-label " new: $query " \
+        --prompt '  ' \
+        --header 'What kind of window?' \
+    )
+
+    [[ -z "$win_type" ]] && return 0
+
+    # If the picker is filtered to a hub, create the window/feature THERE (in the
+    # hub's copy of the session) and jump into it, rather than locally.
+    hub="$(hub_scope)"
+    if [[ -n "$hub" ]]; then
+      root=$(ssh "$hub" \
+        "tmux display-message -t '=$session:1' -p '#{pane_current_path}'" \
+        2>/dev/null)
+      if [[ "$win_type" == "bare terminal" ]]; then
+        ssh "$hub" "tmux new-window -t '=$session' -n '$query' -c '$root'" \
+          2>/dev/null
+      else
+        ssh "$hub" \
+          "tmux new-window -t '=$session' -n _launcher -c '$root' \
+             \"zsh -ic 'feat $query; exit'\"" 2>/dev/null
+      fi
+      rm -f "$CACHE_DIR/$hub-windows-$session" 2>/dev/null
+      jump_to_hub_session "$hub" "$session"
+      return 0
+    fi
+
+    project_root=$(get_project_root "$session")
+    tmux switch-client -t "=$session"
+
+    if [[ "$win_type" == "bare terminal" ]]; then
+      tmux new-window -t "=$session" -n "$query" \
+        -c "$project_root"
+    else
+      # Run feat in a temporary window that sources the shell config, runs feat,
+      # then closes itself. feat creates its own window with the full layout so
+      # this runner window is just a launcher.
+      tmux new-window -t "=$session" \
+        -n "_launcher" -c "$project_root" \
+        "zsh -ic 'feat $query; exit'"
+    fi
+  fi
+}
+
 # Handle flags for fzf reload
 case "${1:-}" in
   --list-all)      list_all; exit 0 ;;
@@ -254,6 +394,16 @@ case "${1:-}" in
   --list-projects)   list_projects; exit 0 ;;
   --list-worktrees)  list_worktrees; exit 0 ;;
   --list-extras)     list_extras; exit 0 ;;
+  --drop-hub-gateways)
+    # Called from tmux-resurrect's post-restore hook. A reboot makes continuum
+    # restore every session, including hub gateways, which come back as dead
+    # husks (mosh pane + @hub flag are runtime-only). Drop each so the finder
+    # rebuilds a live mosh+@hub gateway on demand instead of surfacing a dead
+    # "archie" that masks/misroutes the picker. No-op on a hub host (self is
+    # excluded from remote_hubs, so it has no gateways of its own).
+    for _h in $(remote_hubs); do drop_dead_gateway "$_h"; done
+    exit 0
+    ;;
   --cycle-host)
     cur="$(host_scope)"
     order=(all home $(remote_hubs))
@@ -293,6 +443,20 @@ case "${1:-}" in
     exit 0
     ;;
   --kill-window-local) kill_window_local "$2" "$3"; exit 0 ;;
+  --switch-popup)
+    # Entry point for `prefix s`: invoked via run-shell so $2 is the correctly
+    # expanded launching session. Open the switcher as a popup with it baked in
+    # (a popup cannot resolve its own launching session reliably).
+    exec tmux display-popup -E -w 60% -h 60% \
+      "$0 --switch-window '${2}'"
+    ;;
+  --switch-window)
+    # Window switcher for one session (cross-host), skipping the project picker.
+    # Defaults to the current session when no name is passed.
+    echo all > "$HOST_STATE"
+    pick_window "${2:-$(tmux display-message -p '#{session_name}' 2>/dev/null)}"
+    exit 0
+    ;;
   --link-session)
     session="$2"
     # Create a grouped session with a unique name
@@ -440,111 +604,5 @@ else
   fi
 fi
 
-# Step 2: pick a window or type a new name
-# --print-query outputs query on line 1, match on line 2
-result=$(list_windows "$session" | fzf \
-  --no-sort \
-  --border-label " $session " \
-  --prompt '  ' \
-  --header 'Enter=select  C-r host  C-d=kill  C-l=linked view  Type=new' \
-  --print-query \
-  --bind 'tab:down,btab:up' \
-  --bind "ctrl-r:transform($0 --cycle-host \"--list-windows $session\")" \
-  --bind "ctrl-d:execute-silent($0 --kill-window $session {1} {2})+reload($0 --list-windows $session)" \
-  --bind "ctrl-l:execute-silent($0 --link-session $session)+abort" \
-)
-
-query=$(echo "$result" | sed -n '1p')
-match=$(echo "$result" | sed -n '2p')
-
-# Escape with no input
-[[ -z "$query" && -z "$match" ]] && exit 0
-
-# Helper: resolve project root from session (main repo, not a worktree)
-get_project_root() {
-  local root
-  root=$(
-    tmux display-message -t "=$session:1" \
-      -p '#{pane_current_path}' 2>/dev/null
-  )
-  git -C "$root" worktree list 2>/dev/null \
-    | awk 'NR==1 {print $1}' \
-    || echo "$root"
-}
-
-if [[ -n "$match" ]]; then
-  # Matched an existing window: route by its host tag ([home]/[hub]).
-  host_tag="${match%%] *}"; host_tag="${host_tag#[}"
-  match="${match#\[*\] }"
-  win_index="${match%%:*}"
-  if [[ "$host_tag" == "$(local_label)" ]]; then
-    tmux switch-client -t "=$session"
-    tmux select-window -t "=$session:$win_index"
-  else
-    # Remote hub: switch to its nested mosh session here (created on demand,
-    # flagged @hub for auto-passthrough). It lives inside this tmux.
-    if tmux has-session -t "=$host_tag" 2>/dev/null; then
-      # Existing connection: drive its attached client to the chosen window.
-      ssh "$host_tag" \
-        "tmux switch-client -t '=$session' \; select-window -t '=$session:$win_index'" \
-        2>/dev/null || true
-    else
-      # First time: pre-select the target window on the host, then attach that
-      # session directly via mosh (bypassing the home auto-attach) so we land
-      # on the exact window, not the host's home session.
-      ssh "$host_tag" "tmux select-window -t '=$session:$win_index'" \
-        2>/dev/null || true
-      tmux new-session -d -s "$host_tag" \
-        "/bin/zsh -lc 'mosh --predict=experimental $host_tag -- tmux attach -t $session'"
-      flag_hub "$host_tag"
-    fi
-    tmux switch-client -t "=$host_tag"
-  fi
-else
-  # No match: ask what kind of window to create
-  win_type=$(printf "feature branch\nbare terminal" \
-    | fzf \
-      --no-sort \
-      --border-label " new: $query " \
-      --prompt '  ' \
-      --header 'What kind of window?' \
-  )
-
-  [[ -z "$win_type" ]] && exit 0
-
-  # If the picker is filtered to a hub, create the window/feature THERE (in the
-  # hub's copy of the session) and jump into it, rather than locally.
-  hub="$(hub_scope)"
-  if [[ -n "$hub" ]]; then
-    root=$(ssh "$hub" \
-      "tmux display-message -t '=$session:1' -p '#{pane_current_path}'" \
-      2>/dev/null)
-    if [[ "$win_type" == "bare terminal" ]]; then
-      ssh "$hub" "tmux new-window -t '=$session' -n '$query' -c '$root'" \
-        2>/dev/null
-    else
-      ssh "$hub" \
-        "tmux new-window -t '=$session' -n _launcher -c '$root' \
-           \"zsh -ic 'feat $query; exit'\"" 2>/dev/null
-    fi
-    rm -f "$CACHE_DIR/$hub-windows-$session" 2>/dev/null
-    jump_to_hub_session "$hub" "$session"
-    exit 0
-  fi
-
-  project_root=$(get_project_root)
-  tmux switch-client -t "=$session"
-
-  if [[ "$win_type" == "bare terminal" ]]; then
-    tmux new-window -t "=$session" -n "$query" \
-      -c "$project_root"
-  else
-    # Run feat in a temporary window that sources
-    # the shell config, runs feat, then closes itself.
-    # feat creates its own window with the full layout
-    # so this runner window is just a launcher.
-    tmux new-window -t "=$session" \
-      -n "_launcher" -c "$project_root" \
-      "zsh -ic 'feat $query; exit'"
-  fi
-fi
+# Step 2: pick a window in the resolved session (or create one)
+pick_window "$session"
