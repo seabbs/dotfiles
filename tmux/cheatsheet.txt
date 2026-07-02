@@ -35,7 +35,9 @@
   ----------------------------------------------------------------
   Ctrl-Space f     session switcher (fzf popup, home + archie)
                  C-a all  C-s sessions  C-r host  C-p projects
-                 C-w worktrees  C-e extras  C-d kill
+                 C-w worktrees  C-o orgs  C-e extras  C-d kill
+                 C-o → org-level session (all repos of EpiAware etc.)
+                 in an org session, prefix s → "open repo" adds a repo window
                  type/pick while C-r=archie → created on archie
   Ctrl-Space \     toggle last session
   Ctrl-Space /     toggle last window
@@ -75,6 +77,8 @@
   SHELL: PROJECT MANAGEMENT
   ----------------------------------------------------------------
   proj <name> [branch]     open full project (nvim + ai + repl)
+  proj <org> / agent <org> open org-level session (EpiAware, epiforecasts,
+                           …) rooted at the org dir for cross-repo work
   agent [name] [worktree]  open agent session (ai only)
   agent-to-proj            upgrade agent to full project layout
   gproj / gagent           gemini variants of proj / agent
