@@ -101,7 +101,14 @@ list_sessions() {
         remote_cached "$h" "sessions" "tmux list-sessions -F '$fmt'" \
           | awk -F'|' '$3!="1"' | sort -rn -t'|' -k1
     done
-  } | awk -F'|' 'NF && $2 && !seen[$2]++ {print "[active] " $2}'
+  } | awk -F'|' 'NF && $2 && !seen[$2]++ {
+        # Org sessions are stored as org-<name> (to avoid colliding with a repo
+        # session of the same name) but display as "[org] <name>" — the same
+        # label and selection handler as the C-o org view, so the internal
+        # prefix never leaks into the picker.
+        if ($2 ~ /^org-/) print "[org] " substr($2, 5)
+        else print "[active] " $2
+      }'
 }
 
 list_projects() {
@@ -132,15 +139,37 @@ list_worktrees() {
       [[ "$proj" == "worktrees" ]] && continue
       [[ "$proj" == worktree-* ]] && continue
       [[ "$proj" == .* ]] && continue
-      local wt_dir="$proj_dir/worktrees"
-      [[ ! -d "$wt_dir" ]] && continue
-      for branch_dir in "$wt_dir"/*/; do
-        [[ ! -d "$branch_dir" ]] && continue
-        branch=$(basename "$branch_dir")
-        echo "$org/$proj :: $branch"
-      done
+      [[ ! -d "${proj_dir%/}/worktrees" ]] && continue
+      # Use git's authoritative worktree list and label each by its path under
+      # worktrees/, so slashed branch names (feat/x, fix/y) survive intact
+      # rather than being truncated to their first path segment by a one-level
+      # glob. The base is taken from git's own first (main) worktree line so it
+      # is byte-identical to the linked-worktree paths it is matched against
+      # (the shell-built path can carry a stray // from the loop globs).
+      git -C "$proj_dir" worktree list --porcelain 2>/dev/null \
+        | awk -v label="$org/$proj" '
+            /^worktree / {
+              path = substr($0, 10)
+              if (NR == 1) { base = path "/worktrees/"; next }
+              if (index(path, base) == 1)
+                print label " :: " substr(path, length(base) + 1)
+            }'
     done
   done
+}
+
+# Org-level roots: top-level $CODE_DIR dirs that carry a CLAUDE.md (the marker
+# for "an org folder with repos"). Excludes archive and loose project dirs.
+# Picking one opens a session rooted at the org dir, where the org-wide CLAUDE.md
+# and the /org-* skills have the right context to work across all its repos.
+# Emitted as a bare name so the project-selection handler picks it up directly.
+list_orgs() {
+  local org_dir org
+  for org_dir in "$CODE_DIR"/*/; do
+    org=$(basename "$org_dir")
+    [[ "$org" == "archive" ]] && continue
+    [[ -f "$org_dir/CLAUDE.md" ]] && echo "[org] $org"
+  done | sort
 }
 
 list_extras() {
@@ -240,6 +269,19 @@ hub_scope() {
   for h in $(remote_hubs); do [ "$scope" = "$h" ] && { echo "$h"; return; }; done
 }
 
+# Name of the hub host whose session cache currently lists a session named $1,
+# or empty. Lets the picker route to a session that is live on a hub but not
+# local (e.g. an org session started on archie) instead of shadowing it with a
+# fresh empty local session of the same name.
+hub_with_session() {
+  local want="$1" h
+  for h in $(remote_hubs); do
+    [ -f "$CACHE_DIR/$h-sessions" ] || continue
+    awk -F'|' -v s="$want" '$2==s{f=1} END{exit !f}' \
+      "$CACHE_DIR/$h-sessions" && { printf '%s' "$h"; return; }
+  done
+}
+
 # Kill a window on the local tmux, cleaning up its git worktree if it is one.
 kill_window_local() {
   local session="$1" win_ref="$2" win_index win_name root
@@ -280,6 +322,46 @@ get_project_root() {
   git -C "$root" worktree list 2>/dev/null \
     | awk 'NR==1 {print $1}' \
     || echo "$root"
+}
+
+# Resolve a query to a repo directory directly under an org dir. Tries an exact
+# child first, then a unique case-insensitive prefix match. Prints the absolute
+# repo path, or nothing if there is no unambiguous match.
+resolve_org_repo() {
+  local org_dir="$1" q="$2" d name match=""
+  if [[ -d "$org_dir/$q" ]]; then echo "$org_dir/$q"; return 0; fi
+  for d in "$org_dir"/*/; do
+    [[ -d "$d" ]] || continue
+    name=$(basename "$d")
+    [[ "$name" == worktrees || "$name" == .* ]] && continue
+    if [[ "${name,,}" == "${q,,}"* ]]; then
+      [[ -n "$match" ]] && return 1   # ambiguous prefix
+      match="${d%/}"
+    fi
+  done
+  [[ -n "$match" ]] && echo "$match"
+}
+
+# Build the standard nvim / ai / repl layout as a new window named $2 in
+# session $1, rooted at $3. Mirrors the worktree-selection layout below; the
+# repl is auto-detected (Julia / R / shell).
+build_dev_window() {
+  local session="$1" name="$2" dir="$3" repl="zsh"
+  if [[ -f "$dir/Project.toml" ]]; then
+    repl="julia --project=."
+  elif [[ -f "$dir/DESCRIPTION" ]]; then
+    repl="R"
+  fi
+  tmux new-window -t "=$session" -n "$name" -c "$dir"
+  tmux select-pane -T "nvim"
+  tmux send-keys "nvim ." Enter
+  tmux split-window -h -c "$dir"
+  tmux select-pane -T "ai:$name"
+  tmux send-keys "${AGENT_CLI_DEV_TOOL:-claude}" Enter
+  tmux split-window -v -c "$dir"
+  tmux select-pane -T "repl"
+  tmux send-keys "$repl" Enter
+  tmux select-pane -t 0
 }
 
 # Step 2 as a standalone unit: pick (or create) a window in $1, cross-host.
@@ -339,8 +421,25 @@ pick_window() {
       tmux switch-client -t "=$host_tag"
     fi
   else
-    # No match: ask what kind of window to create
-    win_type=$(printf "feature branch\nbare terminal" \
+    # Detect an org session: root is a top-level $CODE_DIR dir with a CLAUDE.md.
+    # get_project_root resolves worktree -> main repo and is empty for a
+    # non-repo dir, so read the pane path directly here.
+    local pane_path is_org=0
+    pane_path=$(tmux display-message -t "=$session:1" \
+      -p '#{pane_current_path}' 2>/dev/null)
+    [[ "$(dirname "$pane_path")" == "${CODE_DIR%/}" \
+       && -f "$pane_path/CLAUDE.md" ]] && is_org=1
+
+    # No match: ask what kind of window to create. An org session has no single
+    # repo, so offer "open repo" (drill into one of its repos) rather than
+    # "feature branch".
+    local menu
+    if [[ $is_org -eq 1 ]]; then
+      menu=$'open repo\nbare terminal'
+    else
+      menu=$'feature branch\nbare terminal'
+    fi
+    win_type=$(printf '%s' "$menu" \
       | fzf \
         --no-sort \
         --border-label " new: $query " \
@@ -373,7 +472,34 @@ pick_window() {
     project_root=$(get_project_root "$session")
     tmux switch-client -t "=$session"
 
-    if [[ "$win_type" == "bare terminal" ]]; then
+    if [[ "$win_type" == "open repo" ]]; then
+      # Org session: open one of its repos (resolved from the typed query) as a
+      # window with the standard dev layout, reusing an existing one if present.
+      local repo_dir repo_name existing_repo_win
+      repo_dir=$(resolve_org_repo "$pane_path" "$query")
+      if [[ -z "$repo_dir" ]]; then
+        tmux display-message \
+          "no repo matching '$query' under $(basename "$pane_path")"
+      else
+        repo_name=$(basename "$repo_dir")
+        existing_repo_win=$(
+          tmux list-windows -t "=$session" \
+            -F '#{window_index}:#{window_name}' 2>/dev/null \
+            | while IFS= read -r line; do
+                [[ "${line#*:}" == "$repo_name" ]] \
+                  && echo "${line%%:*}" && break
+              done
+        )
+        if [[ -n "$existing_repo_win" ]]; then
+          tmux select-window -t "=$session:$existing_repo_win"
+        else
+          build_dev_window "$session" "$repo_name" "$repo_dir"
+        fi
+      fi
+    elif [[ "$win_type" == "bare terminal" ]]; then
+      # Org sessions are non-repos, so project_root is empty; fall back to the
+      # org dir itself.
+      [[ -z "$project_root" ]] && project_root="$pane_path"
       tmux new-window -t "=$session" -n "$query" \
         -c "$project_root"
     else
@@ -393,6 +519,7 @@ case "${1:-}" in
   --list-sessions) list_sessions; exit 0 ;;
   --list-projects)   list_projects; exit 0 ;;
   --list-worktrees)  list_worktrees; exit 0 ;;
+  --list-orgs)       list_orgs; exit 0 ;;
   --list-extras)     list_extras; exit 0 ;;
   --drop-hub-gateways)
     # Called from tmux-resurrect's post-restore hook. A reboot makes continuum
@@ -476,7 +603,7 @@ result=$(list_all | fzf \
   --border-label ' sessions ' \
   --prompt '  ' \
   --header \
-    'C-a all  C-s sessions  C-r host  C-p projects  C-w worktrees  C-e extras  C-d kill' \
+    'C-a all  C-s sessions  C-r host  C-p projects  C-w worktrees  C-o orgs  C-e extras  C-d kill' \
   --print-query \
   --bind 'tab:down,btab:up' \
   --bind "ctrl-a:change-prompt(  )+reload($0 --list-all)" \
@@ -484,6 +611,7 @@ result=$(list_all | fzf \
   --bind "ctrl-r:transform($0 --cycle-host)" \
   --bind "ctrl-p:change-prompt(  )+reload($0 --list-projects)" \
   --bind "ctrl-w:change-prompt(  )+reload($0 --list-worktrees)" \
+  --bind "ctrl-o:change-prompt(  )+reload($0 --list-orgs)" \
   --bind "ctrl-e:change-prompt(  )+reload($0 --list-extras)" \
   --bind "ctrl-d:execute-silent($0 --kill-session {2..})+reload($0 --list-all)" \
 )
@@ -532,6 +660,38 @@ elif [[ "$selected" == "[dir] "* ]]; then
       "$session" "$project_root" --no-attach
   fi
 
+elif [[ "$selected" == "[org] "* ]]; then
+  # Org-level session, rooted at the org dir. Named org-<name> so it never
+  # collides with a repo session of the same name (e.g. epinowcast/epinowcast).
+  org_name="${selected#\[org\] }"
+  session="org-$org_name"
+  project_root="$CODE_DIR/$org_name"
+
+  # If the picker is scoped to a hub (C-r), open/switch the org session THERE,
+  # mirroring how a project is created on the hub. Orgs are not a single repo,
+  # so nothing is cloned — the org dir (with its org-wide CLAUDE.md) is assumed
+  # to already exist on the hub.
+  hub="$(hub_scope)"
+  dbg "org selected=$selected session=$session scope=$(host_scope) hub=$hub"
+  if [[ -n "$hub" ]]; then
+    create_hub_session "$hub" "$session" "~/code/$org_name"
+    exit 0
+  fi
+
+  # Otherwise prefer an already-live session over launching a fresh local one:
+  # if it is live on a hub but not here, route to the hub (like a remote
+  # [active] session) rather than shadowing it with an empty local org session.
+  if ! tmux has-session -t "=$session" 2>/dev/null; then
+    hub="$(hub_with_session "$session")"
+    if [[ -n "$hub" ]]; then
+      jump_to_hub_session "$hub" "$session"
+      exit 0
+    fi
+    [[ -d "$project_root" ]] || exit 0
+    tmuxinator start project \
+      "$session" "$project_root" --no-attach
+  fi
+
 elif [[ "$selected" == *" :: "* ]]; then
   # Worktree selection: org/repo :: branch
   local_project="${selected%% :: *}"
@@ -539,7 +699,10 @@ elif [[ "$selected" == *" :: "* ]]; then
   project="${local_project##*/}"
   project_root="$CODE_DIR/$local_project"
   worktree_path="$project_root/worktrees/$branch"
-  session="$project"
+  # Sanitise to match how tmux stores the session name (it rewrites '.' and ':'
+  # to '_'); targeting the raw dotted repo name (e.g. CensoredDistributions.jl)
+  # fails because tmux reads the '.' as a window/pane separator.
+  session=$(echo "$project" | sed 's/[^a-zA-Z0-9_-]/_/g')
 
   # Ensure tmux session exists for the repo
   if ! tmux has-session -t "=$session" 2>/dev/null; then

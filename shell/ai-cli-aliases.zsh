@@ -306,8 +306,14 @@ proj() {
     if [[ $? -ne 0 ]]; then
       return 1
     fi
-    project="${project_path##*/}"
     project_root="$CODE_DIR/$project_path"
+    if [[ "$project_path" == */* ]]; then
+      project="${project_path##*/}"
+    else
+      # Org-level (no slash): distinct session name so it never collides with a
+      # repo of the same name (e.g. the epinowcast/epinowcast package session).
+      project="org-${project_path}"
+    fi
   fi
 
   # Ensure the session exists (start detached; we enter it ourselves below)
@@ -336,10 +342,11 @@ proj() {
   _enter_session "=$project"
 }
 
-# Open a pull request branch in its own worktree session.
+# Open a pull request branch in a worktree window of the repo's session.
 # Usage: prsesh <org/repo> <pr-number>
-# Checks out the PR (forks included) into a worktree under the repo
-# and starts a dedicated tmux session for it.
+# Checks out the PR (forks included) into a worktree under the repo and opens
+# it as a window (nvim/ai/repl) inside the repo's tmux session, reusing the
+# window if it already exists.
 prsesh() {
   local repo="$1"
   local num="$2"
@@ -366,8 +373,12 @@ prsesh() {
   fi
 
   local wt="$root/worktrees/$branch"
-  local session="${project_path##*/}-${branch}"
-  session=$(echo "$session" | sed 's/[^a-zA-Z0-9_-]/_/g')
+  # Repo session name, sanitised to match how tmux stores it: tmux rewrites
+  # '.' and ':' to '_', so a dotted repo like CensoredDistributions.jl lives in
+  # the session CensoredDistributions_jl. Targeting the raw dotted name fails
+  # (tmux reads the '.' as a window/pane separator).
+  local repo_session
+  repo_session=$(echo "${project_path##*/}" | sed 's/[^a-zA-Z0-9_-]/_/g')
 
   # Check out the PR into its own worktree if needed
   local reused=true
@@ -395,9 +406,27 @@ prsesh() {
       || echo "Note: '$branch' could not fast-forward (diverged?)" >&2
   fi
 
-  # Start a dedicated session rooted at the worktree (nvim/ai/repl)
-  _ensure_session "$session" "$wt" "ai:$branch"
-  _enter_session "=$session"
+  # Ensure the repo's session exists, then open the PR worktree as a WINDOW
+  # inside it (the feat / worktree-picker model) rather than a standalone
+  # session. Reuse an existing window for the branch if one is already there.
+  if ! tmux has-session -t "=$repo_session" 2>/dev/null; then
+    tmuxinator start project "$repo_session" "$root" --no-attach
+  fi
+  local existing_win
+  existing_win=$(tmux list-windows -t "=$repo_session" \
+    -F '#{window_index}:#{window_name}' 2>/dev/null \
+    | while IFS= read -r line; do
+        [[ "${line#*:}" == "$branch" ]] && { echo "${line%%:*}"; break; }
+      done)
+  if [[ -n "$existing_win" ]]; then
+    tmux select-window -t "=$repo_session:$existing_win"
+  else
+    local p0
+    p0=$(tmux new-window -t "=$repo_session" -n "$branch" -c "$wt" \
+      -P -F '#{pane_id}')
+    _build_panes "$p0" "$wt" "ai:$branch"
+  fi
+  _enter_session "=$repo_session"
 }
 
 # Open an issue's linked branch in its own worktree session.
@@ -570,6 +599,16 @@ _find_project() {
 
   # Support explicit org/project format
   if [[ "$partial" == */* && -d "$code_dir/$partial" ]]; then
+    echo "$partial"
+    return 0
+  fi
+
+  # Org-level match: an exact top-level dir carrying a CLAUDE.md (the org
+  # marker). Lets `proj EpiAware` / `agent EpiAware` open a session rooted at
+  # the org dir, where the org-wide CLAUDE.md and /org-* skills have context to
+  # work across all its repos. Returns the bare org name so callers resolve
+  # project_root as $CODE_DIR/<org>.
+  if [[ -d "$code_dir/$partial" && -f "$code_dir/$partial/CLAUDE.md" ]]; then
     echo "$partial"
     return 0
   fi
