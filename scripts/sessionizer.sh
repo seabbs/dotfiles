@@ -429,6 +429,83 @@ clone_and_open() {
   fi
 }
 
+# Open PRs of a GitHub "owner/repo" for the picker: "#<n>  <title>  (author:head)".
+list_prs() {
+  gh pr list -R "$1" --limit 40 \
+    --json number,title,headRefName,author \
+    --jq '.[] | "#\(.number)  \(.title)  (\(.author.login):\(.headRefName))"' \
+    2>/dev/null
+}
+
+# Check out PR #num of owner/repo as a worktree session on the LOCAL host,
+# cloning the base repo under ~/code/<owner>/<repo> on demand. prsesh does the
+# fork-aware checkout + window; it resolves the repo by the "owner/repo" arg, so
+# PRs live under the owner dir (not external) to keep that resolution exact.
+open_local_pr() {
+  local full="$1" num="$2" owner repo dest session
+  owner="${full%%/*}"; repo="${full##*/}"; dest="$CODE_DIR/$owner/$repo"
+  if [ ! -d "$dest" ]; then
+    mkdir -p "$CODE_DIR/$owner"
+    tmux display-message "cloning $full …"
+    git clone "https://github.com/$full.git" "$dest" 2>/dev/null \
+      || { tmux display-message "clone failed: $full"; return 1; }
+  fi
+  session=$(printf '%s' "$repo" | sed 's/[^a-zA-Z0-9_-]/_/g')
+  tmux has-session -t "=$session" 2>/dev/null \
+    || tmuxinator start project "$session" "$dest" --no-attach
+  tmux switch-client -t "=$session"
+  tmux new-window -t "=$session" -n _launcher -c "$dest" \
+    "zsh -ic 'prsesh $full $num; exit'"
+}
+
+# Same, on a hub: clone the base repo on demand, then run prsesh in a launcher
+# window on the hub and jump into the repo session.
+open_hub_pr() {
+  local hub="$1" full="$2" num="$3" owner repo session
+  owner="${full%%/*}"; repo="${full##*/}"
+  session=$(printf '%s' "$repo" | sed 's/[^a-zA-Z0-9_-]/_/g')
+  ssh "$hub" \
+    "[ -d ~/code/$owner/$repo ] \
+       || git clone https://github.com/$full.git ~/code/$owner/$repo" \
+    2>/dev/null || true
+  ssh "$hub" \
+    "tmux has-session -t '=$session' 2>/dev/null \
+       || tmuxinator start project '$session' '~/code/$owner/$repo' --no-attach" \
+    2>/dev/null || true
+  ssh "$hub" \
+    "tmux new-window -t '=$session' -n _launcher -c '~/code/$owner/$repo' \
+       \"zsh -ic 'prsesh $full $num; exit'\"" 2>/dev/null || true
+  rm -f "$CACHE_DIR/$hub-windows-$session" 2>/dev/null
+  jump_to_hub_session "$hub" "$session"
+}
+
+# Entry for a picked [gh] repo: choose "open repo" or "open a PR" (pick the PR,
+# then the host), so a session can be made from a PR branch of a repo you do not
+# have locally yet — cloned on demand on the chosen host.
+open_github_repo() {
+  local full="$1" action pr num host
+  action=$(printf 'open repo\nopen a PR\n' | fzf --no-sort \
+    --border-label " $full " --prompt '  ' --header 'What do you want?')
+  [ -z "$action" ] && return 0
+  if [ "$action" = "open repo" ]; then
+    clone_and_open "$full"
+    return 0
+  fi
+  pr=$(list_prs "$full" | fzf --no-sort --border-label " PRs · $full " \
+    --prompt '  ' --header 'Pick a PR (Enter)')
+  [ -z "$pr" ] && return 0
+  num="${pr#\#}"; num="${num%% *}"
+  host=$(printf 'home\n%s\n' "$(remote_hubs)" | sed '/^$/d' | fzf \
+    --no-sort --border-label " PR #$num → where?" --prompt '  ' \
+    --header 'Set up on which host?')
+  [ -z "$host" ] && return 0
+  if [ "$host" = "home" ] || [ "$host" = "$(local_label)" ]; then
+    open_local_pr "$full" "$num"
+  else
+    open_hub_pr "$host" "$full" "$num"
+  fi
+}
+
 # Kill a window on the local tmux, cleaning up its git worktree if it is one.
 kill_window_local() {
   local session="$1" win_ref="$2" win_index win_name root
@@ -778,9 +855,10 @@ selected=$(echo "$result" | sed -n '2p')
 [[ -z "$selected" && -z "$query" ]] && exit 0
 [[ "$selected" == "────────────" ]] && exit 0
 
-# GitHub repo picked (C-g / ⌥g view): clone it to a chosen host, then open it.
+# GitHub repo picked (C-g / ⌥g view): open the repo, or set up a session from
+# one of its PRs — on a chosen host, cloned on demand.
 if [[ "$selected" == "[gh] "* ]]; then
-  clone_and_open "${selected#\[gh\] }"
+  open_github_repo "${selected#\[gh\] }"
   exit 0
 fi
 
