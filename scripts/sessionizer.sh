@@ -111,7 +111,8 @@ list_sessions() {
       }'
 }
 
-list_projects() {
+# Local repo dirs as "org/repo", most-recently-modified first.
+list_projects_local() {
   local dirs=() org_dir org proj_dir proj
   for org_dir in "$CODE_DIR"/*/; do
     org=$(basename "$org_dir")
@@ -127,6 +128,27 @@ list_projects() {
   [[ ${#dirs[@]} -gt 0 ]] || return 0
   # Order by last modified (most-recent first); ls -t works on mac and linux.
   ls -dt "${dirs[@]}" 2>/dev/null | sed "s|^$CODE_DIR/||; s|/\$||"
+}
+
+# The same "org/repo" list on a hub, via a plain inline ssh command (NOT the
+# hub's copy of this script) so it works whatever script version is deployed
+# there. Mirrors list_projects_local's exclusions (archive/worktrees/hidden).
+REMOTE_PROJECTS_CMD="cd ~/code 2>/dev/null && ls -dt */*/ 2>/dev/null | sed 's:/*\$::' | grep -vE '^archive/|/worktrees\$|/worktree-|/\.'"
+
+# Projects merged across home + hub hosts (deduped, local first), scope-aware.
+# A repo living on only one host still appears; selecting it routes to whichever
+# host actually has it (see the project handler). Remote comes from a
+# background-refreshed cache so the finder never blocks on ssh.
+list_projects() {
+  local scope llbl h; scope="$(host_scope)"; llbl="$(local_label)"
+  {
+    [[ "$scope" == "all" || "$scope" == "$llbl" || "$scope" == "home" ]] && \
+      list_projects_local
+    for h in $(remote_hubs); do
+      [[ "$scope" == "all" || "$scope" == "$h" ]] && \
+        remote_cached "$h" "projects" "$REMOTE_PROJECTS_CMD"
+    done
+  } | awk 'NF && !seen[$0]++'
 }
 
 list_worktrees() {
@@ -236,13 +258,15 @@ drop_dead_gateway() {
   tmux kill-session -t "=$1" 2>/dev/null
 }
 
-# Create a session on a hub host (if missing) and jump into its nested mosh
-# session here. $1=hub  $2=session name  $3=working dir on the hub (e.g. ~).
-create_hub_session() {
+# Ensure a session exists on a hub host WITHOUT jumping into it: clone the repo
+# on demand, then start the session detached if missing. Callers that want to
+# then pick/create a window on the hub (the project path) use this and let
+# pick_window do the routing. $1=hub $2=session $3=dir $4=repo (optional).
+ensure_hub_session() {
   local hub="$1" sname="$2" dir="$3" repo="${4:-}"
-  dbg "create_hub_session hub=$hub sname=$sname dir=$dir repo=$repo"
+  dbg "ensure_hub_session hub=$hub sname=$sname dir=$dir repo=$repo"
   # Clone the repo on demand if it is not on the hub yet (gh credential helper
-  # on the hub covers private repos).
+  # on the hub covers private repos). git clone creates missing parent dirs.
   if [[ -n "$repo" ]]; then
     ssh "$hub" \
       "[ -d $dir ] || git clone https://github.com/$repo.git $dir" \
@@ -252,15 +276,13 @@ create_hub_session() {
     "tmux has-session -t '=$sname' 2>/dev/null \
        || tmuxinator start project '$sname' '$dir' --no-attach" \
     2>/dev/null || true
-  drop_dead_gateway "$hub"
-  if tmux has-session -t "=$hub" 2>/dev/null; then
-    ssh "$hub" "tmux switch-client -t '=$sname'" 2>/dev/null || true
-  else
-    tmux new-session -d -s "$hub" \
-      "/bin/zsh -lc 'mosh --predict=experimental $hub -- tmux attach -t $sname'"
-    flag_hub "$hub"
-  fi
-  tmux switch-client -t "=$hub"
+}
+
+# Create a session on a hub host (if missing) and jump into its nested mosh
+# session here. $1=hub  $2=session name  $3=working dir on the hub  $4=repo.
+create_hub_session() {
+  ensure_hub_session "$@"
+  jump_to_hub_session "$1" "$2"
 }
 
 # The hub host currently filtered to (empty unless C-r is on a specific hub).
@@ -280,6 +302,96 @@ hub_with_session() {
     awk -F'|' -v s="$want" '$2==s{f=1} END{exit !f}' \
       "$CACHE_DIR/$h-sessions" && { printf '%s' "$h"; return; }
   done
+}
+
+# Name of the hub host whose cached project list contains "org/repo" $1, or
+# empty. Lets a repo that exists only on a hub open on that hub without the user
+# choosing a host (seamless cross-host open).
+hub_with_project() {
+  local want="$1" h
+  for h in $(remote_hubs); do
+    [ -f "$CACHE_DIR/$h-projects" ] || continue
+    awk -v s="$want" '$0==s{f=1} END{exit !f}' \
+      "$CACHE_DIR/$h-projects" && { printf '%s' "$h"; return; }
+  done
+}
+
+# Map a GitHub owner to a local org dir name: an existing ~/code/<owner>
+# (case-insensitive), else "external" (matching the ~/code/external convention
+# for other people's repos). Home and hub mirror the same org layout.
+org_dir_for() {
+  local owner="$1" d name
+  for d in "$CODE_DIR"/*/; do
+    name=$(basename "$d")
+    [[ "${name,,}" == "${owner,,}" ]] && { printf '%s' "$name"; return; }
+  done
+  printf 'external'
+}
+
+# GitHub owners to pre-list (your own + orgs), overridable via env.
+GH_OWNERS="${GH_OWNERS:-seabbs epinowcast epiforecasts EpiAware nfidd}"
+
+# Your own + org repos as "[gh] owner/repo", printed instantly from cache and
+# refreshed in the background (the gh API round-trips are slow). Mirrors the
+# remote_cached pattern so C-g never blocks.
+list_github() {
+  local cache="$CACHE_DIR/github-repos" lock o
+  [ -f "$cache" ] && cat "$cache"
+  lock="$cache.lock"
+  if [ -d "$lock" ]; then
+    local lmt
+    lmt=$(stat -f %m "$lock" 2>/dev/null || stat -c %Y "$lock" 2>/dev/null || echo 0)
+    [ "$(( $(date +%s) - lmt ))" -ge 60 ] && rmdir "$lock" 2>/dev/null
+  fi
+  if mkdir "$lock" 2>/dev/null; then
+    ( for o in $GH_OWNERS; do
+        gh repo list "$o" --no-archived --limit 200 \
+          --json nameWithOwner --jq '.[].nameWithOwner' 2>/dev/null
+      done | sort -u | sed 's/^/[gh] /' >"$cache.tmp" \
+        && mv "$cache.tmp" "$cache"
+      rm -f "$cache.tmp"; rmdir "$lock" ) >/dev/null 2>&1 &
+  fi
+}
+
+# Search all of GitHub for $1 (⌥g in the picker), as "[gh] owner/repo".
+search_github() {
+  local q="$1"
+  [ -z "$q" ] && return 0
+  gh search repos "$q" --limit 40 --json fullName --jq '.[].fullName' 2>/dev/null \
+    | sed 's/^/[gh] /'
+}
+
+# Clone a GitHub "owner/repo" onto a chosen host (home or a hub) under
+# ~/code/<owner-or-external>/<repo>, then open a session there. For a hub the
+# clone happens on demand via create_hub_session (gh credential helper covers
+# private repos). Invoked when a [gh] entry is picked.
+clone_and_open() {
+  local full="$1" owner repo dest_org rel host dest
+  owner="${full%%/*}"; repo="${full##*/}"
+  dest_org="$(org_dir_for "$owner")"
+  rel="$dest_org/$repo"
+
+  host=$(printf 'home\n%s\n' "$(remote_hubs)" | sed '/^$/d' | fzf \
+    --no-sort --border-label " clone $full " --prompt '  ' \
+    --header 'Where should this repo live?')
+  [ -z "$host" ] && return 0
+
+  if [ "$host" = "home" ] || [ "$host" = "$(local_label)" ]; then
+    dest="$CODE_DIR/$rel"
+    if [ ! -d "$dest" ]; then
+      mkdir -p "$CODE_DIR/$dest_org"
+      tmux display-message "cloning $full …"
+      git clone "https://github.com/$full.git" "$dest" 2>/dev/null \
+        || { tmux display-message "clone failed: $full"; return 1; }
+    fi
+    tmux has-session -t "=$repo" 2>/dev/null \
+      || tmuxinator start project "$repo" "$dest" --no-attach
+    tmux switch-client -t "=$repo"
+    pick_window "$repo"
+  else
+    echo "$host" > "$HOST_STATE"
+    create_hub_session "$host" "$repo" "~/code/$rel" "$full"
+  fi
 }
 
 # Kill a window on the local tmux, cleaning up its git worktree if it is one.
@@ -520,6 +632,8 @@ case "${1:-}" in
   --list-projects)   list_projects; exit 0 ;;
   --list-worktrees)  list_worktrees; exit 0 ;;
   --list-orgs)       list_orgs; exit 0 ;;
+  --list-github)     list_github; exit 0 ;;
+  --search-github)   search_github "$2"; exit 0 ;;
   --list-extras)     list_extras; exit 0 ;;
   --drop-hub-gateways)
     # Called from tmux-resurrect's post-restore hook. A reboot makes continuum
@@ -603,7 +717,7 @@ result=$(list_all | fzf \
   --border-label ' sessions ' \
   --prompt '  ' \
   --header \
-    'C-a all  C-s sessions  C-r host  C-p projects  C-w worktrees  C-o orgs  C-e extras  C-d kill' \
+    'C-a all  C-s sessions  C-r host  C-p projects  C-w worktrees  C-o orgs  C-g github(⌥g=all)  C-e extras  C-d kill' \
   --print-query \
   --bind 'tab:down,btab:up' \
   --bind "ctrl-a:change-prompt(  )+reload($0 --list-all)" \
@@ -612,6 +726,8 @@ result=$(list_all | fzf \
   --bind "ctrl-p:change-prompt(  )+reload($0 --list-projects)" \
   --bind "ctrl-w:change-prompt(  )+reload($0 --list-worktrees)" \
   --bind "ctrl-o:change-prompt(  )+reload($0 --list-orgs)" \
+  --bind "ctrl-g:change-prompt(  )+reload($0 --list-github)" \
+  --bind "alt-g:change-prompt(  )+reload($0 --search-github {q})" \
   --bind "ctrl-e:change-prompt(  )+reload($0 --list-extras)" \
   --bind "ctrl-d:execute-silent($0 --kill-session {2..})+reload($0 --list-all)" \
 )
@@ -626,6 +742,12 @@ selected=$(echo "$result" | sed -n '2p')
 # Nothing typed and nothing picked
 [[ -z "$selected" && -z "$query" ]] && exit 0
 [[ "$selected" == "────────────" ]] && exit 0
+
+# GitHub repo picked (C-g / ⌥g view): clone it to a chosen host, then open it.
+if [[ "$selected" == "[gh] "* ]]; then
+  clone_and_open "${selected#\[gh\] }"
+  exit 0
+fi
 
 # Unmatched query: ad-hoc session named after the query. If filtered to a hub,
 # create it there; otherwise locally at $HOME.
@@ -749,19 +871,31 @@ elif [[ "$selected" == *" :: "* ]]; then
   exit 0
 
 else
-  # Project path: create session if needed. If filtered to a hub, create it
-  # there (same repo path under the hub's ~/code) and jump in.
+  # Project path. Resolve the target host, then fall through to the window step
+  # so you can open the main window OR create a feature branch on that host.
   project="${selected##*/}"
   project_root="$CODE_DIR/$selected"
   session="$project"
 
   hub="$(hub_scope)"
-  dbg "project selected=$selected session=$session scope=$(host_scope) hub=$hub"
-  if [[ -n "$hub" ]]; then
-    create_hub_session "$hub" "$session" "~/code/$selected" "$selected"
-    exit 0
+  # Seamless cross-host open: with no explicit hub scope, if the repo is not
+  # here but lives on a hub, target that hub and scope the window step to it, so
+  # an archie-only repo opens on archie without the user choosing a host.
+  if [[ -z "$hub" && ! -d "$project_root" ]]; then
+    hub="$(hub_with_project "$selected")"
+    [[ -n "$hub" ]] && echo "$hub" > "$HOST_STATE"
   fi
-  if ! tmux has-session -t "=$session" 2>/dev/null; then
+  dbg "project selected=$selected session=$session scope=$(host_scope) hub=$hub"
+
+  if [[ -n "$hub" ]]; then
+    # Create/clone the session on the hub (no jump), then refresh its window
+    # cache so the window step lists it right away. pick_window (scoped to the
+    # hub) then opens a window or creates a feature branch ON the hub.
+    ensure_hub_session "$hub" "$session" "~/code/$selected" "$selected"
+    ssh "$hub" \
+      "tmux list-windows -t '=$session' -F '#{window_activity} #{window_index}:#{window_name}'" \
+      >"$CACHE_DIR/$hub-windows-$session" 2>/dev/null
+  elif ! tmux has-session -t "=$session" 2>/dev/null; then
     tmuxinator start project \
       "$session" "$project_root" --no-attach
   fi

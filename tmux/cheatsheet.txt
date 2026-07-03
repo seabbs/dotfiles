@@ -35,10 +35,15 @@
   ----------------------------------------------------------------
   Ctrl-Space f     session switcher (fzf popup, home + archie)
                  C-a all  C-s sessions  C-r host  C-p projects
-                 C-w worktrees  C-o orgs  C-e extras  C-d kill
+                 C-w worktrees  C-o orgs  C-g github  C-e extras  C-d kill
                  C-o → org-level session (all repos of EpiAware etc.)
                  in an org session, prefix s → "open repo" adds a repo window
-                 type/pick while C-r=archie → created on archie
+                 C-g → your/org repos · ⌥g → search all GitHub; pick one →
+                       choose home/archie → clone + open
+                 projects span home+archie: a repo on only one host still
+                 shows and opens there (local first; C-r=archie forces archie)
+                 pick a repo while C-r=archie → opens on archie; type a name
+                 there → new feature branch created on archie
   Ctrl-Space \     toggle last session
   Ctrl-Space /     toggle last window
   Ctrl-Space s     session picker (built-in)
