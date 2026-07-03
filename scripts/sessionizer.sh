@@ -151,7 +151,8 @@ list_projects() {
   } | awk 'NF && !seen[$0]++'
 }
 
-list_worktrees() {
+list_worktrees_local() {
+  local org_dir org proj_dir proj
   for org_dir in "$CODE_DIR"/*/; do
     org=$(basename "$org_dir")
     [[ "$org" == "archive" ]] && continue
@@ -178,6 +179,24 @@ list_worktrees() {
             }'
     done
   done
+}
+
+# The same "org/repo :: branch" list on a hub, via a plain inline ssh command
+# (version-independent). Pure shell so slashed branch names survive intact.
+REMOTE_WORKTREES_CMD='cd ~/code 2>/dev/null || exit; for p in */*/; do case "$p" in archive/*|*/worktrees/|*/worktree-*/) continue;; esac; [ -d "${p}worktrees" ] || continue; repo="${p%/}"; git -C "$p" worktree list 2>/dev/null | while read -r path _; do case "$path" in */worktrees/*) echo "$repo :: ${path#*/worktrees/}";; esac; done; done'
+
+# Worktrees merged across home + hub hosts (deduped, local first), scope-aware.
+# A worktree on only one host still appears; selecting it routes to that host.
+list_worktrees() {
+  local scope llbl h; scope="$(host_scope)"; llbl="$(local_label)"
+  {
+    [[ "$scope" == "all" || "$scope" == "$llbl" || "$scope" == "home" ]] && \
+      list_worktrees_local
+    for h in $(remote_hubs); do
+      [[ "$scope" == "all" || "$scope" == "$h" ]] && \
+        remote_cached "$h" "worktrees" "$REMOTE_WORKTREES_CMD"
+    done
+  } | awk 'NF && !seen[$0]++'
 }
 
 # Org-level roots: top-level $CODE_DIR dirs that carry a CLAUDE.md (the marker
@@ -283,6 +302,22 @@ ensure_hub_session() {
 create_hub_session() {
   ensure_hub_session "$@"
   jump_to_hub_session "$1" "$2"
+}
+
+# Open a worktree window on a hub: ensure the repo session, then run `feat` in
+# it (idempotent — reuses an existing worktree, so it just opens a window with
+# the nvim/ai/repl layout), then jump in. $1=hub $2=session $3=org/repo $4=branch.
+open_hub_worktree() {
+  local hub="$1" session="$2" rel="$3" branch="$4"
+  ssh "$hub" \
+    "tmux has-session -t '=$session' 2>/dev/null \
+       || tmuxinator start project '$session' '~/code/$rel' --no-attach" \
+    2>/dev/null || true
+  ssh "$hub" \
+    "tmux new-window -t '=$session' -n _launcher -c '~/code/$rel' \
+       \"zsh -ic 'feat $branch; exit'\"" 2>/dev/null || true
+  rm -f "$CACHE_DIR/$hub-windows-$session" 2>/dev/null
+  jump_to_hub_session "$hub" "$session"
 }
 
 # The hub host currently filtered to (empty unless C-r is on a specific hub).
@@ -800,14 +835,17 @@ elif [[ "$selected" == "[org] "* ]]; then
     exit 0
   fi
 
-  # Otherwise prefer an already-live session over launching a fresh local one:
-  # if it is live on a hub but not here, route to the hub (like a remote
-  # [active] session) rather than shadowing it with an empty local org session.
+  # Otherwise, in "all" scope, prefer an already-live session over launching a
+  # fresh local one: if it is live on a hub but not here, route to the hub. In
+  # "home" scope this is skipped, so you can create a LOCAL org session even
+  # when archie already has one of the same name (C-r home to force local).
   if ! tmux has-session -t "=$session" 2>/dev/null; then
-    hub="$(hub_with_session "$session")"
-    if [[ -n "$hub" ]]; then
-      jump_to_hub_session "$hub" "$session"
-      exit 0
+    if [[ "$(host_scope)" == "all" ]]; then
+      hub="$(hub_with_session "$session")"
+      if [[ -n "$hub" ]]; then
+        jump_to_hub_session "$hub" "$session"
+        exit 0
+      fi
     fi
     [[ -d "$project_root" ]] || exit 0
     tmuxinator start project \
@@ -825,6 +863,18 @@ elif [[ "$selected" == *" :: "* ]]; then
   # to '_'); targeting the raw dotted repo name (e.g. CensoredDistributions.jl)
   # fails because tmux reads the '.' as a window/pane separator.
   session=$(echo "$project" | sed 's/[^a-zA-Z0-9_-]/_/g')
+
+  # Cross-host: open on the hub when C-r-scoped there, or (in "all" scope) when
+  # the worktree exists only on the hub. feat is idempotent so it just opens a
+  # window for the existing worktree.
+  hub="$(hub_scope)"
+  if [[ -z "$hub" && "$(host_scope)" == "all" && ! -d "$worktree_path" ]]; then
+    hub="$(hub_with_project "$local_project")"
+  fi
+  if [[ -n "$hub" ]]; then
+    open_hub_worktree "$hub" "$session" "$local_project" "$branch"
+    exit 0
+  fi
 
   # Ensure tmux session exists for the repo
   if ! tmux has-session -t "=$session" 2>/dev/null; then
@@ -878,10 +928,11 @@ else
   session="$project"
 
   hub="$(hub_scope)"
-  # Seamless cross-host open: with no explicit hub scope, if the repo is not
-  # here but lives on a hub, target that hub and scope the window step to it, so
-  # an archie-only repo opens on archie without the user choosing a host.
-  if [[ -z "$hub" && ! -d "$project_root" ]]; then
+  # Seamless cross-host open (only in "all" scope): if the repo is not here but
+  # lives on a hub, target that hub and scope the window step to it, so an
+  # archie-only repo opens on archie without the user choosing a host. In "home"
+  # scope this is skipped so the picker stays strictly local.
+  if [[ -z "$hub" && "$(host_scope)" == "all" && ! -d "$project_root" ]]; then
     hub="$(hub_with_project "$selected")"
     [[ -n "$hub" ]] && echo "$hub" > "$HOST_STATE"
   fi

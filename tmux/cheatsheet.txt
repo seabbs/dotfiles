@@ -40,8 +40,10 @@
                  in an org session, prefix s → "open repo" adds a repo window
                  C-g → your/org repos · ⌥g → search all GitHub; pick one →
                        choose home/archie → clone + open
-                 projects span home+archie: a repo on only one host still
-                 shows and opens there (local first; C-r=archie forces archie)
+                 projects+worktrees span home+archie: something on only one
+                 host still shows and opens there. all=local first;
+                 C-r=archie forces archie; C-r=home forces local (create a
+                 home org/session even when archie has one of that name)
                  pick a repo while C-r=archie → opens on archie; type a name
                  there → new feature branch created on archie
   Ctrl-Space \     toggle last session
