@@ -39,7 +39,9 @@
                  C-o → org-level session (all repos of EpiAware etc.)
                  in an org session, prefix s → "open repo" adds a repo window
                  C-g → your/org repos · ⌥g → search all GitHub; pick one →
-                       choose home/archie → clone + open
+                       "open repo" or "open a PR" → choose home/archie →
+                       clone on demand + open (PR sessions work even for
+                       repos you don't have locally; fork PRs included)
                  projects+worktrees span home+archie: something on only one
                  host still shows and opens there. all=local first;
                  C-r=archie forces archie; C-r=home forces local (create a
