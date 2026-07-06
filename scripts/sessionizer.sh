@@ -363,6 +363,13 @@ org_dir_for() {
   printf 'external'
 }
 
+# tmux rewrites '.' and ':' in a session name to '_', so a dotted repo such as
+# CensoredDistributions.jl or epiaware.github.io lives in a session with
+# underscores. Derive that tmux-safe name up front so every -t '=name' target
+# (local and over ssh) matches what tmux actually stored — otherwise the main
+# session is created but window/feature targets miss and silently do nothing.
+sanitize_session() { printf '%s' "$1" | sed 's/[^a-zA-Z0-9_-]/_/g'; }
+
 # GitHub owners to pre-list (your own + orgs), overridable via env.
 GH_OWNERS="${GH_OWNERS:-seabbs epinowcast epiforecasts EpiAware nfidd}"
 
@@ -401,10 +408,11 @@ search_github() {
 # clone happens on demand via create_hub_session (gh credential helper covers
 # private repos). Invoked when a [gh] entry is picked.
 clone_and_open() {
-  local full="$1" owner repo dest_org rel host dest
+  local full="$1" owner repo dest_org rel host dest session
   owner="${full%%/*}"; repo="${full##*/}"
   dest_org="$(org_dir_for "$owner")"
   rel="$dest_org/$repo"
+  session="$(sanitize_session "$repo")"
 
   host=$(printf 'home\n%s\n' "$(remote_hubs)" | sed '/^$/d' | fzf \
     --no-sort --border-label " clone $full " --prompt '  ' \
@@ -419,13 +427,13 @@ clone_and_open() {
       git clone "https://github.com/$full.git" "$dest" 2>/dev/null \
         || { tmux display-message "clone failed: $full"; return 1; }
     fi
-    tmux has-session -t "=$repo" 2>/dev/null \
-      || tmuxinator start project "$repo" "$dest" --no-attach
-    tmux switch-client -t "=$repo"
-    pick_window "$repo"
+    tmux has-session -t "=$session" 2>/dev/null \
+      || tmuxinator start project "$session" "$dest" --no-attach
+    tmux switch-client -t "=$session"
+    pick_window "$session"
   else
     echo "$host" > "$HOST_STATE"
-    create_hub_session "$host" "$repo" "~/code/$rel" "$full"
+    create_hub_session "$host" "$session" "~/code/$rel" "$full"
   fi
 }
 
@@ -1003,7 +1011,7 @@ else
   # so you can open the main window OR create a feature branch on that host.
   project="${selected##*/}"
   project_root="$CODE_DIR/$selected"
-  session="$project"
+  session="$(sanitize_session "$project")"
 
   hub="$(hub_scope)"
   # Seamless cross-host open (only in "all" scope): if the repo is not here but
