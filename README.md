@@ -80,6 +80,7 @@ It runs automatically during setup, or can be run standalone.
 | `pi/settings.json` | `~/.pi/agent/settings.json` |
 | `pi/AGENTS.md` | `~/.pi/agent/AGENTS.md` |
 | `pi/agents` | `~/.pi/agent/agents` |
+| `pi/web-search.json` | `~/.pi/web-search.json` |
 
 ## Scheduled jobs
 

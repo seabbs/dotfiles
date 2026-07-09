@@ -1,0 +1,4 @@
+{
+  "workflow": "auto-summary",
+  "summaryModel": "deepseek/deepseek-v4-flash"
+}
