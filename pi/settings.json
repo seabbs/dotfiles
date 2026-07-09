@@ -49,7 +49,7 @@
   "enabledModels": [
     "z-ai/glm-5.2",
     "deepseek/deepseek-v4-flash",
-    "anthropic/claude-haiku-4.5"
+    "anthropic/claude-opus-4.8"
   ],
   "warnings": {
     "anthropicExtraUsage": true
