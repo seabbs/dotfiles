@@ -10,16 +10,19 @@ pi-specific guidance: models, subagent usage, and security posture.
 - **Parent session:** `z-ai/glm-5.2` via OpenRouter — 1M-token context, strong
   agentic coding. This is the model that runs the main conversation and all
   heavy reasoning (`thinking: high`).
-- **Cheap subagents:** `z-ai/glm-4.7-flash` for recon and gathering roles
-  (`scout`, `context-builder`, `researcher`, `delegate`) — these mostly read
-  files and fetch sources, so a fast cheap model is plenty.
+- **Cheap subagents:** `deepseek/deepseek-v4-flash` for recon and gathering roles
+  (`scout`, `context-builder`, `researcher`, `delegate`) and mechanical implementation
+  (`weak-worker`) — strong flash-tier coder (leads glm-4.7-flash by ~13 coding-index
+  points), cheap on output tokens. In `enabledModels` so Ctrl+P cycles to it mid-session.
+  GLM-5.2 stays ~10 SWE-bench Pro points ahead, so reasoning/review/implementation
+  stays on the flagship.
 - **Heavy subagents inherit the parent model:** `planner`, `worker`, `oracle`,
   `reviewer` run on glm-5.2 (deep reasoning, implementation, review).
-- **`weak-worker`:** a custom cheap worker on glm-4.7-flash for low-stakes
-  tasks — summarisation, simple mechanical edits, scratch scaffolding, bulk
-  find-and-replace, docstring churn. Use it instead of `worker` when the task
-  is mechanical and doesn't need flagship reasoning. Do NOT use it for logic,
-  architecture, or anything where a subtle error is costly.
+- **`weak-worker`:** a cheap worker on `deepseek/deepseek-v4-flash` with
+  `thinking: high` for low-stakes tasks — summarisation, simple mechanical edits,
+  scratch scaffolding, bulk find-and-replace, docstring churn. Use it instead of
+  `worker` when the task is mechanical and doesn't need flagship reasoning. Do NOT
+  use it for logic, architecture, or anything where a subtle error is costly.
 - **Secondary provider (optional):** an Anthropic subscription is available via
   `/login` (OAuth, no key). Use Ctrl+P to cycle to Claude mid-session. Not
   wired by default; run `/login` and select Anthropic to enable.
@@ -37,11 +40,11 @@ around.
 
 | Task shape | Agent | Model | Notes |
 |---|---|---|---|
-| Codebase recon, "what's where" | `scout` | glm-4.7-flash | Writes `context.md` handoff. |
-| Requirements / structured handoff | `context-builder` | glm-4.7-flash | Before `planner`/`worker`. |
-| Web research, primary sources | `researcher` | glm-4.7-flash | Pair with local `scout`. |
-| Mechanical edits, scaffolding, find-and-replace, docstring churn | `weak-worker` | glm-4.7-flash | NOT for logic/architecture. |
-| Lightweight generic delegation | `delegate` | glm-4.7-flash | When no other fits. |
+| Codebase recon, "what's where" | `scout` | deepseek-v4-flash | Writes `context.md` handoff. |
+| Requirements / structured handoff | `context-builder` | deepseek-v4-flash | Before `planner`/`worker`. |
+| Web research, primary sources | `researcher` | deepseek-v4-flash | Pair with local `scout`. |
+| Mechanical edits, scaffolding, find-and-replace, docstring churn | `weak-worker` | deepseek-v4-flash | NOT for logic/architecture. |
+| Lightweight generic delegation | `delegate` | deepseek-v4-flash | When no other fits. |
 | Implementation plans | `planner` | glm-5.2 (inherits) | From a context handoff. |
 | Single-writer implementation | `worker` | glm-5.2 (inherits) | Approved handoffs only. |
 | Architecture / decision advice | `oracle` | glm-5.2 (inherits) | Advisory, doesn't write. |
