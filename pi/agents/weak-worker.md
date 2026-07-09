@@ -1,7 +1,7 @@
 ---
 name: weak-worker
 description: Cheap implementation agent for mechanical, low-stakes edits and scaffolding
-model: z-ai/glm-4.7-flash
+model: deepseek/deepseek-v4-flash
 thinking: high
 systemPromptMode: replace
 inheritProjectContext: true
