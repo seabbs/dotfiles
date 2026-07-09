@@ -6,6 +6,7 @@ bash nvim/setup.sh
 bash python/setup.sh
 bash R/setup.sh
 bash julia/setup.sh
+bash qmd/setup.sh
 bash scripts/link.sh
 bash jobs/setup.sh
 bash pi/setup.sh

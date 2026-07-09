@@ -40,6 +40,7 @@ bash scripts/link.sh
 | `nvim/` | Neovim config (LazyVim-based) |
 | `pi/` | Pi coding agent config (settings, AGENTS.md, agents, guardrails) |
 | `python/` | Python, uv |
+| `qmd/` | QMD (tobilu/qmd) on-device markdown/docs search config |
 | `R/` | R, radian, packages, .Rprofile |
 | `remote/` | Remote Linux machine setup |
 | `scripts/` | Shared scripts (symlinks, repo sync, Julia maintenance) |
@@ -57,11 +58,13 @@ It runs automatically during setup, or can be run standalone.
 |---|---|
 | `shell/.zshrc` | `~/.zshrc` |
 | `shell/ai-cli-aliases.zsh` | `~/.config/zsh/ai-cli-aliases.zsh` |
+| `shell/qmd.zsh` | `~/.config/zsh/qmd.zsh` |
 | `nvim/` | `~/.config/nvim` |
 | `tmux/tmux.conf` | `~/.tmux.conf` |
 | `tmuxinator/project.yml` | `~/.config/tmuxinator/project.yml` |
 | `R/.Rprofile` | `~/.Rprofile` |
 | `julia/startup.jl` | `~/.julia/config/startup.jl` |
+| `qmd/index.yml` | `~/.config/qmd/index.yml` |
 | `git/ignore` | `~/.config/git/ignore` |
 | `git/config` | `~/.config/git/config` |
 | `aerospace/aerospace.toml` | `~/.config/aerospace/aerospace.toml` |

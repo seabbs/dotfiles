@@ -11,3 +11,6 @@ pi/sessions/
 pi/trust.json
 pi/extensions/
 pi/npm/node_modules/
+
+# Pi subagent run artifacts (transcripts, outputs, session logs) — machine-local.
+.pi-subagents/

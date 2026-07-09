@@ -18,6 +18,7 @@ echo "Linking dotfiles from $DOTFILES"
 link "shell/.zshrc"              "$HOME/.zshrc"
 link "shell/ai-cli-aliases.zsh"  "$HOME/.config/zsh/ai-cli-aliases.zsh"
 link "shell/taskwarrior.zsh"     "$HOME/.config/zsh/taskwarrior.zsh"
+link "shell/qmd.zsh"             "$HOME/.config/zsh/qmd.zsh"
 
 # Neovim
 link "nvim"                      "$HOME/.config/nvim"
@@ -33,6 +34,9 @@ link "R/.Rprofile"               "$HOME/.Rprofile"
 
 # Julia
 link "julia/startup.jl"          "$HOME/.julia/config/startup.jl"
+
+# QMD (tobilu/qmd) — on-device markdown/docs search
+link "qmd/index.yml"             "$HOME/.config/qmd/index.yml"
 
 # Git
 link "git/ignore"                "$HOME/.config/git/ignore"
