@@ -24,10 +24,59 @@ pi-specific guidance: models, subagent usage, and security posture.
   `/login` (OAuth, no key). Use Ctrl+P to cycle to Claude mid-session. Not
   wired by default; run `/login` and select Anthropic to enable.
 
+## Dispatch reflex — default to delegation
+
+Do not do inline work that a subagent could do. The parent orchestrates,
+reviews, and applies fixes as the single writer. Before writing a multi-file
+change, running a multi-step investigation, or editing more than ~1 trivial
+file, stop and dispatch. Cost matters: cheap models are fast and plentiful,
+flagship models are scarce — match the model to the task, not the other way
+around.
+
+### Task-size → model map
+
+| Task shape | Agent | Model | Notes |
+|---|---|---|---|
+| Codebase recon, "what's where" | `scout` | glm-4.7-flash | Writes `context.md` handoff. |
+| Requirements / structured handoff | `context-builder` | glm-4.7-flash | Before `planner`/`worker`. |
+| Web research, primary sources | `researcher` | glm-4.7-flash | Pair with local `scout`. |
+| Mechanical edits, scaffolding, find-and-replace, docstring churn | `weak-worker` | glm-4.7-flash | NOT for logic/architecture. |
+| Lightweight generic delegation | `delegate` | glm-4.7-flash | When no other fits. |
+| Implementation plans | `planner` | glm-5.2 (inherits) | From a context handoff. |
+| Single-writer implementation | `worker` | glm-5.2 (inherits) | Approved handoffs only. |
+| Architecture / decision advice | `oracle` | glm-5.2 (inherits) | Advisory, doesn't write. |
+| Adversarial review + fix | `reviewer` | glm-5.2 (inherits) | Fresh context, distinct angles. |
+
+### Dispatch patterns
+
+- **Implementation:** `oracle` advises → `planner` plans → `worker`
+  implements → fresh-context `reviewer` inspects → parent synthesises and
+  applies fixes.
+- **Research:** parallel `researcher` (external) + `scout` (local), parent
+  synthesises.
+- **Review:** fresh-context `reviewer`s with distinct angles, parent applies
+  only fixes worth doing now.
+- **Mechanical edits (no logic):** `scout` (optional, for recon) →
+  `weak-worker` implements → parent verifies with `jq`/`git diff`/test runs.
+  This is the cheapest path and the default for wiring, config, and docs.
+
+### Rules
+
+- One writer per repo/worktree. Use fresh-context reviewers, then the parent
+  applies fixes — never have several writers in the same tree.
+- Child subagents must not launch their own subagents unless explicitly
+  assigned a fanout role.
+- Keep the fanout small; prefer `context: "fresh"` and pass only what each
+  child needs.
+- Give each child an exact, self-contained task with file paths and expected
+  content — cheap models shine with precise specs, not open-ended asks.
+- Verify cheap-agent output yourself before accepting: the parent is the guard
+  against silent mistakes. A stale "needs attention" signal does not mean the
+  run failed — check `status` before nudging.
+
 ## Subagent usage — use extensively
 
-Default to delegating non-trivial work rather than doing it inline. The parent
-orchestrates, reviews, and applies fixes as the single writer.
+The dispatch-reflex table above is the reference. Agent roster:
 
 - `scout` — fast codebase recon, writes `context.md` handoff (cheap).
 - `context-builder` — structured requirements/codebase handoff (cheap).
@@ -38,22 +87,6 @@ orchestrates, reviews, and applies fixes as the single writer.
 - `worker` — single-writer implementation, approved handoffs (flagship).
 - `oracle` — decision/architecture advisory (flagship).
 - `reviewer` — adversarial review-and-fix (flagship).
-
-Patterns:
-- **Implementation:** `oracle` advises → `planner` plans → `worker` implements
-  → fresh-context `reviewer` inspects → parent synthesises and applies fixes.
-- **Research:** parallel `researcher` (external) + `scout` (local), parent
-  synthesises.
-- **Review:** fresh-context `reviewer`s with distinct angles, parent applies
-  only fixes worth doing now.
-
-Rules:
-- One writer per repo/worktree. Use fresh-context reviewers, then the parent
-  applies fixes — never have several writers in the same tree.
-- Child subagents must not launch their own subagents unless explicitly
-  assigned a fanout role.
-- Keep the fanout small; prefer `context: "fresh"` and pass only what each
-  child needs.
 
 ## Security posture (auto-mode, minimal interaction)
 
@@ -86,3 +119,11 @@ rather than trusting the project.
 - **`@hypabolic/pi-hypa`** — compresses noisy tool output out of the context window (saves tokens on long sessions and heavy subagent use).
 - **`pi-memory`** — durable facts/decisions and a daily log as markdown, surviving compaction and restarts.
 - **`@ayulab/pi-rewind`** — `/rewind` checkpoint navigation (see above).
+
+## On-device search (qmd)
+
+**`qmd`** (tobilu/qmd) is installed globally and wired into Claude Code as an
+MCP server (`qmd mcp`). It indexes markdown/docs under `~/.config/qmd/index.yml`
+and runs hybrid BM25 + vector + LLM reranking locally. Use it for knowledge
+retrieval instead of grepping when the question is semantic ("where do we
+configure X") rather than literal. Config in `qmd/` of the dotfiles repo.

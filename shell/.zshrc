@@ -62,6 +62,7 @@ export PATH
 
 source ~/.config/zsh/ai-cli-aliases.zsh
 source ~/.config/zsh/taskwarrior.zsh
+source ~/.config/zsh/qmd.zsh
 
 # fzf integration (kept for piping: cmd | fzf)
 source <(fzf --zsh)
