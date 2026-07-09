@@ -3,3 +3,11 @@
 # Python bytecode
 __pycache__/
 *.pyc
+
+# Pi machine-local state (auth, sessions, trust, guardrails config,
+# installed node_modules). Only settings.json + AGENTS.md + agents/ are tracked.
+pi/auth.json
+pi/sessions/
+pi/trust.json
+pi/extensions/
+pi/npm/node_modules/

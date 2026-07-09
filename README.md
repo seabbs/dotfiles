@@ -38,6 +38,7 @@ bash scripts/link.sh
 | `julia/` | Julia via juliaup, startup config |
 | `mac/` | Mac-specific setup and GUI apps |
 | `nvim/` | Neovim config (LazyVim-based) |
+| `pi/` | Pi coding agent config (settings, AGENTS.md, agents, guardrails) |
 | `python/` | Python, uv |
 | `R/` | R, radian, packages, .Rprofile |
 | `remote/` | Remote Linux machine setup |
@@ -73,6 +74,9 @@ It runs automatically during setup, or can be run standalone.
 | `claude/CLAUDE.md` | `~/.claude/CLAUDE.md` |
 | `claude/settings.json` | `~/.claude/settings.json` |
 | `claude/commands/` | `~/.claude/commands` |
+| `pi/settings.json` | `~/.pi/agent/settings.json` |
+| `pi/AGENTS.md` | `~/.pi/agent/AGENTS.md` |
+| `pi/agents` | `~/.pi/agent/agents` |
 
 ## Scheduled jobs
 
