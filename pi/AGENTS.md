@@ -130,3 +130,15 @@ MCP server (`qmd mcp`). It indexes markdown/docs under `~/.config/qmd/index.yml`
 and runs hybrid BM25 + vector + LLM reranking locally. Use it for knowledge
 retrieval instead of grepping when the question is semantic ("where do we
 configure X") rather than literal. Config in `qmd/` of the dotfiles repo.
+
+## Web search (pi-web-access)
+
+Behavioural config (`workflow`, `summaryModel`) is tracked at
+`pi/web-search.json` and symlinked to `~/.pi/web-search.json` so search behaves
+the same across machines. Default: `auto-summary` workflow with summaries on
+`deepseek/deepseek-v4-flash` (cheap; avoids burning opus on summaries).
+
+**API keys are env-var only** (`OPENAI_API_KEY`, `BRAVE_API_KEY`, `EXA_API_KEY`,
+`TAVILY_API_KEY`, `GEMINI_API_KEY`, `PERPLEXITY_API_KEY`) — env vars take
+precedence over the config file. Never paste API keys into `web-search.json`:
+it's a symlink into the tracked repo and would leak into git.
