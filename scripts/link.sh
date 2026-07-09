@@ -94,4 +94,9 @@ fi
 # Claude Code (delegates to submodule's own link script)
 "$DOTFILES/claude/link.sh"
 
+# Pi coding agent
+link "pi/settings.json"          "$HOME/.pi/agent/settings.json"
+link "pi/AGENTS.md"             "$HOME/.pi/agent/AGENTS.md"
+link "pi/agents"                "$HOME/.pi/agent/agents"
+
 echo "Done."

@@ -8,3 +8,4 @@ bash R/setup.sh
 bash julia/setup.sh
 bash scripts/link.sh
 bash jobs/setup.sh
+bash pi/setup.sh
