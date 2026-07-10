@@ -1,0 +1,15 @@
+{
+  "name": "pi-sandbox-dev",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "clean": "echo nothing",
+    "build": "echo nothing",
+    "check": "echo nothing"
+  },
+  "pi": {
+    "extensions": ["./index.ts"]
+  },
+  "dependencies": {}
+}
