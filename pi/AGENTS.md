@@ -10,7 +10,7 @@ pi-specific guidance: models, subagent usage, and security posture.
 - **Parent session:** `z-ai/glm-5.2` via OpenRouter — 1M-token context, strong
   agentic coding. This is the model that runs the main conversation and all
   heavy reasoning (`thinking: high`).
-- **Cheap subagents:** `deepseek/deepseek-v4-flash` for recon and gathering roles
+- **Cheap subagents:** `openrouter/deepseek/deepseek-v4-flash` for recon and gathering roles
   (`scout`, `context-builder`, `researcher`, `delegate`) and mechanical implementation
   (`weak-worker`) — strong flash-tier coder (leads glm-4.7-flash by ~13 coding-index
   points), cheap on output tokens. In `enabledModels` so Ctrl+P cycles to it mid-session.
@@ -18,7 +18,7 @@ pi-specific guidance: models, subagent usage, and security posture.
   stays on the flagship.
 - **Heavy subagents inherit the parent model:** `planner`, `worker`, `oracle`,
   `reviewer` run on glm-5.2 (deep reasoning, implementation, review).
-- **`weak-worker`:** a cheap worker on `deepseek/deepseek-v4-flash` with
+- **`weak-worker`:** a cheap worker on `openrouter/deepseek/deepseek-v4-flash` with
   `thinking: high` for low-stakes tasks — summarisation, simple mechanical edits,
   scratch scaffolding, bulk find-and-replace, docstring churn. Use it instead of
   `worker` when the task is mechanical and doesn't need flagship reasoning. Do NOT
@@ -136,7 +136,7 @@ configure X") rather than literal. Config in `qmd/` of the dotfiles repo.
 Behavioural config (`workflow`, `summaryModel`) is tracked at
 `pi/web-search.json` and symlinked to `~/.pi/web-search.json` so search behaves
 the same across machines. Default: `auto-summary` workflow with summaries on
-`deepseek/deepseek-v4-flash` (cheap; avoids burning opus on summaries).
+`openrouter/deepseek/deepseek-v4-flash` (cheap; avoids burning opus on summaries).
 
 **API keys are env-var only** (`OPENAI_API_KEY`, `BRAVE_API_KEY`, `EXA_API_KEY`,
 `TAVILY_API_KEY`, `GEMINI_API_KEY`, `PERPLEXITY_API_KEY`) — env vars take
