@@ -1,7 +1,7 @@
 ---
 name: weak-worker
 description: Cheap implementation agent for mechanical, low-stakes edits and scaffolding
-model: deepseek/deepseek-v4-flash
+model: openrouter/deepseek/deepseek-v4-flash
 thinking: high
 systemPromptMode: replace
 inheritProjectContext: true
