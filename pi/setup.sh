@@ -18,7 +18,7 @@ fi
 # defaultProjectTrust is handled at the agent level, not by `pi install`.
 if [ -f "$(dirname "$0")/settings.json" ]; then
   echo "  installing declared packages (pi-web-access, pi-subagents,"
-  echo "  @juicesharp/rpiv-todo, @aliou/pi-guardrails)..."
+  echo "  pi-container-sandbox, @juicesharp/rpiv-todo, @aliou/pi-guardrails)..."
   pi install --no-approve 2>/dev/null \
     || echo "  Warning: some packages failed to install (run 'pi list' to check)"
 fi

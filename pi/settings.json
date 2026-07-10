@@ -9,6 +9,7 @@
   "packages": [
     "npm:pi-web-access",
     "npm:pi-subagents",
+    "npm:pi-container-sandbox",
     "npm:@juicesharp/rpiv-todo",
     "npm:@aliou/pi-guardrails",
     "npm:@hypabolic/pi-hypa",

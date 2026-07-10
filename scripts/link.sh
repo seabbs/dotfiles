@@ -102,6 +102,8 @@ fi
 link "pi/settings.json"          "$HOME/.pi/agent/settings.json"
 link "pi/AGENTS.md"             "$HOME/.pi/agent/AGENTS.md"
 link "pi/agents"                "$HOME/.pi/agent/agents"
+link "pi/prompts"               "$HOME/.pi/agent/prompts"
 link "pi/web-search.json"       "$HOME/.pi/web-search.json"
+link "pi-sandbox-dev"            "$HOME/.pi/agent/extensions/pi-sandbox-dev"
 
 echo "Done."
