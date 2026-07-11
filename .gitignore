@@ -4,13 +4,18 @@
 __pycache__/
 *.pyc
 
-# Pi machine-local state (auth, sessions, trust, guardrails config,
-# installed node_modules). Only settings.json + AGENTS.md + agents/ are tracked.
-pi/auth.json
-pi/sessions/
-pi/trust.json
+# Pi machine-local state (auth, sessions, trust, installed deps) at any depth
+pi/**/auth.json
+pi/**/trust.json
+pi/**/sessions/
+pi/**/node_modules/
 pi/extensions/
-pi/npm/node_modules/
+# Pi project-local scratch dir: ignore its contents but keep the tracked
+# guardrails policy.
+pi/.pi/*
+!pi/.pi/extensions/
+pi/.pi/extensions/*
+!pi/.pi/extensions/guardrails.json
 
 # Pi subagent run artifacts (transcripts, outputs, session logs) — machine-local.
 .pi-subagents/
