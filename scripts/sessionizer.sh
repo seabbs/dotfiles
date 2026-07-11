@@ -282,7 +282,18 @@ drop_dead_gateway() {
   local flag
   flag=$(tmux list-sessions -F '#{session_name}	#{@hub}' 2>/dev/null \
     | awk -F'\t' -v s="$1" '$1==s {print $2; exit}')
-  [ "$flag" = "1" ] && return 0
+  if [ "$flag" = "1" ]; then
+    # Flagged, but confirm the mosh pane is still the live connection: a mosh
+    # that exited (or was replaced by a shell on remain-on-exit) leaves a
+    # flagged husk that answers has-session yet shows a dead view. Keep only
+    # while the pane still runs mosh/ssh; otherwise drop it to rebuild.
+    local cmd
+    cmd=$(tmux list-panes -t "=$1" -F '#{pane_current_command}' 2>/dev/null \
+      | head -1)
+    case "$cmd" in
+      mosh*|ssh) return 0 ;;
+    esac
+  fi
   tmux kill-session -t "=$1" 2>/dev/null
 }
 
@@ -553,13 +564,28 @@ kill_window_local() {
   fi
 }
 
+# Point a hub's live client at a session (and optional window). Targets the
+# most-recently-active client explicitly: a roamed mosh connection can leave an
+# idle orphan client on the hub, and an unqualified switch-client may then drive
+# that stale client instead of the gateway in view, so the jump silently appears
+# to do nothing. $1=hub  $2=session  $3=window index (optional).
+hub_switch_client() {
+  local hub="$1" session="$2" win="${3:-}" sel=""
+  [ -n "$win" ] && sel=" \\; select-window -t '=$session:$win'"
+  ssh "$hub" "c=\$(tmux list-clients -F '#{client_activity} #{client_name}' \
+      2>/dev/null | sort -rn | head -1 | cut -d' ' -f2-); \
+    [ -n \"\$c\" ] || exit 0; \
+    tmux switch-client -c \"\$c\" -t '=$session'$sel" \
+    2>/dev/null || true
+}
+
 # Switch the active client into a hub's nested mosh session, creating the
 # connection on demand (flagged @hub). $1=hub  $2=session name on the hub.
 jump_to_hub_session() {
   local hub="$1" session="$2"
   drop_dead_gateway "$hub"
   if tmux has-session -t "=$hub" 2>/dev/null; then
-    ssh "$hub" "tmux switch-client -t '=$session'" 2>/dev/null || true
+    hub_switch_client "$hub" "$session"
   else
     tmux new-session -d -s "$hub" \
       "/bin/zsh -lc 'mosh --predict=experimental $hub -- tmux attach -t $session'"
@@ -660,10 +686,8 @@ pick_window() {
       # flagged @hub for auto-passthrough). It lives inside this tmux.
       drop_dead_gateway "$host_tag"
       if tmux has-session -t "=$host_tag" 2>/dev/null; then
-        # Existing connection: drive its attached client to the chosen window.
-        ssh "$host_tag" \
-          "tmux switch-client -t '=$session' \; select-window -t '=$session:$win_index'" \
-          2>/dev/null || true
+        # Existing connection: drive its live client to the chosen window.
+        hub_switch_client "$host_tag" "$session" "$win_index"
       else
         # First time: pre-select the target window on the host, then attach that
         # session directly via mosh (bypassing the home auto-attach) so we land
