@@ -12,10 +12,11 @@ root: <%= @args[1] %>
 startup_window: main
 
 on_project_start: |
-  # Set pane titles after layout is created
-  tmux select-pane -t 0 -T "nvim"
-  tmux select-pane -t 1 -T "ai:main"
-  tmux select-pane -t 2 -T "repl"
+  # Set pane titles after layout is created. Indices honour pane-base-index 1
+  # (set on all hosts); -t 0 raised "can't find pane: 0" on every new session.
+  tmux select-pane -t 1 -T "nvim"
+  tmux select-pane -t 2 -T "ai:main"
+  tmux select-pane -t 3 -T "repl"
 
 windows:
   - main:

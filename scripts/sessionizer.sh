@@ -39,6 +39,15 @@ HOST_STATE="$HOME/.cache/sessionizer-host"
 mkdir -p "$HOME/.cache" 2>/dev/null
 dbg() { [ -n "${SESSIONIZER_DEBUG:-}" ] && \
   echo "$(date '+%T') $*" >> /tmp/sessionizer-debug.log; }
+# Always-on failure logger for the cross-host path: append to a persistent log
+# and, inside tmux, surface the message so the popup never closes with no
+# feedback (the silent-close class of bug). $*=message.
+slog() {
+  echo "$(date '+%F %T') $*" >> "$CACHE_DIR/errors.log" 2>/dev/null
+  [ -n "${TMUX:-}" ] && \
+    tmux display-message -d 4000 "sessionizer: $*" 2>/dev/null
+  return 0
+}
 host_scope() { cat "$HOST_STATE" 2>/dev/null || echo all; }
 SELF_HOST="$(hostname -s)"
 self_host() { printf '%s' "$SELF_HOST"; }
@@ -282,25 +291,33 @@ drop_dead_gateway() {
 # then pick/create a window on the hub (the project path) use this and let
 # pick_window do the routing. $1=hub $2=session $3=dir $4=repo (optional).
 ensure_hub_session() {
-  local hub="$1" sname="$2" dir="$3" repo="${4:-}"
+  local hub="$1" sname="$2" dir="$3" repo="${4:-}" err
   dbg "ensure_hub_session hub=$hub sname=$sname dir=$dir repo=$repo"
   # Clone the repo on demand if it is not on the hub yet (gh credential helper
   # on the hub covers private repos). git clone creates missing parent dirs.
   if [[ -n "$repo" ]]; then
-    ssh "$hub" \
-      "[ -d $dir ] || git clone https://github.com/$repo.git $dir" \
-      2>/dev/null || true
+    err=$(ssh "$hub" \
+      "[ -d $dir ] || git clone https://github.com/$repo.git $dir" 2>&1) \
+      || slog "clone $repo on $hub failed: $err"
   fi
-  ssh "$hub" \
-    "tmux has-session -t '=$sname' 2>/dev/null \
-       || tmuxinator start project '$sname' '$dir' --no-attach" \
-    2>/dev/null || true
+  # Start the session detached if missing, then confirm it actually exists —
+  # tmuxinator errors were previously swallowed, so a failed start left every
+  # later window/feature step targeting a session that was never created.
+  if ! ssh "$hub" "tmux has-session -t '=$sname' 2>/dev/null"; then
+    err=$(ssh "$hub" \
+      "tmuxinator start project '$sname' '$dir' --no-attach" 2>&1)
+    if ! ssh "$hub" "tmux has-session -t '=$sname' 2>/dev/null"; then
+      slog "could not create session '$sname' on $hub: $err"
+      return 1
+    fi
+  fi
+  return 0
 }
 
 # Create a session on a hub host (if missing) and jump into its nested mosh
 # session here. $1=hub  $2=session name  $3=working dir on the hub  $4=repo.
 create_hub_session() {
-  ensure_hub_session "$@"
+  ensure_hub_session "$@" || return 1
   jump_to_hub_session "$1" "$2"
 }
 
@@ -309,13 +326,11 @@ create_hub_session() {
 # the nvim/ai/repl layout), then jump in. $1=hub $2=session $3=org/repo $4=branch.
 open_hub_worktree() {
   local hub="$1" session="$2" rel="$3" branch="$4"
-  ssh "$hub" \
-    "tmux has-session -t '=$session' 2>/dev/null \
-       || tmuxinator start project '$session' '~/code/$rel' --no-attach" \
-    2>/dev/null || true
+  ensure_hub_session "$hub" "$session" "~/code/$rel" "$rel" || return 0
   ssh "$hub" \
     "tmux new-window -t '=$session' -n _launcher -c '~/code/$rel' \
-       \"zsh -ic 'feat $branch; exit'\"" 2>/dev/null || true
+       \"zsh -ic 'feat $branch; exit'\"" \
+    2>/dev/null || slog "feat '$branch' on $hub:$session failed"
   rm -f "$CACHE_DIR/$hub-windows-$session" 2>/dev/null
   jump_to_hub_session "$hub" "$session"
 }
@@ -349,6 +364,21 @@ hub_with_project() {
     awk -v s="$want" '$0==s{f=1} END{exit !f}' \
       "$CACHE_DIR/$h-projects" && { printf '%s' "$h"; return; }
   done
+}
+
+# Map a (sanitised) session name back to an "org/repo" by scanning a hub's
+# cached project list, so a session scoped to the hub in the window step can be
+# created from its repo. Matches on the sanitised basename so dotted repos
+# (e.g. CensoredDistributions.jl -> CensoredDistributions_jl) resolve. Prints
+# org/repo, or nothing. $1=hub $2=session.
+hub_repo_for_session() {
+  local hub="$1" want="$2" line base
+  [ -f "$CACHE_DIR/$hub-projects" ] || return 0
+  while IFS= read -r line; do
+    base="${line##*/}"
+    [ "$(sanitize_session "$base")" = "$want" ] && \
+      { printf '%s' "$line"; return 0; }
+  done < "$CACHE_DIR/$hub-projects"
 }
 
 # Map a GitHub owner to a local org dir name: an existing ~/code/<owner>
@@ -472,17 +502,11 @@ open_hub_pr() {
   local hub="$1" full="$2" num="$3" owner repo session
   owner="${full%%/*}"; repo="${full##*/}"
   session=$(printf '%s' "$repo" | sed 's/[^a-zA-Z0-9_-]/_/g')
-  ssh "$hub" \
-    "[ -d ~/code/$owner/$repo ] \
-       || git clone https://github.com/$full.git ~/code/$owner/$repo" \
-    2>/dev/null || true
-  ssh "$hub" \
-    "tmux has-session -t '=$session' 2>/dev/null \
-       || tmuxinator start project '$session' '~/code/$owner/$repo' --no-attach" \
-    2>/dev/null || true
+  ensure_hub_session "$hub" "$session" "~/code/$owner/$repo" "$full" || return 0
   ssh "$hub" \
     "tmux new-window -t '=$session' -n _launcher -c '~/code/$owner/$repo' \
-       \"zsh -ic 'prsesh $full $num; exit'\"" 2>/dev/null || true
+       \"zsh -ic 'prsesh $full $num; exit'\"" \
+    2>/dev/null || slog "prsesh $full #$num on $hub:$session failed"
   rm -f "$CACHE_DIR/$hub-windows-$session" 2>/dev/null
   jump_to_hub_session "$hub" "$session"
 }
@@ -685,16 +709,31 @@ pick_window() {
     # hub's copy of the session) and jump into it, rather than locally.
     hub="$(hub_scope)"
     if [[ -n "$hub" ]]; then
+      local rel
+      # The picker can be scoped to the hub (C-r) without the project step
+      # having created the session there, e.g. opening a repo that also exists
+      # locally, then C-r to the hub to branch. Ensure the session exists first,
+      # or the new-window below targets a missing session and silently no-ops
+      # (the reported "prefix f closes and does nothing" on a fresh hub repo).
+      if ! ssh "$hub" "tmux has-session -t '=$session' 2>/dev/null"; then
+        rel="$(hub_repo_for_session "$hub" "$session")"
+        if [[ -z "$rel" ]]; then
+          slog "no repo for session '$session' on $hub, cannot create it"
+          return 0
+        fi
+        ensure_hub_session "$hub" "$session" "~/code/$rel" "$rel" || return 0
+      fi
       root=$(ssh "$hub" \
         "tmux display-message -t '=$session:1' -p '#{pane_current_path}'" \
         2>/dev/null)
       if [[ "$win_type" == "bare terminal" ]]; then
         ssh "$hub" "tmux new-window -t '=$session' -n '$query' -c '$root'" \
-          2>/dev/null
+          2>/dev/null || slog "new window '$query' on $hub:$session failed"
       else
         ssh "$hub" \
           "tmux new-window -t '=$session' -n _launcher -c '$root' \
-             \"zsh -ic 'feat $query; exit'\"" 2>/dev/null
+             \"zsh -ic 'feat $query; exit'\"" \
+          2>/dev/null || slog "feat '$query' on $hub:$session failed"
       fi
       rm -f "$CACHE_DIR/$hub-windows-$session" 2>/dev/null
       jump_to_hub_session "$hub" "$session"
@@ -1022,13 +1061,15 @@ else
     hub="$(hub_with_project "$selected")"
     [[ -n "$hub" ]] && echo "$hub" > "$HOST_STATE"
   fi
-  dbg "project selected=$selected session=$session scope=$(host_scope) hub=$hub"
 
   if [[ -n "$hub" ]]; then
     # Create/clone the session on the hub (no jump), then refresh its window
     # cache so the window step lists it right away. pick_window (scoped to the
-    # hub) then opens a window or creates a feature branch ON the hub.
-    ensure_hub_session "$hub" "$session" "~/code/$selected" "$selected"
+    # hub) then opens a window or creates a feature branch ON the hub. Bail with
+    # a visible message if the hub session could not be created, rather than
+    # letting the window step target a missing session and silently no-op.
+    ensure_hub_session "$hub" "$session" "~/code/$selected" "$selected" \
+      || exit 0
     ssh "$hub" \
       "tmux list-windows -t '=$session' -F '#{window_activity} #{window_index}:#{window_name}'" \
       >"$CACHE_DIR/$hub-windows-$session" 2>/dev/null
