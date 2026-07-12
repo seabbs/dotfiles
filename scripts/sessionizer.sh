@@ -685,6 +685,20 @@ pick_window() {
       # Remote hub: switch to its nested mosh session here (created on demand,
       # flagged @hub for auto-passthrough). It lives inside this tmux.
       drop_dead_gateway "$host_tag"
+      # A stale window cache can offer a window for a hub session that no longer
+      # exists there (e.g. it was killed since the last refresh). Recreate it
+      # from its repo so the switch lands on it, rather than silently leaving
+      # the gateway on whatever session it was showing before.
+      if ! ssh "$host_tag" "tmux has-session -t '=$session' 2>/dev/null"; then
+        local rel; rel="$(hub_repo_for_session "$host_tag" "$session")"
+        if [[ -z "$rel" ]]; then
+          slog "session '$session' is gone from $host_tag"
+          rm -f "$CACHE_DIR/$host_tag-windows-$session" 2>/dev/null
+          return 0
+        fi
+        ensure_hub_session "$host_tag" "$session" "~/code/$rel" "$rel" \
+          || return 0
+      fi
       if tmux has-session -t "=$host_tag" 2>/dev/null; then
         # Existing connection: drive its live client to the chosen window.
         hub_switch_client "$host_tag" "$session" "$win_index"
