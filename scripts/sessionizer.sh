@@ -283,16 +283,13 @@ drop_dead_gateway() {
   flag=$(tmux list-sessions -F '#{session_name}	#{@hub}' 2>/dev/null \
     | awk -F'\t' -v s="$1" '$1==s {print $2; exit}')
   if [ "$flag" = "1" ]; then
-    # Flagged, but confirm the mosh pane is still the live connection: a mosh
-    # that exited (or was replaced by a shell on remain-on-exit) leaves a
-    # flagged husk that answers has-session yet shows a dead view. Keep only
-    # while the pane still runs mosh/ssh; otherwise drop it to rebuild.
-    local cmd
-    cmd=$(tmux list-panes -t "=$1" -F '#{pane_current_command}' 2>/dev/null \
-      | head -1)
-    case "$cmd" in
-      mosh*|ssh) return 0 ;;
-    esac
+    # Flagged, but confirm the pane is still live: a mosh that exited leaves a
+    # dead pane (a remain-on-exit husk) that answers has-session yet shows
+    # nothing. Key on pane_dead, not the command name, so a still-connecting
+    # gateway (zsh -> mosh bootstrap) is never mistaken for a husk and killed.
+    local dead
+    dead=$(tmux list-panes -t "=$1" -F '#{pane_dead}' 2>/dev/null | head -1)
+    [ "$dead" != "1" ] && return 0
   fi
   tmux kill-session -t "=$1" 2>/dev/null
 }
@@ -337,7 +334,7 @@ create_hub_session() {
 # the nvim/ai/repl layout), then jump in. $1=hub $2=session $3=org/repo $4=branch.
 open_hub_worktree() {
   local hub="$1" session="$2" rel="$3" branch="$4"
-  ensure_hub_session "$hub" "$session" "~/code/$rel" "$rel" || return 0
+  ensure_hub_session "$hub" "$session" "~/code/$rel" "$rel" || return 1
   ssh "$hub" \
     "tmux new-window -t '=$session' -n _launcher -c '~/code/$rel' \
        \"zsh -ic 'feat $branch; exit'\"" \
@@ -513,7 +510,7 @@ open_hub_pr() {
   local hub="$1" full="$2" num="$3" owner repo session
   owner="${full%%/*}"; repo="${full##*/}"
   session=$(printf '%s' "$repo" | sed 's/[^a-zA-Z0-9_-]/_/g')
-  ensure_hub_session "$hub" "$session" "~/code/$owner/$repo" "$full" || return 0
+  ensure_hub_session "$hub" "$session" "~/code/$owner/$repo" "$full" || return 1
   ssh "$hub" \
     "tmux new-window -t '=$session' -n _launcher -c '~/code/$owner/$repo' \
        \"zsh -ic 'prsesh $full $num; exit'\"" \
