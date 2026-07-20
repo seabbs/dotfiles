@@ -18,6 +18,8 @@ npm install -g happy-coder
 brew install act
 brew install glow
 brew install git-delta
+brew install jj    # Jujutsu — colocated-git VCS for incremental review
+brew install hunk  # review-first terminal diff viewer (jj/git-aware)
 brew install bat
 brew install hyperfine
 brew install direnv
