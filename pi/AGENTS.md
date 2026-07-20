@@ -113,6 +113,41 @@ without being dangerous:
 untrusted repos, run pi inside a container (see pi's Containerization docs)
 rather than trusting the project.
 
+## Version control — jj + hunk
+
+Some repos are **colocated** jj/git (a `.jj` dir beside `.git`). jj is a second
+view over the same git history: every git commit is a jj commit and vice versa,
+so the git-based PR flow is unchanged and stays primary. jj does NOT read git's
+`user.*`; identity comes from `~/.config/jj/config.toml` (the bot account).
+
+### Worktrees stay git — jj is opt-in inside them
+
+Task isolation stays `git worktree`; it is the strong-isolation mechanism, keep
+using it. A fresh git worktree has no `.jj`, so jj is unavailable there by
+default. Do NOT use `jj workspace` or try to replace worktrees with jj — mixing
+jj workspaces with git worktrees is fragile. If you want jj tooling inside a
+worktree, run `jj git init --colocate` in it (safe, reversible with `rm -rf .jj`).
+
+### Use jj for shaping history (where a repo is colocated)
+
+Within a single working copy, prefer jj over git plumbing:
+- `jj st` / `jj log` — inspect state; there is no staging area, edits are already
+  in the working-copy commit `@`.
+- `jj describe -m "…"` — set the message on `@`.
+- `jj commit -m "…"` — close `@` and start the next change (≈ `git commit`).
+- `jj split` — carve one mixed change into clean, reviewable commits.
+- `jj undo` — reverse the last operation.
+
+Push/PR stays git + gh: `jj bookmark create feat/x -r @ && jj git push --bookmark
+feat/x`, then the normal `gh pr create` flow. Never point a bookmark at `main`.
+If a repo is plain git (no `.jj`), use git as normal — do not run `jj git init`.
+
+### Review with hunk
+
+For any diff a human will read, review through **hunk** (installed) rather than
+raw `git diff`: `hunk diff` (working tree), `hunk show <ref|revset>` (a commit),
+`hunk diff --watch` (live as files change). It is jj- and git-aware.
+
 ## Installed extensions
 
 - **`pi-web-access`** — web search, URL fetching, GitHub repo cloning, PDF/YouTube/video understanding.

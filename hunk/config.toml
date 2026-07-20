@@ -1,0 +1,10 @@
+# hunk — review-first terminal diff viewer.
+# Symlinked to ~/.config/hunk/config.toml by scripts/link.sh.
+# vcs is auto-detected (git or colocated jj), so it is left unset.
+
+theme = "auto"          # match terminal light/dark (catppuccin-macchiato)
+mode = "auto"           # split on wide panes, stack on narrow
+line_numbers = true
+wrap_lines = false
+menu_bar = true
+agent_notes = true      # show agent rationale inline when a sidecar is given

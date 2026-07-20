@@ -101,6 +101,12 @@ keybindings:
             'nvim -c ":silent Octo pr edit {{.PrNumber}}"'
         - key: O
           builtin: checkout
+        - key: H
+          name: review in hunk
+          command: >
+            tmux new-window -c {{.RepoPath}}
+            -n "hunk-{{.PrNumber}}"
+            'gh pr diff {{.PrNumber}} --repo {{.RepoName}} | hunk patch -'
         - key: V
           name: review & merge
           command: >

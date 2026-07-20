@@ -1,0 +1,21 @@
+# jj (Jujutsu) — colocated-git workflow config.
+# Symlinked to ~/.config/jj/config.toml by scripts/link.sh.
+# jj does NOT read git's user.* config, so identity is set explicitly.
+
+[user]
+name = "seabbs-bot"
+email = "signin@samabbott.co.uk"
+
+[ui]
+editor = "nvim"
+default-command = "log"
+# Review diffs through hunk. hunk's pager has diff-detection and passes
+# non-diff output (e.g. `jj log`) through unchanged, so it is safe as the
+# global pager. `jj diff`, `jj show`, `jj log -p` render in hunk.
+pager = ["hunk", "pager"]
+# Emit git-format diffs so hunk (and other git tooling) understand them.
+diff-formatter = ":git"
+
+[git]
+# Name pushed bookmarks under feat/ by default; never point one at main.
+push-bookmark-prefix = "feat/"
