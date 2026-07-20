@@ -2,6 +2,7 @@ const REPL_PACKAGES = [
     :Revise, :Term, :JET, :Cthulhu,
     :CodeTracking, :PrettyPrinting,
     :BenchmarkTools, :TestEnv, :MuxDisplay,
+    :TestItemRunner, :UnicodePlots,
 ]
 
 atreplinit() do repl

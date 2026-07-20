@@ -20,8 +20,16 @@ return {
           -- mason auto-enable and pass the env path ourselves.
           mason = false,
           cmd = function(dispatchers)
+            -- Fall back to the newest default env rather than a
+            -- hardcoded version, which goes stale on each upgrade.
+            local envs = vim.fn.glob(
+              vim.fn.expand("~/.julia/environments/v*"),
+              false,
+              true
+            )
+            table.sort(envs)
             local root = vim.fs.root(0, { "Project.toml", "JuliaProject.toml" })
-              or vim.fn.expand("~/.julia/environments/v1.11")
+              or envs[#envs]
             return vim.lsp.rpc.start({ "julia-lsp", root }, dispatchers)
           end,
           settings = {
