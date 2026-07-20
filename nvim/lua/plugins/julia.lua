@@ -7,6 +7,12 @@ return {
       "rcarriga/nvim-dap-ui",
     },
     ft = "julia",
+    -- The plugin ships a Manifest.toml pinning JuliaInterpreter
+    -- 0.9.x, which fails on Julia 1.12 lowering with
+    -- "invalid lookup expr $(Expr(:latestworld))". Drop it so the
+    -- bundled env re-resolves; it is tracked in git, so lazy.nvim
+    -- restores it on every update and this has to run each time.
+    build = "rm -f Manifest.toml",
     config = function()
       require("nvim-dap-julia").setup()
     end,
