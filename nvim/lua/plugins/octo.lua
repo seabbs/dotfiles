@@ -9,6 +9,12 @@ return {
     require("octo").setup({
       picker = "telescope",
       enable_builtin = true,
+      -- Needs `read:project` on the seabbs token (see gh_env below). Without
+      -- it, repo-info queries fail with INSUFFICIENT_SCOPES and take issue
+      -- and PR creation down with them. To re-grant:
+      --   gh auth switch --user seabbs
+      --   gh auth refresh -h github.com -s read:project,project
+      --   gh auth switch --user seabbs-bot
       default_to_projects_v2 = true,
       default_remote = {"upstream", "origin"},
       default_merge_method = "squash",
