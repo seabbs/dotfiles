@@ -282,6 +282,19 @@ return {
           "devtools::check()")
         rmap("<leader>Ri", "devtools::install()",
           "devtools::install()")
+
+        -- Test the current file. Pass the path explicitly so it
+        -- works in a plain REPL; the no-arg <leader>RT above only
+        -- resolves the active file inside RStudio.
+        vim.keymap.set("n", "<leader>RF", function()
+          send_text(string.format(
+            "devtools::test_active_file(%q)",
+            vim.fn.expand("%:p")
+          ))
+        end, {
+          buffer = true,
+          desc = "Test current file",
+        })
       end,
     })
 
@@ -322,6 +335,23 @@ return {
         jmap("<leader>RR",
           "using Pkg; Pkg.resolve()",
           "Pkg.resolve()")
+
+        -- Run only the @testitems in the current file, via the
+        -- warm session (TestItemRunner is auto-loaded in
+        -- startup.jl). Filters on the buffer's basename, so
+        -- invoke it from a test file while iterating; run the
+        -- full Pkg.test() on a fresh session before finishing.
+        vim.keymap.set("n", "<leader>RF", function()
+          local fname = vim.fn.expand("%:t")
+          send_text(string.format(
+            "using TestItemRunner; @run_package_tests "
+              .. "filter=ti->contains(ti.filename, %q)",
+            fname
+          ))
+        end, {
+          buffer = true,
+          desc = "Run test items in current file",
+        })
       end,
     })
 

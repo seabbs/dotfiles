@@ -75,6 +75,13 @@ Unified test runner with adapters for R (testthat), Python (pytest), and Julia (
 |---|---|
 | `<leader>cji` | Open Julia REPL (terminal) |
 | `<leader>cjs` | Send Pkg.test() to REPL |
+| `<leader>RF` | Run @testitems in current file (warm session) |
+
+`<leader>RF` also works in R, sending `devtools::test_active_file()`
+for the current file. It runs against the warm REPL in the
+bottom-right pane rather than spawning a fresh process, so pay the
+Julia start-up cost once. Invoke it from a test file while iterating,
+then run the full suite on a fresh session before finishing.
 
 ## Highlight (vim-illuminate)
 
