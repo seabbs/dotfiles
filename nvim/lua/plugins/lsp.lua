@@ -22,12 +22,19 @@ return {
           cmd = function(dispatchers)
             -- Fall back to the newest default env rather than a
             -- hardcoded version, which goes stale on each upgrade.
-            local envs = vim.fn.glob(
-              vim.fn.expand("~/.julia/environments/v*"),
-              false,
-              true
-            )
-            table.sort(envs)
+            -- glob() expands ~ itself; wrapping it in expand() first
+            -- collapses the matches to one newline-joined string that
+            -- then globs to nothing.
+            local envs = vim.fn.glob("~/.julia/environments/v*", false, true)
+            -- Sort on the numeric version, not the string: v1.9 sorts
+            -- after v1.10 lexicographically.
+            local function version(path)
+              local major, minor = path:match("v(%d+)%.(%d+)$")
+              return (tonumber(major) or 0) * 1000 + (tonumber(minor) or 0)
+            end
+            table.sort(envs, function(a, b)
+              return version(a) < version(b)
+            end)
             local root = vim.fs.root(0, { "Project.toml", "JuliaProject.toml" })
               or envs[#envs]
             return vim.lsp.rpc.start({ "julia-lsp", root }, dispatchers)
