@@ -123,13 +123,18 @@ for org in "${ORGS[@]}"; do
   while IFS='|' read -r name branch private; do
     [ -n "$name" ] || continue
 
+    dir=${local_by_name[$name]:-}
+
     if [ -z "$branch" ]; then
+      # Mark an existing clone as seen before skipping, or the orphan pass
+      # below reports it as needing action: an empty repo we have already
+      # cloned is accounted for, it just has nothing to check out yet.
+      [ -n "$dir" ] && seen_dirs[$dir]=1
       logf "  $name" "empty (skipped)"
       empty=$((empty + 1))
       continue
     fi
 
-    dir=${local_by_name[$name]:-}
     if [ -n "$dir" ]; then
       seen_dirs[$dir]=1
       # A repo whose name starts with a dot is cloned as dot-<name>, so
