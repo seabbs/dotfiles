@@ -81,7 +81,12 @@ if [ -n "$ONLY_REPO" ]; then
   repos=("$ONLY_REPO")
 else
   repos=()
-  for gitdir in "$CODE_DIR"/"${ONLY_ORG:-*}"/*/.git; do
+  # Deliberately unquoted: quoting the default "*" makes it a literal
+  # directory name rather than a glob, so the whole pattern matched nothing
+  # and the script silently processed no repos at all. Org names have no
+  # glob metacharacters, so an explicit --org still matches literally.
+  org_glob="${ONLY_ORG:-*}"
+  for gitdir in "$CODE_DIR"/$org_glob/*/.git; do
     [ -e "$gitdir" ] || continue
     repos+=("$(dirname "$gitdir")")
   done
