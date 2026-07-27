@@ -56,14 +56,18 @@ export PATH="$PATH:$HOME/.local/bin:$HOME/.lmstudio/bin:$HOME/.cargo/bin:$HOME/.
 
 # >>> juliaup initialize >>>
 # !! Contents within this block are managed by juliaup !!
-# Paths kept as $HOME rather than juliaup's hardcoded absolute paths so the
-# same .zshrc works on both machines.
+# Left empty on purpose: juliaup rewrites whatever is between these markers on
+# every update, and it writes absolute /home/seabbs paths that break the mac.
+# The portable equivalent lives below the closing marker, where it survives.
+# <<< juliaup initialize <<<
+
+# juliaup, kept portable. Runs after the managed block, and `path=(x $path)`
+# prepends, so this wins over anything juliaup puts back above.
 path=("$HOME/.juliaup/bin" $path)
 export PATH
 # Tab completion for juliaup and julia channel selection
 [ -f "$HOME/.julia/juliaup/completions/zsh.zsh" ] &&
   source "$HOME/.julia/juliaup/completions/zsh.zsh"
-# <<< juliaup initialize <<<
 
 source ~/.config/zsh/ai-cli-aliases.zsh
 source ~/.config/zsh/taskwarrior.zsh
