@@ -1096,6 +1096,7 @@ else
     hub="$(hub_with_project "$selected")"
     [[ -n "$hub" ]] && echo "$hub" > "$HOST_STATE"
   fi
+  dbg "project selected=$selected session=$session scope=$(host_scope) hub=$hub"
 
   if [[ -n "$hub" ]]; then
     # Create/clone the session on the hub (no jump), then refresh its window
