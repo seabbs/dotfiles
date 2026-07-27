@@ -38,6 +38,16 @@ done
 INTERACTIVE=false
 [ -t 1 ] && INTERACTIVE=true
 
+# Modification time in epoch seconds. BSD stat (macOS) and GNU stat (the
+# Linux hub) spell this differently, and this job runs on both. Picked once
+# rather than per worktree. Prints nothing if neither works, so callers must
+# handle an empty result.
+if stat -f %m . >/dev/null 2>&1; then
+  mtime_of() { stat -f %m "$1" 2>/dev/null; }
+else
+  mtime_of() { stat -c %Y "$1" 2>/dev/null; }
+fi
+
 log() {
   printf '%s\n' "$1" >> "$LOG_FILE"
   $INTERACTIVE && printf '%s\n' "$1"
@@ -164,7 +174,10 @@ for repo in "${repos[@]}"; do
 
         state=${pr_state[$wt_branch]:-NONE}
         dirty=$(git -C "$wt_path" status --porcelain 2>/dev/null | wc -l)
-        mtime=$(stat -c %Y "$wt_path" 2>/dev/null || echo "$now")
+        # Treat an unreadable mtime as "just touched", so a stat failure
+        # keeps the worktree rather than ageing it out.
+        mtime=$(mtime_of "$wt_path")
+        mtime=${mtime:-$now}
         age=$(( (now - mtime) / 86400 ))
 
         reason=""
