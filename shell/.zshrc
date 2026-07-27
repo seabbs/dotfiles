@@ -56,8 +56,13 @@ export PATH="$PATH:$HOME/.local/bin:$HOME/.lmstudio/bin:$HOME/.cargo/bin:$HOME/.
 
 # >>> juliaup initialize >>>
 # !! Contents within this block are managed by juliaup !!
+# Paths kept as $HOME rather than juliaup's hardcoded absolute paths so the
+# same .zshrc works on both machines.
 path=("$HOME/.juliaup/bin" $path)
 export PATH
+# Tab completion for juliaup and julia channel selection
+[ -f "$HOME/.julia/juliaup/completions/zsh.zsh" ] &&
+  source "$HOME/.julia/juliaup/completions/zsh.zsh"
 # <<< juliaup initialize <<<
 
 source ~/.config/zsh/ai-cli-aliases.zsh
