@@ -1,9 +1,13 @@
 #!/bin/bash
-# Keep ~/code/<org>/ matching the GitHub org.
+# Keep ~/code/<org>/ matching the GitHub org membership.
 #
-# Clones repos that exist in the org but not locally, fast-forwards the
-# default branch of the ones that do, and reports clones whose repo has
-# been renamed or that no longer belong to the org.
+# Clones repos that exist in the org but not locally, and reports clones
+# whose repo has been renamed or that no longer belong to the org.
+#
+# It deliberately does NOT fetch or fast-forward: sync-repos.sh already
+# does that for every repo under ~/code, and runs an hour after this one.
+# This script answers "do we have the right repos?", sync-repos.sh
+# answers "are they up to date?".
 #
 # Never deletes anything. Renames and orphans are reported only.
 #
@@ -18,7 +22,7 @@ mkdir -p "$LOG_DIR"
 # Only orgs where every repo is wanted locally. Orgs cloned selectively
 # (epiforecasts, JuliaEpi, ...) must be named explicitly, otherwise a
 # nightly run would drag down a hundred repos nobody asked for.
-DEFAULT_ORGS=(EpiAware)
+DEFAULT_ORGS=(EpiAware epinowcast)
 DRY_RUN=false
 MAX_CLONES=25
 ORGS=()
@@ -58,43 +62,10 @@ $DRY_RUN && log "DRY RUN - nothing will be cloned"
 log ""
 
 cloned=0
-updated=0
-skipped=0
+present=0
 empty=0
 renamed=0
 orphaned=0
-
-# Fast-forward a clone's default branch without disturbing the checkout.
-# Mirrors the logic in sync-repos.sh.
-update_default_branch() {
-  local dir=$1 label=$2 branch current
-
-  branch=$(git -C "$dir" symbolic-ref refs/remotes/origin/HEAD 2>/dev/null |
-    sed 's@^refs/remotes/origin/@@')
-  branch=${branch:-main}
-
-  git -C "$dir" fetch origin --quiet 2>/dev/null
-
-  current=$(git -C "$dir" branch --show-current 2>/dev/null)
-  current=${current:-detached HEAD}
-  if [ "$current" = "$branch" ]; then
-    if git -C "$dir" pull --ff-only --quiet 2>/dev/null; then
-      logf "  $label" "ok (pulled $branch)"
-      updated=$((updated + 1))
-    else
-      logf "  $label" "skipped (dirty or diverged)"
-      skipped=$((skipped + 1))
-    fi
-  else
-    if git -C "$dir" fetch origin "$branch:$branch" --quiet 2>/dev/null; then
-      logf "  $label" "ok ($branch updated, on $current)"
-      updated=$((updated + 1))
-    else
-      logf "  $label" "skipped ($branch not fast-forwardable)"
-      skipped=$((skipped + 1))
-    fi
-  fi
-}
 
 for org in "${ORGS[@]}"; do
   log "=== $org ==="
@@ -168,8 +139,10 @@ for org in "${ORGS[@]}"; do
         renamed=$((renamed + 1))
         [ -n "${local_dirs[$name]:-}" ] &&
           logf "    " "correctly named clone already exists"
+      else
+        logf "  $name" "present"
       fi
-      update_default_branch "$org_dir/$dir" "$name"
+      present=$((present + 1))
       continue
     fi
 
@@ -189,7 +162,6 @@ for org in "${ORGS[@]}"; do
       cloned=$((cloned + 1))
     else
       logf "  $name" "clone FAILED"
-      skipped=$((skipped + 1))
     fi
   done <<< "$remote_list"
 
@@ -214,8 +186,7 @@ if $DRY_RUN; then
 else
   logf "cloned" "$cloned"
 fi
-logf "updated" "$updated"
-logf "skipped" "$skipped"
+logf "already present" "$present"
 logf "empty (not cloned)" "$empty"
 logf "renamed (action needed)" "$renamed"
 logf "orphaned (action needed)" "$orphaned"
