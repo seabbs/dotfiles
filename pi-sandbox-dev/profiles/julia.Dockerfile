@@ -20,9 +20,6 @@ RUN groupadd -g 1000 pi && useradd -u 1000 -g 1000 -m -s /bin/bash pi
 RUN curl -fsSL "https://github.com/go-task/task/releases/latest/download/task_linux_amd64.tar.gz" \
     | tar -xzf - -C /usr/local/bin task
 
-# Install hypa (context compression for pi-hypa extension) system-wide
-RUN npm install -g @hypabolic/hypa
-
 # Install Julia system-wide from official binary tarball.
 # Update JULIA_VERSION / JULIA_MAJOR when new releases come out.
 ARG JULIA_VERSION=1.11.5

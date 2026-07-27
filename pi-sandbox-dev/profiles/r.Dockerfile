@@ -29,9 +29,6 @@ RUN groupadd -g 1000 pi && useradd -u 1000 -g 1000 -m -s /bin/bash pi
 RUN curl -fsSL "https://github.com/go-task/task/releases/latest/download/task_linux_amd64.tar.gz" \
     | tar -xzf - -C /usr/local/bin task
 
-# Install hypa (context compression for pi-hypa extension) system-wide
-RUN npm install -g @hypabolic/hypa
-
 # Install common R packages system-wide
 RUN R -e 'install.packages(c("devtools","usethis","testthat","pkgdown","rcmdcheck"), repos="https://cloud.r-project.org")'
 
