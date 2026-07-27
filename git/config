@@ -11,7 +11,10 @@
     syntax-theme = TwoDark
 
 [merge]
-    conflictstyle = zdiff3
+    # zdiff3 needs git >= 2.35. archie is on Ubuntu's 2.34.1, where an
+    # unknown value is a fatal error on any command that reads it (merge,
+    # revert, rebase), so keep diff3 until archie's git is newer.
+    conflictstyle = diff3
 
 [diff]
     colorMoved = default
