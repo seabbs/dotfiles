@@ -86,6 +86,15 @@ defaults:
                 hidden: true
     refetchIntervalMinutes: 30
 keybindings:
+    # Available in every view. gh-dash hands over the terminal, so the
+    # interactive `gh issue create` prompts (title, then body in nvim) run
+    # inside the popup. The repo comes from the selected row, so select
+    # anything in the target repo first.
+    universal:
+        - key: N
+          name: new issue
+          command: >
+            EDITOR=nvim gh issue create --repo {{.RepoName}}
     prs:
         - key: p
           name: open PR session
@@ -93,20 +102,16 @@ keybindings:
         - key: a
           name: open agent
           command: zsh -ic "agent {{.RepoName}}"
+        # tuicr takes over the gh-dash popup and hands it back on quit, so
+        # the review stays in the popup instead of spawning a window. `:submit`
+        # pushes the review to GitHub with the popup's GH_TOKEN.
         - key: C
-          name: code review
+          name: code review (tuicr)
           command: >
-            tmux new-window -c {{.RepoPath}}
-            -n "review-{{.PrNumber}}"
-            'nvim -c ":silent Octo pr edit {{.PrNumber}}"'
+            ~/code/seabbs/dotfiles/scripts/tuicr-review.sh
+            {{.RepoName}} {{.PrNumber}} "{{.RepoPath}}"
         - key: O
           builtin: checkout
-        - key: H
-          name: review in hunk
-          command: >
-            tmux new-window -c {{.RepoPath}}
-            -n "hunk-{{.PrNumber}}"
-            'gh pr diff {{.PrNumber}} --repo {{.RepoName}} | hunk patch -'
         - key: V
           name: review & merge
           command: >
