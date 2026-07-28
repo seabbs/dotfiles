@@ -2,6 +2,8 @@
 # Symlinked to ~/.config/tuicr/config.toml by scripts/link.sh.
 # The VCS (git, jj, hg) is auto-detected, so it is left unset.
 
+# Catppuccin, matching ghostty, nvim and tmux. Macchiato is what ghostty is
+# pinned to; latte is the light counterpart for terminals that report light.
 appearance = "system"           # follow the terminal's light/dark mode
 theme_dark = "catppuccin-macchiato"
 theme_light = "catppuccin-latte"
