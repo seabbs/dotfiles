@@ -1,0 +1,32 @@
+# tuicr — code review TUI with vim keybindings.
+# Symlinked to ~/.config/tuicr/config.toml by scripts/link.sh.
+# The VCS (git, jj, hg) is auto-detected, so it is left unset.
+
+appearance = "system"           # follow the terminal's light/dark mode
+theme_dark = "catppuccin-macchiato"
+theme_light = "catppuccin-latte"
+
+diff_view = "side-by-side"      # toggle in-app with :diff
+show_file_list = true           # toggle with <leader>e
+wrap = false
+cursor_line = true
+scroll_offset = 5               # like vim's scrolloff
+mouse = true
+leader = ";"
+comment_vim = true              # vim keys in the comment box, to match nvim
+ignore_whitespace = false
+
+# Comment classes, ordered as Tab cycles them. Matches how review feedback is
+# triaged when it flows back to an agent: issues block, suggestions are
+# optional, notes are questions, praise is noise-free acknowledgement.
+comment_types = [
+  { id = "issue", definition = "must fix before merge", color = "red" },
+  { id = "suggestion", definition = "consider, or explain why not" },
+  { id = "note", label = "question", definition = "ask for clarification" },
+  { id = "praise", definition = "positive feedback" },
+]
+
+[forge]
+# Prefix pushed GitHub review comments with their type, so [ISSUE] vs
+# [SUGGESTION] survives the round trip to the PR.
+comment_type_prefix = true

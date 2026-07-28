@@ -1,5 +1,8 @@
 .DS_Store
 
+# Worktrees kept inside the repo (per-task checkouts, never committed)
+.worktrees/
+
 # Python bytecode
 __pycache__/
 *.pyc
