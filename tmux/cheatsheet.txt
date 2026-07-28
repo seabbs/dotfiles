@@ -10,6 +10,7 @@
   Ctrl-Space T     btop system monitor
   Ctrl-Space t     scratch terminal
   Ctrl-Space C-g   lazygit popup (current dir)
+  Ctrl-Space v     review local work in tuicr (current dir)
   Ctrl-Space C-h   this cheatsheet
 
   TMUX PANES
