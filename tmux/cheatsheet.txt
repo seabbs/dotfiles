@@ -123,7 +123,8 @@
   cai / gai      explicit claude / gemini aliases
   tc <cmd>       tmux + claude session
   commit         commit (haiku)
-  review         code review
+  review         review in tuicr (no args / PR number / range)
+  tc review review   agent code review (the old `review`)
   pr             create PR (sonnet)
   lint           lint changed files (sonnet)
   test           run tests (sonnet)
@@ -139,12 +140,24 @@
   /          edit section filter
   p          open project for selected repo
   a          open agent for selected repo
-  C          code review PR in Neovim (Octo)
+  C          code review PR in tuicr (in the popup; q to come back)
+  N          new issue in the selected row's repo
   R          request reviewer on PR
   O          checkout PR branch
   o          open in browser
   d          mark notification done
   ?          full gh-dash help
+
+  TUICR (code review TUI)
+  ----------------------------------------------------------------
+  j / k      down / up            c      comment on line
+  { / }      prev / next file     C      comment on file
+  Ctrl-d/u   half page            ;c     review-level comment
+  v / V      select range         Tab    cycle comment type
+  r          toggle reviewed      y      copy review for an agent
+  :submit    push review to GitHub
+  :edit      open the file in nvim
+  q          quit                 ?      full tuicr help
 
   GIT DIFF (delta side-by-side pager)
   ----------------------------------------------------------------
