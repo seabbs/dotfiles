@@ -113,7 +113,7 @@ without being dangerous:
 untrusted repos, run pi inside a container (see pi's Containerization docs)
 rather than trusting the project.
 
-## Version control — jj + hunk
+## Version control — jj + tuicr
 
 Some repos are **colocated** jj/git (a `.jj` dir beside `.git`). jj is a second
 view over the same git history: every git commit is a jj commit and vice versa,
@@ -142,11 +142,23 @@ Push/PR stays git + gh: `jj bookmark create feat/x -r @ && jj git push --bookmar
 feat/x`, then the normal `gh pr create` flow. Never point a bookmark at `main`.
 If a repo is plain git (no `.jj`), use git as normal — do not run `jj git init`.
 
-### Review with hunk
+### Review with tuicr
 
-For any diff a human will read, review through **hunk** (installed) rather than
-raw `git diff`: `hunk diff` (working tree), `hunk show <ref|revset>` (a commit),
-`hunk diff --watch` (live as files change). It is jj- and git-aware.
+**tuicr** is where a human reads a diff, not raw `git diff`. It is git-, jj- and
+hg-aware. The `pi-tuicr` extension wires it into pi (tmux only).
+
+The TUI is the human's; the CLI is yours. When the human is reviewing your work,
+open or find the session and then read their comments — do not review your own
+patch in their session or write comments as them:
+- `tuicr review list --repo .` — find the session, `active: true` is the live one.
+- `tuicr review comments --session <slug>` — read the comments as JSON. Poll
+  roughly every 30s while waiting, and re-read before claiming you are done.
+- Treat `issue` as blocking, `suggestion` as consider-or-explain, `note` as a
+  question to answer, `praise` as no action.
+
+Only when asked to review a patch yourself, add findings with
+`tuicr review add --session <slug> --target-file … --line … --type issue
+--username pi`, so agent comments stay distinguishable from the human's.
 
 ## Installed extensions
 
@@ -157,6 +169,7 @@ raw `git diff`: `hunk diff` (working tree), `hunk show <ref|revset>` (a commit),
 - **`@hypabolic/pi-hypa`** — compresses noisy tool output out of the context window (saves tokens on long sessions and heavy subagent use).
 - **`pi-memory`** — durable facts/decisions and a daily log as markdown, surviving compaction and restarts.
 - **`@ayulab/pi-rewind`** — `/rewind` checkpoint navigation (see above).
+- **`pi-tuicr`** — opens tuicr for local review and feeds the comments back (see above). Needs tmux.
 
 ## On-device search (qmd)
 

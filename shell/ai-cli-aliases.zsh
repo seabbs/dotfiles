@@ -111,7 +111,6 @@ alias lint='tc lint --model sonnet lint'
 alias literature-search='tc literature-search literature-search'
 alias pr='tc pr --model sonnet pr'
 alias preprint-search='tc preprint-search preprint-search'
-alias review='tc review review'
 alias scan-issues='tc scan-issues scan-issues'
 alias test='tc test --model sonnet test'
 alias uk-news='tc uk-news uk-news'
@@ -205,6 +204,31 @@ _sync_worktree_files() {
 # git rev-parse --show-toplevel returns the worktree dir, not the main repo.
 _git_main_root() {
   git worktree list 2>/dev/null | awk 'NR==1 {print $1}'
+}
+
+# Review in tuicr. Replaces the old `review` alias (the Claude /review session,
+# still reachable as `tc review review`) — reading the diff yourself first is
+# the point, and tuicr's `y` hands the comments back to an agent.
+#   review          uncommitted changes, else the commit selector
+#   review 125      GitHub PR #125
+#   review main..HEAD   a commit range
+review() {
+  if ! command -v tuicr >/dev/null 2>&1; then
+    echo "tuicr is not installed. Run cli/setup.sh." >&2
+    return 1
+  fi
+  if [[ -z "$1" ]]; then
+    if ! git diff --quiet 2>/dev/null || ! git diff --cached --quiet 2>/dev/null
+    then
+      tuicr -w
+    else
+      tuicr
+    fi
+  elif [[ "$1" == <-> ]]; then
+    tuicr pr "$1"
+  else
+    tuicr -r "$1"
+  fi
 }
 
 # Switch to main and pull latest (stashes and restores uncommitted changes)

@@ -14,7 +14,8 @@
     "npm:@aliou/pi-guardrails",
     "npm:@hypabolic/pi-hypa",
     "npm:pi-memory",
-    "npm:@ayulab/pi-rewind"
+    "npm:@ayulab/pi-rewind",
+    "npm:pi-tuicr"
   ],
   "compaction": {
     "enabled": true,
