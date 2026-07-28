@@ -19,7 +19,12 @@ brew install act
 brew install glow
 brew install git-delta
 brew install jj    # Jujutsu — colocated-git VCS for incremental review
-brew install hunk  # review-first terminal diff viewer (jj/git-aware)
+# tuicr — code review TUI with vim keybindings (git/jj/hg aware). Not a plain
+# `brew install`: the tap's Linux binary needs a newer glibc than Ubuntu 22.04
+# has, so the script falls back to a source build there.
+"$(dirname "$0")/../scripts/install-tuicr.sh"
+# The tuicr Claude Code skill is not shipped with the binary; fetch it.
+"$(dirname "$0")/../scripts/install-tuicr-skill.sh"
 brew install bat
 brew install hyperfine
 brew install direnv

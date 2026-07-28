@@ -9,11 +9,11 @@ email = "signin@samabbott.co.uk"
 [ui]
 editor = "nvim"
 default-command = "log"
-# Review diffs through hunk. hunk's pager has diff-detection and passes
-# non-diff output (e.g. `jj log`) through unchanged, so it is safe as the
-# global pager. `jj diff`, `jj show`, `jj log -p` render in hunk.
-pager = ["hunk", "pager"]
-# Emit git-format diffs so hunk (and other git tooling) understand them.
+# tuicr is the review tool, but it is a TUI with no pager mode, so it cannot
+# back `jj diff`. delta is already the git pager; reuse it here for casual
+# paging and reach for `tuicr` when the diff is actually being reviewed.
+pager = ["delta", "--paging=always"]
+# Emit git-format diffs so delta, tuicr and other git tooling understand them.
 diff-formatter = ":git"
 
 [git]

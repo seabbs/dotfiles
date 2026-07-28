@@ -35,6 +35,7 @@ bash scripts/link.sh
 | `git/` | Git config (delta, gitignore) |
 | `ghostty/` | Ghostty terminal configuration |
 | `jobs/` | Scheduled jobs (launchd on Mac, cron on Linux) |
+| `jj/` | Jujutsu (colocated-git VCS) configuration |
 | `julia/` | Julia via juliaup, startup config |
 | `mac/` | Mac-specific setup and GUI apps |
 | `nvim/` | Neovim config (LazyVim-based) |
@@ -47,6 +48,7 @@ bash scripts/link.sh
 | `shell/` | Zsh config and aliases |
 | `tmux/` | Tmux configuration |
 | `tmuxinator/` | Tmuxinator project templates |
+| `tuicr/` | tuicr code review TUI configuration |
 | `tv/` | Television fuzzy finder config and custom cable channels |
 
 ## Symlinks
@@ -67,6 +69,8 @@ It runs automatically during setup, or can be run standalone.
 | `qmd/index.yml` | `~/.config/qmd/index.yml` |
 | `git/ignore` | `~/.config/git/ignore` |
 | `git/config` | `~/.config/git/config` |
+| `jj/config.toml` | `~/.config/jj/config.toml` |
+| `tuicr/config.toml` | `~/.config/tuicr/config.toml` |
 | `aerospace/aerospace.toml` | `~/.config/aerospace/aerospace.toml` |
 | `bat/config` | `~/.config/bat/config` |
 | `gh/config.yml` | `~/.config/gh/config.yml` |

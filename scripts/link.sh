@@ -42,9 +42,9 @@ link "qmd/index.yml"             "$HOME/.config/qmd/index.yml"
 link "git/ignore"                "$HOME/.config/git/ignore"
 link "git/config"                "$HOME/.config/git/config"
 
-# jj (Jujutsu) and hunk (diff viewer)
+# jj (Jujutsu) and tuicr (code review TUI)
 link "jj/config.toml"            "$HOME/.config/jj/config.toml"
-link "hunk/config.toml"          "$HOME/.config/hunk/config.toml"
+link "tuicr/config.toml"         "$HOME/.config/tuicr/config.toml"
 
 # Ghostty
 link "ghostty/config"            "$HOME/.config/ghostty/config"
