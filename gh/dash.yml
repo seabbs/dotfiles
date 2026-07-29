@@ -110,6 +110,14 @@ keybindings:
           command: >
             ~/code/seabbs/dotfiles/scripts/tuicr-review.sh
             {{.RepoName}} {{.PrNumber}} "{{.RepoPath}}"
+        # Companion to C, not a replacement: tuicr reads the diff, octo edits
+        # PR metadata and threads comments. Opens a tmux window rather than
+        # taking over the popup, so the editor outlives the dash.
+        - key: E
+          name: edit PR (octo)
+          command: >
+            ~/code/seabbs/dotfiles/scripts/octo-review.sh
+            {{.RepoName}} {{.PrNumber}} "{{.RepoPath}}"
         - key: O
           builtin: checkout
         - key: V
