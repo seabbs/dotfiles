@@ -500,8 +500,10 @@ open_local_pr() {
   tmux has-session -t "=$session" 2>/dev/null \
     || tmuxinator start project "$session" "$dest" --no-attach
   tmux switch-client -t "=$session"
+  # PRSESH_HOST=home: open_github_repo already asked which host to use, so the
+  # prsesh in the launcher must not ask again.
   tmux new-window -t "=$session" -n _launcher -c "$dest" \
-    "zsh -ic 'prsesh $full $num; exit'"
+    "PRSESH_HOST=home zsh -ic 'prsesh $full $num; exit'"
 }
 
 # Same, on a hub: clone the base repo on demand, then run prsesh in a launcher
@@ -511,9 +513,11 @@ open_hub_pr() {
   owner="${full%%/*}"; repo="${full##*/}"
   session=$(printf '%s' "$repo" | sed 's/[^a-zA-Z0-9_-]/_/g')
   ensure_hub_session "$hub" "$session" "~/code/$owner/$repo" "$full" || return 1
+  # PRSESH_HOST=home: the host is already decided by the time we get here, and
+  # without it the prsesh on the hub would prompt for a host of its own.
   ssh "$hub" \
     "tmux new-window -t '=$session' -n _launcher -c '~/code/$owner/$repo' \
-       \"zsh -ic 'prsesh $full $num; exit'\"" \
+       \"PRSESH_HOST=home zsh -ic 'prsesh $full $num; exit'\"" \
     2>/dev/null || slog "prsesh $full #$num on $hub:$session failed"
   rm -f "$CACHE_DIR/$hub-windows-$session" 2>/dev/null
   jump_to_hub_session "$hub" "$session"
@@ -899,6 +903,18 @@ case "${1:-}" in
     tmux new-session -d -t "=$session" -s "$linked"
     tmux switch-client -t "=$linked"
     exit 0
+    ;;
+  --open-hub-pr)
+    # Entry point for prsesh once the user has picked a hub: set the PR up over
+    # there and jump in. Lives here rather than in the shell function so the
+    # hub plumbing (clone-on-demand, mosh gateway, client targeting) has one
+    # implementation. $2=hub $3=org/repo $4=pr-number
+    if [ -z "$2" ] || [ -z "$3" ] || [ -z "$4" ]; then
+      echo "Usage: $0 --open-hub-pr <hub> <org/repo> <pr-number>" >&2
+      exit 1
+    fi
+    open_hub_pr "$2" "$3" "$4"
+    exit $?
     ;;
 esac
 

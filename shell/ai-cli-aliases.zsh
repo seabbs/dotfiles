@@ -266,12 +266,21 @@ _enter_session() {
 
 # Build the standard nvim / ai / repl layout from a first (nvim) pane.
 # Panes are tracked by id so this is immune to pane-base-index.
-# Usage: _build_panes <nvim-pane-id> <dir> <ai-title> [repl-cmd]
+# With <octo-pr> a fourth pane opens that PR in octo, under the nvim pane:
+#
+#   +-----------+-----------+
+#   |   nvim    |    ai     |
+#   +-----------+-----------+
+#   |   octo    |   repl    |
+#   +-----------+-----------+
+#
+# Usage: _build_panes <nvim-pane-id> <dir> <ai-title> [repl-cmd] [octo-pr]
 _build_panes() {
   local p0="$1"
   local dir="$2"
   local ai_title="$3"
   local repl="$4"
+  local octo_pr="$5"
   if [[ -z "$repl" ]]; then
     repl="zsh"
     if [[ -f "$dir/Project.toml" ]]; then
@@ -290,6 +299,14 @@ _build_panes() {
   p2=$(tmux split-window -t "$p1" -v -c "$dir" -P -F '#{pane_id}')
   tmux select-pane -t "$p2" -T "repl"
   tmux send-keys -t "$p2" "$repl" Enter
+  # Review pane. Started in the worktree, so octo resolves the forge repo from
+  # its remote, and the code beside it is the code under review.
+  if [[ -n "$octo_pr" ]]; then
+    local p3
+    p3=$(tmux split-window -t "$p0" -v -c "$dir" -P -F '#{pane_id}')
+    tmux select-pane -t "$p3" -T "octo:#$octo_pr"
+    tmux send-keys -t "$p3" "nvim -c 'Octo pr edit $octo_pr'" Enter
+  fi
   tmux select-pane -t "$p0"
 }
 
@@ -379,6 +396,31 @@ prsesh() {
     return 1
   fi
 
+  # Where should this PR session live? Prompt only when there is a hub to
+  # choose and a TTY to prompt on. PRSESH_HOST skips the prompt, which is what
+  # the hub launcher sets — without it the prsesh running on archie would
+  # prompt again and could bounce the session back off the hub.
+  local host="${PRSESH_HOST:-}"
+  if [[ -z "$host" ]]; then
+    local hubs
+    hubs=$(for h in ${=HUB_HOSTS:-archie}; do
+      [[ "$h" != "$(hostname -s)" ]] && echo "$h"
+    done)
+    if [[ -n "$hubs" && -t 0 ]]; then
+      host=$(printf 'home\n%s\n' "$hubs" | sed '/^$/d' | fzf --no-sort \
+        --border-label " PR #$num → where?" --prompt '  ' \
+        --header 'Set up on which host?')
+      [[ -z "$host" ]] && return 0
+    else
+      host=home
+    fi
+  fi
+  if [[ "$host" != "home" && "$host" != "$(hostname -s)" ]]; then
+    "$CODE_DIR/seabbs/dotfiles/scripts/sessionizer.sh" \
+      --open-hub-pr "$host" "$repo" "$num"
+    return $?
+  fi
+
   # Resolve the local repo checkout
   local project_path
   project_path=$(_find_project "$repo")
@@ -448,7 +490,7 @@ prsesh() {
     local p0
     p0=$(tmux new-window -t "=$repo_session" -n "$branch" -c "$wt" \
       -P -F '#{pane_id}')
-    _build_panes "$p0" "$wt" "ai:$branch"
+    _build_panes "$p0" "$wt" "ai:$branch" "" "$num"
   fi
   _enter_session "=$repo_session"
 }
