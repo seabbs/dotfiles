@@ -25,6 +25,8 @@ Mason auto-installs `basedpyright` on first use.
 Sends code from Neovim to the bottom-right tmux pane (where your REPL lives).
 Works with any REPL (R, Julia, Python) — slime just sends text to tmux.
 
+Claude Code agents get their own warm Julia session instead, separate from this pane — see [`claude/skills/julia-repl`](../claude/skills/julia-repl/SKILL.md).
+
 ### Sending code
 
 | Key | Mode | Action |
