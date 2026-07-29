@@ -22,6 +22,15 @@ Symlinks only (if tools are already installed):
 bash scripts/link.sh
 ```
 
+Upgrade the tuicr review TUI to the latest release:
+
+```bash
+bash scripts/install-tuicr.sh --update
+```
+
+Setup calls the same script without `--update`, which installs or repairs but
+deliberately leaves an existing install alone.
+
 ## Structure
 
 | Directory | Purpose |
