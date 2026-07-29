@@ -14,12 +14,27 @@
 # network) but means a plain re-run never picks up a new release.
 set -euo pipefail
 
+usage() {
+  cat >&2 <<EOF
+usage: $(basename "$0") [--update]
+
+  (no args)  install tuicr, or repair a broken install; leaves a working
+             install alone
+  --update   upgrade an existing install to the latest release
+EOF
+  exit 2
+}
+
 UPDATE=0
-case "${1:-}" in
-  --update) UPDATE=1 ;;
-  "") ;;
-  *) echo "usage: $(basename "$0") [--update]" >&2; exit 2 ;;
-esac
+if [ "$#" -gt 1 ]; then
+  usage
+elif [ "$#" -eq 1 ]; then
+  if [ "$1" = "--update" ]; then
+    UPDATE=1
+  else
+    usage
+  fi
+fi
 
 # `hash -r` first: after an install or uninstall the shell's command cache can
 # still point at a path that has just moved or gone.
@@ -37,14 +52,15 @@ fi
 if [ "$UPDATE" -eq 1 ] && works; then
   before="$(tuicr --version)"
   echo "Updating tuicr (currently $before)..."
-  # Upgrade in place via whichever installer owns the binary. brew --prefix is
-  # only consulted when brew exists, so this stays quiet on cargo-only boxes.
+  # Upgrade in place via whichever installer owns the binary. The brew branch is
+  # only reached when brew exists and has tuicr, so cargo-only boxes stay quiet.
+  upgraded=1
   if command -v brew >/dev/null 2>&1 &&
      brew list --versions tuicr >/dev/null 2>&1; then
-    brew upgrade tuicr || echo "  Warning: brew upgrade failed"
+    brew upgrade tuicr || upgraded=0
   elif command -v cargo >/dev/null 2>&1; then
     # --force because cargo skips the install when the version is unchanged.
-    cargo install tuicr --locked --force
+    cargo install tuicr --locked --force || upgraded=0
   else
     echo "  Neither brew nor cargo found; cannot update." >&2
     exit 1
@@ -52,6 +68,12 @@ if [ "$UPDATE" -eq 1 ] && works; then
 
   if works; then
     after="$(tuicr --version)"
+    # Report the failure rather than the version. Saying "already on the latest"
+    # after a failed upgrade would claim we checked when we did not.
+    if [ "$upgraded" -eq 0 ]; then
+      echo "Upgrade failed. Still on $before, which may not be current." >&2
+      exit 1
+    fi
     if [ "$before" = "$after" ]; then
       echo "Already on the latest release: $after"
     else
