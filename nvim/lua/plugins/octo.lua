@@ -52,7 +52,9 @@ return {
       },
       file_panel = {
         size = 10,
-        use_icons = true
+        -- `use_icons` was renamed to `icons`; octo hard-errors on the old
+        -- name, which aborts setup() and leaves :Octo undefined entirely.
+        icons = true
       },
       mappings = {
         issue = {
