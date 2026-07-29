@@ -3,10 +3,18 @@
 # The VCS (git, jj, hg) is auto-detected, so it is left unset.
 
 # Catppuccin, matching ghostty, nvim and tmux. Macchiato is what ghostty is
-# pinned to; latte is the light counterpart for terminals that report light.
-appearance = "system"           # follow the terminal's light/dark mode
+# pinned to on both machines, so we are always dark and never need detection.
+#
+# Not "system": tuicr resolves that by querying the terminal background (OSC 11,
+# which tmux swallows), then falling back to gsettings. On a headless Linux box
+# `color-scheme` returns 'default', meaning "no preference set", but tuicr reads
+# it as an explicit light preference (theme/mod.rs:1802 returns Some(false) for
+# 'default'). That short-circuits its own dark fallback, so Linux got latte on a
+# dark terminal while the mac read AppleInterfaceStyle correctly and got
+# macchiato. Pinning the appearance sidesteps the whole probe.
+appearance = "dark"
 theme_dark = "catppuccin-macchiato"
-theme_light = "catppuccin-latte"
+theme_light = "catppuccin-latte"   # unused while appearance is pinned
 
 diff_view = "side-by-side"      # toggle in-app with :diff
 show_file_list = true           # toggle with <leader>e
