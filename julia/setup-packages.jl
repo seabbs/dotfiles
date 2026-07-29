@@ -48,3 +48,15 @@ set_preferences!(
 )
 
 Pkg.precompile()
+
+# AgentREPL keeps a warm Julia session for Claude Code agents over MCP
+# (claude/settings.json starts it, claude/skills/julia-repl says how to
+# use it). Unregistered, so dev it from GitHub. It lives in its own
+# shared environment because the server runs as
+# `julia --project=@AgentREPL`, which needs no absolute path and so
+# survives Julia upgrades and works on both macOS and Linux.
+Pkg.activate("AgentREPL"; shared = true)
+Pkg.develop(url = "https://github.com/samtalki/AgentREPL.jl")
+Pkg.instantiate()
+Pkg.precompile()
+Pkg.activate()
