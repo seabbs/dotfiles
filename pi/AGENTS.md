@@ -170,6 +170,7 @@ Only when asked to review a patch yourself, add findings with
 - **`pi-memory`** — durable facts/decisions and a daily log as markdown, surviving compaction and restarts.
 - **`@ayulab/pi-rewind`** — `/rewind` checkpoint navigation (see above).
 - **`pi-tuicr`** — opens tuicr for local review and feeds the comments back (see above). Needs tmux.
+- **`pi-spine`** — orchestration spine for long-running, multi-day agent batches. Dependency-wave scheduling, parallel git worktrees, reviewer agents, and human integration gates. Use `spine init` per project, then `/spine-plan all`, `/spine pending`, `/spine-status`. See [pi.dev/packages/pi-spine](https://pi.dev/packages/pi-spine).
 
 ## On-device search (qmd)
 
