@@ -2,7 +2,7 @@
   "lastChangelogVersion": "0.81.1",
   "theme": "dark",
   "defaultProvider": "openrouter",
-  "defaultModel": "z-ai/glm-5.2",
+  "defaultModel": "deepseek/deepseek-v4-flash",
   "defaultThinkingLevel": "high",
   "hideThinkingBlock": true,
   "defaultProjectTrust": "always",
@@ -15,7 +15,8 @@
     "npm:@hypabolic/pi-hypa",
     "npm:pi-memory",
     "npm:@ayulab/pi-rewind",
-    "npm:pi-tuicr"
+    "npm:pi-tuicr",
+    "npm:pi-spine"
   ],
   "compaction": {
     "enabled": true,
