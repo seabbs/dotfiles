@@ -6,8 +6,13 @@ include("startup.jl")
 # deliberately absent: nvim-dap-julia ships its own Project.toml,
 # and Mason's julia-lsp bundles LanguageServer.jl in its own depot,
 # so neither needs anything in the default environment.
+#
+# Julia formatting moved to Runic, installed as a standalone app in
+# setup.sh (Pkg.Apps.add("Runic") -> ~/.julia/bin/runic). Runic has
+# no style configuration and a single version to pin, so it does not
+# belong in the default environment. See issue #76.
 dev_only = [
-    "JuliaFormatter", "Preferences",
+    "Preferences",
 ]
 all_packages = [String.(REPL_PACKAGES); dev_only]
 
@@ -16,11 +21,13 @@ all_packages = [String.(REPL_PACKAGES); dev_only]
 # belong in a package's own docs/benchmark env; Pluto is better run
 # from a temp env; DebugAdapter caps JuliaInterpreter below 0.11 and
 # so blocks Revise 3.16; OhMyREPL is unused (startup.jl never loads
-# it) and breaks on 1.13.
+# it) and breaks on 1.13; JuliaFormatter was replaced by Runic (see
+# setup.sh and issue #76) and is removed so it cannot drift out of
+# sync with the pinned pre-commit/CI hook.
 unwanted = [
     "AirspeedVelocity", "DebugAdapter", "Documenter",
-    "DocumenterTools", "JuliaSyntax", "LanguageServer",
-    "OhMyREPL", "Pluto",
+    "DocumenterTools", "JuliaSyntax", "JuliaFormatter",
+    "LanguageServer", "OhMyREPL", "Pluto",
 ]
 
 installed = keys(Pkg.project().dependencies)

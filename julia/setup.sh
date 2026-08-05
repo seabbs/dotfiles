@@ -25,6 +25,14 @@ julia -e '
   Pkg.Apps.add("JuliaC")
 '
 
+# Install Runic as a standalone app. Runic is the Julia formatter used
+# across EpiAware (replacing JuliaFormatter); it has no style config and
+# a single version to pin, so it lives outside the default environment.
+# Pkg.Apps.add drops the `runic` binary into ~/.julia/bin, which is
+# already on PATH (shell/.zshrc). Needs Julia 1.12+. conform.nvim picks
+# it up for format-on-save (nvim/lua/plugins/formatters.lua). See #76.
+julia -e 'using Pkg; Pkg.Apps.add("Runic")'
+
 # Add Julia env vars to zshrc (idempotent)
 grep -qF 'JULIA_NUM_THREADS' ~/.zshrc \
   || echo 'export JULIA_NUM_THREADS=auto' >> ~/.zshrc
