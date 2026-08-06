@@ -7,25 +7,25 @@ pi-specific guidance: models, subagent usage, and security posture.
 
 ## Model strategy
 
-- **Parent session:** `z-ai/glm-5.2` via OpenRouter — 1M-token context, strong
-  agentic coding. This is the model that runs the main conversation and all
-  heavy reasoning (`thinking: high`).
-- **Cheap subagents:** `openrouter/deepseek/deepseek-v4-flash` for recon and gathering roles
-  (`scout`, `context-builder`, `researcher`, `delegate`) and mechanical implementation
-  (`weak-worker`) — strong flash-tier coder (leads glm-4.7-flash by ~13 coding-index
-  points), cheap on output tokens. In `enabledModels` so Ctrl+P cycles to it mid-session.
-  GLM-5.2 stays ~10 SWE-bench Pro points ahead, so reasoning/review/implementation
-  stays on the flagship.
-- **Heavy subagents inherit the parent model:** `planner`, `worker`, `oracle`,
-  `reviewer` run on glm-5.2 (deep reasoning, implementation, review).
-- **`weak-worker`:** a cheap worker on `openrouter/deepseek/deepseek-v4-flash` with
-  `thinking: high` for low-stakes tasks — summarisation, simple mechanical edits,
-  scratch scaffolding, bulk find-and-replace, docstring churn. Use it instead of
-  `worker` when the task is mechanical and doesn't need flagship reasoning. Do NOT
-  use it for logic, architecture, or anything where a subtle error is costly.
+- **Parent session:** `openrouter/~deepseek/deepseek-v4-flash-latest` — strong flash-tier
+  coding model (leads glm-4.7-flash by ~13 coding-index points), cheap on output
+  tokens, with `thinking: high`. This is the model that runs the main conversation,
+  all reasoning, and all subagents by default.
+- **All subagents inherit the parent model** (`~deepseek/deepseek-v4-flash-latest`):
+  `planner`, `worker`, `oracle`, `reviewer` for heavy work, and `scout`,
+  `context-builder`, `researcher`, `delegate` for recon — all on the same model
+  for simplicity and consistency.
+- **`weak-worker`:** explicitly pinned to `openrouter/~deepseek/deepseek-v4-flash-latest`
+  with `thinking: high` as a designated cheaper-in-practice agent for low-stakes
+  tasks — summarisation, simple mechanical edits, scratch scaffolding, bulk
+  find-and-replace, docstring churn. Use it instead of `worker` when the task
+  is mechanical and doesn't need the full subagent reasoning pipeline.
 - **Secondary provider (optional):** an Anthropic subscription is available via
   `/login` (OAuth, no key). Use Ctrl+P to cycle to Claude mid-session. Not
   wired by default; run `/login` and select Anthropic to enable.
+- **Model switching:** `openrouter/~deepseek/deepseek-v4-flash-latest` is in `enabledModels`
+  so Ctrl+P cycles to alternative models mid-session (e.g. `glm-5.2` for
+  specialised deep-reasoning tasks or `claude-opus-4.8` when Anthropic is needed).
 
 ## Dispatch reflex — default to delegation
 
@@ -40,15 +40,15 @@ around.
 
 | Task shape | Agent | Model | Notes |
 |---|---|---|---|
-| Codebase recon, "what's where" | `scout` | deepseek-v4-flash | Writes `context.md` handoff. |
-| Requirements / structured handoff | `context-builder` | deepseek-v4-flash | Before `planner`/`worker`. |
-| Web research, primary sources | `researcher` | deepseek-v4-flash | Pair with local `scout`. |
-| Mechanical edits, scaffolding, find-and-replace, docstring churn | `weak-worker` | deepseek-v4-flash | NOT for logic/architecture. |
-| Lightweight generic delegation | `delegate` | deepseek-v4-flash | When no other fits. |
-| Implementation plans | `planner` | glm-5.2 (inherits) | From a context handoff. |
-| Single-writer implementation | `worker` | glm-5.2 (inherits) | Approved handoffs only. |
-| Architecture / decision advice | `oracle` | glm-5.2 (inherits) | Advisory, doesn't write. |
-| Adversarial review + fix | `reviewer` | glm-5.2 (inherits) | Fresh context, distinct angles. |
+| Codebase recon, "what's where" | `scout` | ~deepseek/deepseek-v4-flash-latest (inherits) | Writes `context.md` handoff. |
+| Requirements / structured handoff | `context-builder` | ~deepseek/deepseek-v4-flash-latest (inherits) | Before `planner`/`worker`. |
+| Web research, primary sources | `researcher` | ~deepseek/deepseek-v4-flash-latest (inherits) | Pair with local `scout`. |
+| Mechanical edits, scaffolding, find-and-replace, docstring churn | `weak-worker` | ~deepseek/deepseek-v4-flash-latest | Explicit pin; NOT for logic/architecture. |
+| Lightweight generic delegation | `delegate` | ~deepseek/deepseek-v4-flash-latest (inherits) | When no other fits. |
+| Implementation plans | `planner` | ~deepseek/deepseek-v4-flash-latest (inherits) | From a context handoff. |
+| Single-writer implementation | `worker` | ~deepseek/deepseek-v4-flash-latest (inherits) | Approved handoffs only. |
+| Architecture / decision advice | `oracle` | ~deepseek/deepseek-v4-flash-latest (inherits) | Advisory, doesn't write. |
+| Adversarial review + fix | `reviewer` | ~deepseek/deepseek-v4-flash-latest (inherits) | Fresh context, distinct angles. |
 
 ### Dispatch patterns
 
@@ -185,7 +185,7 @@ configure X") rather than literal. Config in `qmd/` of the dotfiles repo.
 Behavioural config (`workflow`, `summaryModel`) is tracked at
 `pi/web-search.json` and symlinked to `~/.pi/web-search.json` so search behaves
 the same across machines. Default: `auto-summary` workflow with summaries on
-`openrouter/deepseek/deepseek-v4-flash` (cheap; avoids burning opus on summaries).
+`openrouter/~deepseek/deepseek-v4-flash-latest` (cheap; avoids burning opus on summaries).
 
 **API keys are env-var only** (`OPENAI_API_KEY`, `BRAVE_API_KEY`, `EXA_API_KEY`,
 `TAVILY_API_KEY`, `GEMINI_API_KEY`, `PERPLEXITY_API_KEY`) — env vars take

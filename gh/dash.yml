@@ -96,7 +96,7 @@ keybindings:
           command: >
             EDITOR=nvim gh issue create --repo {{.RepoName}}
     prs:
-        - key: p
+        - key: S
           name: open PR session
           command: zsh -ic "prsesh {{.RepoName}} {{.PrNumber}}"
         - key: a
@@ -141,7 +141,7 @@ keybindings:
             gh pr edit {{.PrNumber}} --repo {{.RepoName}}
             --add-reviewer "$reviewer"
     issues:
-        - key: p
+        - key: S
           name: open issue session
           command: zsh -ic "issuesesh {{.RepoName}} {{.IssueNumber}}"
         - key: a

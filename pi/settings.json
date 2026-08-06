@@ -2,7 +2,7 @@
   "lastChangelogVersion": "0.81.1",
   "theme": "dark",
   "defaultProvider": "openrouter",
-  "defaultModel": "deepseek/deepseek-v4-flash",
+  "defaultModel": "~deepseek/deepseek-v4-flash-latest",
   "defaultThinkingLevel": "high",
   "hideThinkingBlock": true,
   "defaultProjectTrust": "always",
@@ -37,22 +37,22 @@
   "subagents": {
     "agentOverrides": {
       "scout": {
-        "model": "openrouter/deepseek/deepseek-v4-flash"
+        "model": "openrouter/~deepseek/deepseek-v4-flash-latest"
       },
       "context-builder": {
-        "model": "openrouter/deepseek/deepseek-v4-flash"
+        "model": "openrouter/~deepseek/deepseek-v4-flash-latest"
       },
       "researcher": {
-        "model": "openrouter/deepseek/deepseek-v4-flash"
+        "model": "openrouter/~deepseek/deepseek-v4-flash-latest"
       },
       "delegate": {
-        "model": "openrouter/deepseek/deepseek-v4-flash"
+        "model": "openrouter/~deepseek/deepseek-v4-flash-latest"
       }
     }
   },
   "enabledModels": [
     "z-ai/glm-5.2",
-    "openrouter/deepseek/deepseek-v4-flash",
+    "openrouter/~deepseek/deepseek-v4-flash-latest",
     "anthropic/claude-opus-4.8"
   ],
   "warnings": {
