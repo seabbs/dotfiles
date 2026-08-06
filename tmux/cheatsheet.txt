@@ -11,6 +11,7 @@
   Ctrl-Space t     scratch terminal
   Ctrl-Space C-g   lazygit popup (current dir)
   Ctrl-Space v     review local work in tuicr (current dir)
+  Ctrl-Space V     review PR as seabbs (prompts for owner/repo + PR#)
   Ctrl-Space C-h   this cheatsheet
 
   TMUX PANES
@@ -125,7 +126,7 @@
   tc <cmd>       tmux + claude session
   commit         commit (haiku)
   review         review in tuicr (no args / PR number / range)
-  tc review review   agent code review (the old `review`)
+  review-as-seabbs <repo> <#>   review PR as seabbs (home only; errors on archie)
   pr             create PR (sonnet)
   lint           lint changed files (sonnet)
   test           run tests (sonnet)
