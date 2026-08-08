@@ -231,6 +231,26 @@ review() {
   fi
 }
 
+# Review a PR as seabbs (home only). Guards against accidental use on archie
+# where agents should not have seabbs credentials.
+# Usage: review-as-seabbs <owner/repo> <pr-number>
+# Example: review-as-seabbs epinowcast/epinowcast 125
+review-as-seabbs() {
+  local repo="$1"
+  local pr="$2"
+  if [[ -z "$repo" || -z "$pr" ]]; then
+    echo "Usage: review-as-seabbs <owner/repo> <pr-number>" >&2
+    return 1
+  fi
+  local token
+  token=$(gh auth token --user seabbs 2>/dev/null) || {
+    echo "Error: not authenticated as seabbs on this host." >&2
+    echo "This command is intended for home only — archie uses its own account." >&2
+    return 1
+  }
+  GH_TOKEN="$token" tuicr-review.sh "$repo" "$pr"
+}
+
 # Switch to main and pull latest (stashes and restores uncommitted changes)
 gm() {
   local stashed=false
