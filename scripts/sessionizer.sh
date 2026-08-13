@@ -85,8 +85,15 @@ remote_cached() {
   if mkdir "$lock" 2>/dev/null; then
     # Bound the refresh: a degraded link must not hang holding the lock and
     # block every later refresh. ServerAlive kills a dead connection quickly.
+    # Force bash for $cmd regardless of the hub's login shell: these commands
+    # are bash syntax, but ssh runs them under the remote user's own shell
+    # (zsh on archie), and zsh silently breaks a `cmd | while read` pipe
+    # nested inside a `for` loop after its first iteration — no error, just
+    # every repo after the first vanishing from worktree/session listings.
+    # %q round-trips $cmd as a single safely-quoted argument to `bash -c`.
     ( ssh -o ConnectTimeout=8 -o ServerAliveInterval=5 -o ServerAliveCountMax=2 \
-        "$host" "$cmd" >"$cache.tmp" 2>/dev/null && mv "$cache.tmp" "$cache"
+        "$host" "bash -c $(printf '%q' "$cmd")" >"$cache.tmp" 2>/dev/null \
+        && mv "$cache.tmp" "$cache"
       rm -f "$cache.tmp"; rmdir "$lock" ) >/dev/null 2>&1 &
   fi
 }
