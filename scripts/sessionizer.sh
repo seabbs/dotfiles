@@ -377,14 +377,19 @@ hub_with_project() {
 # Map a (sanitised) session name back to an "org/repo" by scanning a hub's
 # cached project list, so a session scoped to the hub in the window step can be
 # created from its repo. Matches on the sanitised basename so dotted repos
-# (e.g. CensoredDistributions.jl -> CensoredDistributions_jl) resolve. Prints
+# (e.g. CensoredDistributions.jl -> CensoredDistributions_jl) resolve.
+# Case-insensitive: the same repo can be cloned with different casing on home
+# vs a hub (e.g. Juliacon2026 vs JuliaCon2026), which otherwise silently
+# breaks recreation ("no repo for session ... cannot create it"). Prints
 # org/repo, or nothing. $1=hub $2=session.
 hub_repo_for_session() {
   local hub="$1" want="$2" line base
+  want="${want,,}"
   [ -f "$CACHE_DIR/$hub-projects" ] || return 0
   while IFS= read -r line; do
     base="${line##*/}"
-    [ "$(sanitize_session "$base")" = "$want" ] && \
+    base="$(sanitize_session "$base")"
+    [ "${base,,}" = "$want" ] && \
       { printf '%s' "$line"; return 0; }
   done < "$CACHE_DIR/$hub-projects"
 }
