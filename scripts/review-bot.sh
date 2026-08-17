@@ -99,9 +99,11 @@ INTERACTIVE=false
 [ -t 1 ] && INTERACTIVE=true
 
 : > "$LOG_FILE"
+# The terminal copy goes to stderr: log is called from inside command
+# substitutions, and on stdout it would be captured as their value.
 log() {
   printf '%s %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$*" >> "$LOG_FILE"
-  $INTERACTIVE && echo "$*"
+  $INTERACTIVE && echo "$*" >&2
   return 0
 }
 
@@ -139,10 +141,20 @@ iso_to_epoch() {
 # Has the app already reviewed this PR, and when did it last do so?
 # GitHub is the source of truth rather than a local file, so losing state
 # cannot cause a duplicate review.
+# Returns the timestamp, empty for never reviewed, or exit 2 when GitHub
+# could not be asked. gh prints its error body on stdout, so the shape of
+# the answer has to be checked: taking an error string as a timestamp
+# would read as "already reviewed" and silently skip every PR.
 last_bot_review() {
-  gh api "repos/$1/pulls/$2/reviews" --paginate \
+  local out
+  out="$(gh api "repos/$1/pulls/$2/reviews" --paginate \
     --jq "[.[] | select(.user.login == \"$BOT_LOGIN\")] | last
-           | .submitted_at // empty" 2>/dev/null
+           | .submitted_at // empty" 2>/dev/null)"
+  case "$out" in
+    "") printf '' ;;
+    20[0-9][0-9]-[0-1][0-9]-[0-3][0-9]T*Z) printf '%s' "$out" ;;
+    *) return 2 ;;
+  esac
 }
 
 # A human asking again: a mention by TRIGGER_USER newer than the
@@ -174,7 +186,15 @@ wants_review() {
   esac
   $FORCE && { echo "forced"; return 0; }
 
-  last="$(last_bot_review "$repo" "$pr")"
+  # Without knowing whether it has been reviewed already, the only safe
+  # move is to leave the PR alone and try again next poll.
+  # Exit 2 rather than 1, so the caller can tell "nothing to do" from
+  # "could not tell". This runs in a command substitution, so a counter
+  # set here would be lost with the subshell.
+  if ! last="$(last_bot_review "$repo" "$pr")"; then
+    log "  skip $repo#$pr: could not read its reviews, will retry"
+    return 2
+  fi
 
   # An explicit ask beats every gate below, on any PR in the watched
   # owners: someone else's work, a draft, or one from years ago. Asking
@@ -690,12 +710,18 @@ fi
 
 $LIST_ONLY || sync_standards
 reviewed=0
+ERRORS=0
 while read -r repo pr; do
   [ -n "${repo:-}" ] || continue
   meta="$(gh pr view "$pr" -R "$repo" --json "$META_FIELDS" 2>/dev/null)"
   [ -n "$meta" ] || { log "  skip $repo#$pr: could not read PR"; continue; }
 
-  reason="$(wants_review "$repo" "$pr" "$meta")" || continue
+  reason="$(wants_review "$repo" "$pr" "$meta")"
+  case $? in
+    0) ;;
+    2) ERRORS=$(( ERRORS + 1 )); continue ;;
+    *) continue ;;
+  esac
   if $LIST_ONLY; then
     log "  would review $repo#$pr ($reason)"
     continue
@@ -706,8 +732,15 @@ while read -r repo pr; do
     break; }
 done < <(candidates)
 
-# Only a poll that ran to completion moves the window forward.
-[ -z "$ONE_PR" ] && ! $LIST_ONLY && ! $DRY_RUN \
-  && date -u +%Y-%m-%dT%H:%M:%SZ > "$POLL_FILE"
+# Only a clean poll moves the window forward. If any PR could not be read,
+# the window stays put, so a request made during a GitHub outage is still
+# inside the lookback once the API recovers.
+if [ -z "$ONE_PR" ] && ! $LIST_ONLY && ! $DRY_RUN; then
+  if [ "$ERRORS" -eq 0 ]; then
+    date -u +%Y-%m-%dT%H:%M:%SZ > "$POLL_FILE"
+  else
+    log "$ERRORS PRs unreadable, holding the lookback window where it is"
+  fi
+fi
 
 log "review-bot done, $reviewed reviewed"
