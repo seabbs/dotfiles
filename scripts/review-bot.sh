@@ -59,6 +59,8 @@ STATE_DIR="$HOME/.local/share/review-bot"
 # PRs opened before this stamp are never picked up automatically, so
 # switching the bot on does not review everything already in flight.
 SINCE_FILE="$STATE_DIR/since"
+# Stamp of the last completed poll, which anchors the /review lookback.
+POLL_FILE="$STATE_DIR/last-poll"
 LOG_FILE="$STATE_DIR/last-run.log"
 HISTORY="$STATE_DIR/reviews.log"
 CACHE_DIR="$HOME/.cache/review-bot"
@@ -632,15 +634,31 @@ META_FIELDS="$META_FIELDS,author,title,additions,deletions,url,createdAt"
 
 # The search API, not `gh search prs`, because repeated author: and org:
 # qualifiers OR correctly here and the gh wrapper drops them.
+#
+# Both queries filter server side. That matters at a five minute cadence:
+# a poll with nothing to do costs two API calls, not one per open PR.
+search_prs() {
+  gh api -X GET search/issues -f per_page=100 -f q="$1" \
+    --jq '.items[] | "\(.repository_url | sub(".*/repos/"; "")) \(.number)"' \
+    2>/dev/null
+}
+
 candidates() {
   if [ -n "$ONE_PR" ]; then
     echo "${ONE_PR/\#/ }"
     return
   fi
-  gh api -X GET search/issues -f per_page=100 \
-    -f q="is:open is:pr $AUTHORS $OWNERS" \
-    --jq '.items[] | "\(.repository_url | sub(".*/repos/"; "")) \(.number)"' \
-    2>/dev/null
+  {
+    # Opened since the bot was switched on, ready for review.
+    search_prs "is:open is:pr draft:false -label:$SKIP_LABEL \
+$AUTHORS $OWNERS created:>=$SINCE"
+    # Asked for by hand, at any age and including drafts. The window is
+    # anchored on the last completed poll, so a day with the machine off
+    # does not lose a request. "/review" matches loosely here; the
+    # authoritative check is retrigger_after.
+    search_prs "is:open is:pr $AUTHORS $OWNERS \
+commenter:$TRIGGER_USER \"/review\" updated:>=$WINDOW"
+  } | sort -u
 }
 
 log "review-bot starting"
@@ -650,6 +668,16 @@ if [ ! -f "$SINCE_FILE" ]; then
   log "first run: only PRs opened after $(cat "$SINCE_FILE") are picked up"
 fi
 SINCE="$(cat "$SINCE_FILE")"
+
+# How far back to look for a /review request. An hour before the last
+# completed poll, so a missed or crashed run loses nothing, or a week on
+# a first run.
+if [ -f "$POLL_FILE" ]; then
+  WINDOW="$(date -u -d "$(cat "$POLL_FILE") -1 hour" +%Y-%m-%dT%H:%M:%SZ \
+    2>/dev/null)"
+fi
+: "${WINDOW:=$(date -u -d '7 days ago' +%Y-%m-%dT%H:%M:%SZ 2>/dev/null)}"
+: "${WINDOW:=$SINCE}"
 
 $LIST_ONLY || sync_standards
 reviewed=0
@@ -668,5 +696,9 @@ while read -r repo pr; do
   [ "$reviewed" -ge "$MAX_PRS" ] && { log "hit the $MAX_PRS per-run cap"
     break; }
 done < <(candidates)
+
+# Only a poll that ran to completion moves the window forward.
+[ -z "$ONE_PR" ] && ! $LIST_ONLY && ! $DRY_RUN \
+  && date -u +%Y-%m-%dT%H:%M:%SZ > "$POLL_FILE"
 
 log "review-bot done, $reviewed reviewed"

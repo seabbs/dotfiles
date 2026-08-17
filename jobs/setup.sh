@@ -28,7 +28,7 @@ JOBS=(
   "com.seabbs.sync-repos|sync-repos.sh|7|0|||"
   "com.seabbs.update-claude-plugins|update-claude-plugins.sh|7|15|$LOCAL_PATH||"
   "com.seabbs.worktree-gc|worktree-gc.sh|5|0||0|--apply"
-  "com.seabbs.review-bot|review-bot.sh|*|*/20|$LOCAL_PATH||"
+  "com.seabbs.review-bot|review-bot.sh|*|*/5|$LOCAL_PATH||"
 )
 
 if [[ "$(uname)" == "Darwin" ]]; then
