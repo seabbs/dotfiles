@@ -39,6 +39,7 @@ BUDGET_SH="$HOME/.claude/hooks/compute-budget.sh"
 # Owners to watch. user: for personal repos, org: for organisations; the
 # search ORs repeated owner qualifiers.
 OWNERS="user:seabbs org:epinowcast org:epiforecasts org:EpiAware"
+OWNERS="$OWNERS org:nfidd org:mfiidd"
 # PR authors whose work gets an automatic first pass.
 AUTHORS="author:seabbs author:seabbs-bot"
 # Only a human can ask for a re-review, so agent chatter cannot loop it.
