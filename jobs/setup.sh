@@ -11,10 +11,13 @@ mkdir -p "$HOME/.local/share/julia-maintenance"
 mkdir -p "$HOME/.local/share/update-claude-plugins"
 mkdir -p "$HOME/.local/share/org-sync"
 mkdir -p "$HOME/.local/share/worktree-gc"
+mkdir -p "$HOME/.local/share/review-bot"
 
 # Job definitions, pipe separated:
 #   label|script|hour|minute|extra PATH|weekday|args
 # weekday is empty for daily, or 0-6 (0 = Sunday) for weekly.
+# A minute of */N with an hour of * means every N minutes instead, which
+# launchd expresses as StartInterval rather than a calendar entry.
 # gh lives in /usr/local/bin or /opt/homebrew/bin, already on the default
 # PATH below, so org-sync and worktree-gc need no extra PATH.
 JULIA_PATH="$HOME/.juliaup/bin:"
@@ -25,6 +28,7 @@ JOBS=(
   "com.seabbs.sync-repos|sync-repos.sh|7|0|||"
   "com.seabbs.update-claude-plugins|update-claude-plugins.sh|7|15|$LOCAL_PATH||"
   "com.seabbs.worktree-gc|worktree-gc.sh|5|0||0|--apply"
+  "com.seabbs.review-bot|review-bot.sh|*|*/20|$LOCAL_PATH||"
 )
 
 if [[ "$(uname)" == "Darwin" ]]; then
@@ -46,6 +50,18 @@ if [[ "$(uname)" == "Darwin" ]]; then
     <key>Weekday</key>
     <integer>${weekday}</integer>"
 
+    local schedule_xml="  <key>StartCalendarInterval</key>
+  <dict>
+    <key>Hour</key>
+    <integer>${hour}</integer>
+    <key>Minute</key>
+    <integer>${minute}</integer>${weekday_xml}
+  </dict>"
+    if [[ "$minute" == \*/* ]]; then
+      schedule_xml="  <key>StartInterval</key>
+  <integer>$(( ${minute#*/} * 60 ))</integer>"
+    fi
+
     cat <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
@@ -59,13 +75,7 @@ if [[ "$(uname)" == "Darwin" ]]; then
     <string>/bin/bash</string>
     <string>${DOTFILES}/scripts/${script}</string>${arg_xml}
   </array>
-  <key>StartCalendarInterval</key>
-  <dict>
-    <key>Hour</key>
-    <integer>${hour}</integer>
-    <key>Minute</key>
-    <integer>${minute}</integer>${weekday_xml}
-  </dict>
+${schedule_xml}
   <key>StandardOutPath</key>
   <string>${log_dir}/launchd-stdout.log</string>
   <key>StandardErrorPath</key>
