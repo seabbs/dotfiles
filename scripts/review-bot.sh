@@ -43,7 +43,12 @@ OWNERS="user:seabbs org:epinowcast org:epiforecasts org:EpiAware"
 AUTHORS="author:seabbs author:seabbs-bot"
 # Only a human can ask for a re-review, so agent chatter cannot loop it.
 TRIGGER_USER="seabbs"
-TRIGGER_RE='(^|[[:space:]])/review([[:space:]]|$)'
+# Either spelling works. @seabbs-review-bot is how you would ask a person,
+# so it is what people type; GitHub will not render it as a real mention,
+# because the app's login carries a [bot] suffix, but the text is all this
+# needs. /review stays as the terse form.
+TRIGGER_RE='(^|[[:space:]])(/review|@seabbs-review-bot(\[bot\])?)'
+TRIGGER_RE="$TRIGGER_RE"'([[:space:],.!]|$)'
 # The app's login as it appears in the reviews API.
 BOT_LOGIN="${REVIEW_BOT_LOGIN:-seabbs-review-bot[bot]}"
 SKIP_LABEL="no-review"
@@ -656,10 +661,13 @@ $AUTHORS $OWNERS created:>=$SINCE"
     # Asked for by hand: any PR in these owners, any age, drafts and
     # other people's work included. The window is anchored on the last
     # completed poll, so a day with the machine off does not lose a
-    # request. "/review" matches loosely here; the authoritative check is
-    # retrigger_after.
+    # request. Searching on the commenter alone rather than on the trigger
+    # text keeps this honest: GitHub's text matching is loose enough that
+    # a phrase query both misses and over-matches. It costs nothing to
+    # widen, since seabbs comments on a handful of PRs a week and
+    # retrigger_after makes the real decision.
     search_prs "is:open is:pr $OWNERS \
-commenter:$TRIGGER_USER \"/review\" updated:>=$WINDOW"
+commenter:$TRIGGER_USER updated:>=$WINDOW"
   } | sort -u
 }
 
