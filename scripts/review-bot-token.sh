@@ -46,6 +46,10 @@
 
 set -uo pipefail
 
+# For the portable date helpers only; nothing here logs or sandboxes.
+BOT_NAME=review-bot
+. "$(dirname "$0")/bot-common.sh"
+
 CONFIG_DIR="${REVIEW_BOT_CONFIG:-$HOME/.config/review-bot}"
 APP_ID_FILE="$CONFIG_DIR/app-id"
 KEY_FILE="${REVIEW_BOT_KEY:-$CONFIG_DIR/private-key.pem}"
@@ -125,9 +129,10 @@ CACHE_FILE="$CACHE_DIR/${OWNER}__${NAME}.json"
 if [ -f "$CACHE_FILE" ]; then
   expiry="$(jq -r '.expires_at // empty' < "$CACHE_FILE")"
   if [ -n "$expiry" ]; then
-    expiry_s="$(date -d "$expiry" +%s 2>/dev/null \
-      || date -j -f '%Y-%m-%dT%H:%M:%SZ' "$expiry" +%s 2>/dev/null)"
-    if [ -n "$expiry_s" ] && [ "$expiry_s" -gt $(( $(date +%s) + 300 )) ]; then
+    # Shared with review-bot.sh so the GNU/BSD date difference is handled
+    # in one place rather than copied and left to drift.
+    expiry_s="$(iso_to_epoch "$expiry")"
+    if [ "${expiry_s:-0}" -gt $(( $(date -u +%s) + 300 )) ]; then
       jq -r .token < "$CACHE_FILE"
       exit 0
     fi

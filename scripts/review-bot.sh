@@ -61,24 +61,27 @@ SETTLE="${REVIEW_BOT_SETTLE:-180}"
 MAX_DIFF="${REVIEW_BOT_MAX_DIFF:-3000}"
 TIMEOUT="${REVIEW_BOT_TIMEOUT:-900}"
 
-STATE_DIR="$HOME/.local/share/review-bot"
+# Shared with the other agent bots: logging, the audit trail, the portable
+# date helpers, the bwrap sandbox, and cache pruning.
+BOT_NAME=review-bot
+. "$(dirname "$0")/bot-common.sh"
+
 # PRs opened before this stamp are never picked up automatically, so
 # switching the bot on does not review everything already in flight.
 SINCE_FILE="$STATE_DIR/since"
 # Stamp of the last completed poll, anchoring how far back to look.
 POLL_FILE="$STATE_DIR/last-poll"
-LOG_FILE="$STATE_DIR/last-run.log"
 HISTORY="$STATE_DIR/reviews.log"
-CACHE_DIR="$HOME/.cache/review-bot"
 REPO_CACHE="$CACHE_DIR/repos"
 STANDARDS_DIR="$CACHE_DIR/standards"
-SANDBOX_HOME="$CACHE_DIR/sandbox-home"
+POSTED_DIR="$STATE_DIR/posted"
 LOCK_FILE="$CACHE_DIR/lock"
-mkdir -p "$STATE_DIR" "$REPO_CACHE" "$STANDARDS_DIR"
+mkdir -p "$REPO_CACHE" "$STANDARDS_DIR" "$POSTED_DIR"
 
 DRY_RUN=false
 FORCE=false
 LIST_ONLY=false
+STATUS_ONLY=false
 ONE_PR=""
 SANDBOX=true
 [ "${REVIEW_BOT_SANDBOX:-1}" = "0" ] && SANDBOX=false
@@ -88,6 +91,7 @@ while [ $# -gt 0 ]; do
     --dry-run) DRY_RUN=true; shift ;;
     --force) FORCE=true; shift ;;
     --list) LIST_ONLY=true; shift ;;
+    --status) STATUS_ONLY=true; shift ;;
     --no-sandbox) SANDBOX=false; shift ;;
     --pr) ONE_PR="$2"; shift 2 ;;
     -h|--help) sed -n '2,30p' "$0"; exit 0 ;;
@@ -95,27 +99,38 @@ while [ $# -gt 0 ]; do
   esac
 done
 
-INTERACTIVE=false
-[ -t 1 ] && INTERACTIVE=true
-
-: > "$LOG_FILE"
-# The terminal copy goes to stderr: log is called from inside command
-# substitutions, and on stdout it would be captured as their value.
-log() {
-  printf '%s %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$*" >> "$LOG_FILE"
-  $INTERACTIVE && echo "$*" >&2
-  return 0
-}
+# What has this thing been doing? Answerable without reading any code.
+if $STATUS_ONLY; then
+  echo "cron:      $(crontab -l 2>/dev/null | grep -c review-bot.sh) entry"
+  echo "enabled:   $(cat "$SINCE_FILE" 2>/dev/null || echo 'not yet run')"
+  echo "last poll: $(cat "$POLL_FILE" 2>/dev/null || echo none)"
+  echo "disk:      $(du -sh "$CACHE_DIR" 2>/dev/null | cut -f1) cache, \
+$(du -sh "$STATE_DIR" 2>/dev/null | cut -f1) state"
+  echo
+  echo "reviews posted (most recent last):"
+  [ -f "$HISTORY" ] && tail -15 "$HISTORY" | while IFS=$'\t' read -r \
+    when what sha why n cost; do
+    printf '  %s  %-42s %s comment(s) %s  %s\n' "$when" "$what" "${n:-?}" \
+      "${cost:+\$$cost}" "$why"
+  done
+  echo
+  echo "last run:"
+  sed 's/^/  /' "$LOG_FILE" 2>/dev/null | tail -12
+  exit 0
+fi
 
 # ---------------------------------------------------------------- gates
 
 # One run at a time. A review can take minutes; overlapping runs would
-# double-post.
+# double-post. Taken before the per-run log is truncated, so a run that
+# exits here does not wipe the log of the run it lost to.
 exec 9>"$LOCK_FILE"
 if ! flock -n 9; then
   log "another run holds the lock, exiting"
   exit 0
 fi
+: > "$LOG_FILE"
+rotate_logs
 
 if [ -x "$BUDGET_SH" ] && ! "$BUDGET_SH" >/dev/null 2>&1; then
   log "compute budget red, skipping this run"
@@ -133,11 +148,6 @@ if [ ! -f "$HOME/.config/review-bot/private-key.pem" ] \
   exit 1
 fi
 
-iso_to_epoch() {
-  date -d "$1" +%s 2>/dev/null || date -j -f '%Y-%m-%dT%H:%M:%SZ' "$1" +%s \
-    2>/dev/null || echo 0
-}
-
 # Has the app already reviewed this PR, and when did it last do so?
 # GitHub is the source of truth rather than a local file, so losing state
 # cannot cause a duplicate review.
@@ -145,11 +155,17 @@ iso_to_epoch() {
 # could not be asked. gh prints its error body on stdout, so the shape of
 # the answer has to be checked: taking an error string as a timestamp
 # would read as "already reviewed" and silently skip every PR.
+#
+# Read through GraphQL rather than repos/*/pulls/*/reviews. That REST
+# endpoint 404s with an internal node-resolution error on any PR that
+# already has a review, so it fails exactly where the answer matters.
+# GraphQL reports an app's login without the [bot] suffix, hence the trim.
 last_bot_review() {
   local out
-  out="$(gh api "repos/$1/pulls/$2/reviews" --paginate \
-    --jq "[.[] | select(.user.login == \"$BOT_LOGIN\")] | last
-           | .submitted_at // empty" 2>/dev/null)"
+  out="$(gh pr view "$2" -R "$1" --json reviews \
+    --jq "[.reviews[] | select((.author.login | sub(\"\\\\[bot\\\\]$\"; \"\"))
+           == \"${BOT_LOGIN%\[bot\]}\")] | last | .submittedAt // empty" \
+    2>/dev/null)"
   case "$out" in
     "") printf '' ;;
     20[0-9][0-9]-[0-1][0-9]-[0-3][0-9]T*Z) printf '%s' "$out" ;;
@@ -443,41 +459,14 @@ UK English, short direct sentences, no adjectives you do not need.
 PROMPT
 }
 
-# The reviewer reads agent-written code and its output is posted publicly,
-# so text in a PR that talks the model into quoting a file would publish
-# it. Tool limits alone are not enough, because Read reaches the whole
-# filesystem. bwrap fixes that structurally: a tmpfs over $HOME hides
-# ~/.ssh, ~/.config/gh, ~/code and the rest, and only the checkout and the
-# standards are bound back in. The sandbox home holds a copy of the Claude
-# credential and nothing else.
-prepare_sandbox() {
-  local creds="$HOME/.claude/.credentials.json"
-  mkdir -p "$SANDBOX_HOME/.claude"
-  chmod 700 "$SANDBOX_HOME" "$SANDBOX_HOME/.claude"
-  # Refreshed every run: the OAuth token rotates.
-  [ -f "$creds" ] && install -m 600 "$creds" "$SANDBOX_HOME/.claude/"
-  return 0
-}
-
-sandbox_prefix() {
-  $SANDBOX || return 0
-  command -v bwrap >/dev/null || return 0
-  printf '%s\0' bwrap \
-    --ro-bind / / --dev-bind /dev /dev --proc /proc --tmpfs /tmp \
-    --bind "$SANDBOX_HOME" "$HOME" \
-    --bind "$1" "$1" \
-    --ro-bind "$STANDARDS_DIR" "$STANDARDS_DIR" \
-    --unshare-pid --unshare-ipc --unshare-uts --die-with-parent \
-    --chdir "$1" --
-}
-
 run_review() {
   local dir="$1" prompt="$2" out
   local -a wrap=()
   if $SANDBOX; then
     if command -v bwrap >/dev/null; then
       prepare_sandbox
-      mapfile -d '' -t wrap < <(sandbox_prefix "$dir")
+      mapfile -d '' -t wrap \
+        < <(sandbox_prefix "$dir" "$STANDARDS_DIR")
     else
       log "  bwrap missing, running unsandboxed"
     fi
@@ -494,6 +483,10 @@ run_review() {
     --disallowedTools "Write" "Edit" "WebFetch" "WebSearch" "Bash(gh:*)" \
     2>"$STATE_DIR/last-claude-stderr.log")" || return 1
   printf '%s' "$out" > "$STATE_DIR/last-claude-raw.json"
+  # Recorded per review so a run that suddenly costs ten times the usual
+  # is visible in the ledger rather than only on a bill.
+  LAST_COST="$(jq -r '.total_cost_usd // empty' <<< "$out" 2>/dev/null)"
+  LAST_TURNS="$(jq -r '.num_turns // empty' <<< "$out" 2>/dev/null)"
   # Unwrap the CLI envelope, then pull the JSON object out of whatever
   # wrapping the model added around it.
   jq -r '.result // empty' <<< "$out" \
@@ -647,9 +640,23 @@ review_pr() {
 
   review="$(sanitise_review "$repo" "$pr" "$review")" || return 1
   post_review "$repo" "$pr" "$sha" "$review" "$reason" || return 1
-  printf '%s\t%s#%s\t%s\t%s\t%s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+
+  # The ledger: when, what, why, how much. Tab separated and append only,
+  # so --status can read it and nothing rewrites history.
+  printf '%s\t%s#%s\t%s\t%s\t%s\t%s\n' "$(now_iso)" \
     "$repo" "$pr" "$sha" "$reason" \
-    "$(jq -r '.comments | length' <<< "$review")" >> "$HISTORY"
+    "$(jq -r '.comments | length' <<< "$review")" \
+    "${LAST_COST:-}" >> "$HISTORY"
+  log "  cost \$${LAST_COST:-?} over ${LAST_TURNS:-?} turns"
+
+  # Keep exactly what was published, so a review can be audited after the
+  # fact rather than reconstructed from the PR.
+  jq -n --argjson r "$review" --arg repo "$repo" --arg pr "$pr" \
+    --arg sha "$sha" --arg reason "$reason" --arg cost "${LAST_COST:-}" \
+    --arg at "$(now_iso)" \
+    '{at: $at, repo: $repo, pr: $pr, sha: $sha, reason: $reason,
+      cost_usd: $cost, review: $r}' \
+    > "$POSTED_DIR/${repo//\//_}-$pr-${sha:0:8}.json" 2>/dev/null
 }
 
 # ------------------------------------------------------------------ main
@@ -698,14 +705,15 @@ if [ ! -f "$SINCE_FILE" ]; then
 fi
 SINCE="$(cat "$SINCE_FILE")"
 
-# How far back to look for a request. An hour before the last
-# completed poll, so a missed or crashed run loses nothing, or a week on
-# a first run.
+# How far back to look for a request. An hour before the last completed
+# poll, so a missed or crashed run loses nothing, or a week on a first
+# run. Computed by epoch arithmetic rather than a relative date string,
+# because only GNU date parses "-1 hour" and this has to work on the Mac
+# too; getting that wrong collapsed the window to $SINCE silently.
 if [ -f "$POLL_FILE" ]; then
-  WINDOW="$(date -u -d "$(cat "$POLL_FILE") -1 hour" +%Y-%m-%dT%H:%M:%SZ \
-    2>/dev/null)"
+  WINDOW="$(epoch_to_iso $(( $(iso_to_epoch "$(cat "$POLL_FILE")") - 3600 )))"
 fi
-: "${WINDOW:=$(date -u -d '7 days ago' +%Y-%m-%dT%H:%M:%SZ 2>/dev/null)}"
+: "${WINDOW:=$(epoch_to_iso $(( $(date -u +%s) - 604800 )))}"
 : "${WINDOW:=$SINCE}"
 
 $LIST_ONLY || sync_standards
@@ -742,5 +750,11 @@ if [ -z "$ONE_PR" ] && ! $LIST_ONLY && ! $DRY_RUN; then
     log "$ERRORS PRs unreadable, holding the lookback window where it is"
   fi
 fi
+
+# Leave the host as it was found: the fake home collects a transcript per
+# review, and the clone cache grows one repo at a time forever.
+prune_sandbox_home
+prune_repo_cache "$REPO_CACHE"
+find "$POSTED_DIR" -type f -mtime +90 -delete 2>/dev/null
 
 log "review-bot done, $reviewed reviewed"
