@@ -82,6 +82,7 @@ DRY_RUN=false
 FORCE=false
 LIST_ONLY=false
 STATUS_ONLY=false
+AS_JSON=false
 ONE_PR=""
 SANDBOX=true
 [ "${REVIEW_BOT_SANDBOX:-1}" = "0" ] && SANDBOX=false
@@ -92,6 +93,7 @@ while [ $# -gt 0 ]; do
     --force) FORCE=true; shift ;;
     --list) LIST_ONLY=true; shift ;;
     --status) STATUS_ONLY=true; shift ;;
+    --json) AS_JSON=true; shift ;;
     --no-sandbox) SANDBOX=false; shift ;;
     --pr) ONE_PR="$2"; shift 2 ;;
     -h|--help) sed -n '2,30p' "$0"; exit 0 ;;
@@ -99,11 +101,57 @@ while [ $# -gt 0 ]; do
   esac
 done
 
+# The ledger as JSON. One row per posted review, newest last.
+ledger_json() {
+  [ -f "$HISTORY" ] || { echo '[]'; return; }
+  jq -R -s 'split("\n") | map(select(length > 0) | split("\t"))
+    | map({at: .[0], target: .[1], sha: .[2], reason: .[3],
+           comments: ((.[4] // "") | tonumber? // null),
+           cost_usd: ((.[5] // "") | tonumber? // null)})' < "$HISTORY"
+}
+
 # What has this thing been doing? Answerable without reading any code.
+# --json is the interface the reporting skill reads; the plain form is for
+# a human at a terminal.
 if $STATUS_ONLY; then
-  echo "cron:      $(crontab -l 2>/dev/null | grep -c review-bot.sh) entry"
-  echo "enabled:   $(cat "$SINCE_FILE" 2>/dev/null || echo 'not yet run')"
-  echo "last poll: $(cat "$POLL_FILE" 2>/dev/null || echo none)"
+  cron_line="$(crontab -l 2>/dev/null | grep 'review-bot.sh' | head -1)"
+  since_v="$(cat "$SINCE_FILE" 2>/dev/null)"
+  poll_v="$(cat "$POLL_FILE" 2>/dev/null)"
+
+  if $AS_JSON; then
+    jq -n \
+      --arg bot "$BOT_NAME" \
+      --arg schedule "$(echo "$cron_line" | cut -d' ' -f1-5)" \
+      --arg since "$since_v" \
+      --arg last_poll "$poll_v" \
+      --argjson cache_mb "$(du -sm "$CACHE_DIR" 2>/dev/null | cut -f1 || \
+        echo 0)" \
+      --argjson state_mb "$(du -sm "$STATE_DIR" 2>/dev/null | cut -f1 || \
+        echo 0)" \
+      --argjson ledger "$(ledger_json)" \
+      --argjson last_run "$(sed -e 's/\r$//' "$LOG_FILE" 2>/dev/null \
+        | jq -R -s 'split("\n") | map(select(length > 0))')" \
+      --argjson recent_problems "$(grep -iE \
+        'could not|unreadable|failed|missing|dropped|abandoned' \
+        "$AUDIT_LOG" 2>/dev/null | tail -20 \
+        | jq -R -s 'split("\n") | map(select(length > 0))')" \
+      '{bot: $bot,
+        cron: {installed: ($schedule | length > 0), schedule: $schedule},
+        enabled_since: (if $since == "" then null else $since end),
+        last_poll: (if $last_poll == "" then null else $last_poll end),
+        disk: {cache_mb: $cache_mb, state_mb: $state_mb},
+        totals: {reviews: ($ledger | length),
+                 cost_usd: ([$ledger[].cost_usd // 0] | add // 0),
+                 comments: ([$ledger[].comments // 0] | add // 0)},
+        ledger: $ledger,
+        last_run: $last_run,
+        recent_problems: $recent_problems}'
+    exit 0
+  fi
+
+  echo "cron:      ${cron_line:-NOT INSTALLED}"
+  echo "enabled:   ${since_v:-not yet run}"
+  echo "last poll: ${poll_v:-none}"
   echo "disk:      $(du -sh "$CACHE_DIR" 2>/dev/null | cut -f1) cache, \
 $(du -sh "$STATE_DIR" 2>/dev/null | cut -f1) state"
   echo
@@ -160,12 +208,28 @@ fi
 # endpoint 404s with an internal node-resolution error on any PR that
 # already has a review, so it fails exactly where the answer matters.
 # GraphQL reports an app's login without the [bot] suffix, hence the trim.
+# What our own ledger says we posted. GitHub returning an empty review
+# list is indistinguishable from never having reviewed, and during the
+# outage that hit this endpoint it did exactly that, so #79 was reviewed
+# twice. The local record cannot be fooled that way, so it decides, and
+# the API only ever adds to it.
+ledger_last_review() {
+  awk -F'\t' -v target="$1#$2" '$2 == target {print $1}' "$HISTORY" \
+    2>/dev/null | tail -1
+}
+
 last_bot_review() {
-  local out
+  local out local_ts
+  local_ts="$(ledger_last_review "$1" "$2")"
   out="$(gh pr view "$2" -R "$1" --json reviews \
     --jq "[.reviews[] | select((.author.login | sub(\"\\\\[bot\\\\]$\"; \"\"))
            == \"${BOT_LOGIN%\[bot\]}\")] | last | .submittedAt // empty" \
     2>/dev/null)"
+  # Whichever is later wins; a local record with no API answer still
+  # counts as reviewed.
+  if [ -n "$local_ts" ] && [[ "$local_ts" > "${out:-}" ]]; then
+    out="$local_ts"
+  fi
   case "$out" in
     "") printf '' ;;
     20[0-9][0-9]-[0-1][0-9]-[0-3][0-9]T*Z) printf '%s' "$out" ;;
