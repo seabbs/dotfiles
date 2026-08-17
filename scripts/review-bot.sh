@@ -11,7 +11,7 @@
 #   - automatically: open PRs authored by seabbs or seabbs-bot in the
 #     owners listed below, once, when the PR first opens
 #   - on request: any PR in those owners where seabbs (never seabbs-bot)
-#     comments /review, including drafts, older PRs and other people's
+#     comments @seabbs-review-bot, including drafts, older PRs and other
 #     work, and however many times he asks
 # Everything else is left alone. It never approves, never requests changes,
 # never pushes, and never edits a PR.
@@ -43,12 +43,11 @@ OWNERS="user:seabbs org:epinowcast org:epiforecasts org:EpiAware"
 AUTHORS="author:seabbs author:seabbs-bot"
 # Only a human can ask for a re-review, so agent chatter cannot loop it.
 TRIGGER_USER="seabbs"
-# Either spelling works. @seabbs-review-bot is how you would ask a person,
-# so it is what people type; GitHub will not render it as a real mention,
-# because the app's login carries a [bot] suffix, but the text is all this
-# needs. /review stays as the terse form.
-TRIGGER_RE='(^|[[:space:]])(/review|@seabbs-review-bot(\[bot\])?)'
-TRIGGER_RE="$TRIGGER_RE"'([[:space:],.!]|$)'
+# Asking the reviewer by name, the way you would ask a person. GitHub will
+# not render it as a real mention, because the app's login carries a [bot]
+# suffix, but the text is all this needs. One trigger and not a slash
+# command, so nothing collides with the other bots on these repos.
+TRIGGER_RE='(^|[[:space:]])@seabbs-review-bot(\[bot\])?([[:space:],.!]|$)'
 # The app's login as it appears in the reviews API.
 BOT_LOGIN="${REVIEW_BOT_LOGIN:-seabbs-review-bot[bot]}"
 SKIP_LABEL="no-review"
@@ -66,7 +65,7 @@ STATE_DIR="$HOME/.local/share/review-bot"
 # PRs opened before this stamp are never picked up automatically, so
 # switching the bot on does not review everything already in flight.
 SINCE_FILE="$STATE_DIR/since"
-# Stamp of the last completed poll, which anchors the /review lookback.
+# Stamp of the last completed poll, anchoring how far back to look.
 POLL_FILE="$STATE_DIR/last-poll"
 LOG_FILE="$STATE_DIR/last-run.log"
 HISTORY="$STATE_DIR/reviews.log"
@@ -146,7 +145,7 @@ last_bot_review() {
            | .submitted_at // empty" 2>/dev/null
 }
 
-# A human asking again: a /review comment by TRIGGER_USER newer than the
+# A human asking again: a mention by TRIGGER_USER newer than the
 # app's last review. Comments by seabbs-bot are ignored on purpose.
 retrigger_after() {
   local repo="$1" pr="$2" since="$3"
@@ -186,7 +185,7 @@ wants_review() {
   fi
 
   if [ -n "$last" ]; then
-    log "  skip $repo#$pr: reviewed at $last, no /review since"
+    log "  skip $repo#$pr: reviewed at $last, not asked again since"
     return 1
   fi
 
@@ -198,7 +197,7 @@ wants_review() {
   esac
 
   # A draft is work in progress. It still gets a review the moment it is
-  # marked ready, and /review works on it before then.
+  # marked ready, and a mention works on it before then.
   if [ "$draft" = "true" ]; then
     log "  skip $repo#$pr: draft"
     return 1
@@ -532,9 +531,9 @@ post_review() {
   body="$body
 
 <sub>Automated first pass by seabbs-review-bot (Claude $MODEL), triggered \
-by: $reason. Not a human review. Comment \`/review\` to re-run, or add the \
-\`$SKIP_LABEL\` label to opt this PR out. Ping @seabbs with any \
-questions.</sub>"
+by: $reason. Not a human review. @seabbs can comment \
+\`@seabbs-review-bot\` to re-run it, or add the \`$SKIP_LABEL\` label to \
+opt this PR out. Ping @seabbs with any questions.</sub>"
 
   payload="$(jq -n --arg body "$body" --arg sha "$sha" \
     --argjson review "$review" '{
@@ -679,7 +678,7 @@ if [ ! -f "$SINCE_FILE" ]; then
 fi
 SINCE="$(cat "$SINCE_FILE")"
 
-# How far back to look for a /review request. An hour before the last
+# How far back to look for a request. An hour before the last
 # completed poll, so a missed or crashed run loses nothing, or a week on
 # a first run.
 if [ -f "$POLL_FILE" ]; then
