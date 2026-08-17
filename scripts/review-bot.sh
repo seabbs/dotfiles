@@ -8,9 +8,11 @@
 # app setup.
 #
 # What it reviews, deliberately narrow:
-#   - open PRs authored by seabbs or seabbs-bot, in the orgs listed below
-#   - once, when the PR first opens
-#   - again only when seabbs (never seabbs-bot) comments /review
+#   - automatically: open PRs authored by seabbs or seabbs-bot in the
+#     owners listed below, once, when the PR first opens
+#   - on request: any PR in those owners where seabbs (never seabbs-bot)
+#     comments /review, including drafts, older PRs and other people's
+#     work, and however many times he asks
 # Everything else is left alone. It never approves, never requests changes,
 # never pushes, and never edits a PR.
 #
@@ -166,30 +168,29 @@ wants_review() {
   case ",$labels," in
     *",$SKIP_LABEL,"*) log "  skip $repo#$pr: $SKIP_LABEL label"; return 1 ;;
   esac
-  case " $AUTHORS " in
-    *" author:$author "*) ;;
-    *) log "  skip $repo#$pr: author $author not watched"; return 1 ;;
-  esac
-
   $FORCE && { echo "forced"; return 0; }
 
   last="$(last_bot_review "$repo" "$pr")"
 
-  # Already reviewed: only a human asking again brings it back.
+  # An explicit ask beats every gate below, on any PR in the watched
+  # owners: someone else's work, a draft, or one from years ago. Asking
+  # is the point, and only seabbs can ask.
+  if retrigger_after "$repo" "$pr" "${last:-1970-01-01T00:00:00Z}"; then
+    echo "requested by $TRIGGER_USER"
+    return 0
+  fi
+
   if [ -n "$last" ]; then
-    if retrigger_after "$repo" "$pr" "$last"; then
-      echo "re-review requested by $TRIGGER_USER"
-      return 0
-    fi
     log "  skip $repo#$pr: reviewed at $last, no /review since"
     return 1
   fi
 
-  # Never reviewed. An explicit ask always wins.
-  if retrigger_after "$repo" "$pr" "1970-01-01T00:00:00Z"; then
-    echo "requested by $TRIGGER_USER"
-    return 0
-  fi
+  # Nobody asked, so the automatic path applies and it is limited to my
+  # own work.
+  case " $AUTHORS " in
+    *" author:$author "*) ;;
+    *) log "  skip $repo#$pr: author $author not watched"; return 1 ;;
+  esac
 
   # A draft is work in progress. It still gets a review the moment it is
   # marked ready, and /review works on it before then.
@@ -652,11 +653,12 @@ candidates() {
     # Opened since the bot was switched on, ready for review.
     search_prs "is:open is:pr draft:false -label:$SKIP_LABEL \
 $AUTHORS $OWNERS created:>=$SINCE"
-    # Asked for by hand, at any age and including drafts. The window is
-    # anchored on the last completed poll, so a day with the machine off
-    # does not lose a request. "/review" matches loosely here; the
-    # authoritative check is retrigger_after.
-    search_prs "is:open is:pr $AUTHORS $OWNERS \
+    # Asked for by hand: any PR in these owners, any age, drafts and
+    # other people's work included. The window is anchored on the last
+    # completed poll, so a day with the machine off does not lose a
+    # request. "/review" matches loosely here; the authoritative check is
+    # retrigger_after.
+    search_prs "is:open is:pr $OWNERS \
 commenter:$TRIGGER_USER \"/review\" updated:>=$WINDOW"
   } | sort -u
 }
