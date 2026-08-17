@@ -110,7 +110,13 @@ REPO="${1:-}"
 [ -n "$REPO" ] || die "usage: review-bot-token.sh owner/repo | --check"
 OWNER="${REPO%%/*}"
 NAME="${REPO##*/}"
-[ "$OWNER" != "$NAME" ] || die "expected owner/repo, got '$REPO'"
+# Exactly one slash, both halves non-empty. Comparing the two halves would
+# reject epinowcast/epinowcast, where the repo is named after its owner.
+case "$REPO" in
+  */*/*|/*|*/) die "expected owner/repo, got '$REPO'" ;;
+  */*) ;;
+  *) die "expected owner/repo, got '$REPO'" ;;
+esac
 
 mkdir -p "$CACHE_DIR"
 chmod 700 "$HOME/.cache/review-bot" "$CACHE_DIR" 2>/dev/null
