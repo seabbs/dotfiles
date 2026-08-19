@@ -52,6 +52,7 @@ TRIGGER_RE='(^|[[:space:]])@seabbs-review-bot(\[bot\])?([[:space:],.!]|$)'
 # The app's login as it appears in the reviews API.
 BOT_LOGIN="${REVIEW_BOT_LOGIN:-seabbs-review-bot[bot]}"
 SKIP_LABEL="no-review"
+REVIEWED_LABEL="llm-reviewed"
 
 MODEL="${REVIEW_BOT_MODEL:-sonnet}"
 MAX_PRS="${REVIEW_BOT_MAX_PRS:-3}"
@@ -601,6 +602,22 @@ sanitise_review() {
   echo "$clean"
 }
 
+# Best-effort: create the label in the repo if it is not already defined
+# there, then attach it to the PR. Never fails the caller — a labelling
+# hiccup should not turn an already-posted review into a false failure.
+label_pr() {
+  local repo="$1" pr="$2" token="$3"
+  GH_TOKEN="$token" gh api -X POST "repos/$repo/labels" \
+    -f name="$REVIEWED_LABEL" -f color="0e8a16" \
+    -f description="Reviewed by seabbs-review-bot" >/dev/null 2>&1
+  if GH_TOKEN="$token" gh api -X POST "repos/$repo/issues/$pr/labels" \
+    -f "labels[]=$REVIEWED_LABEL" >/dev/null 2>&1; then
+    log "  labelled $repo#$pr $REVIEWED_LABEL"
+  else
+    log "  could not label $repo#$pr $REVIEWED_LABEL"
+  fi
+}
+
 post_review() {
   local repo="$1" pr="$2" sha="$3" review="$4" reason="$5"
   local token payload body http
@@ -649,7 +666,8 @@ opt this PR out. Ping @seabbs with any questions.</sub>"
 
   http="$(GH_TOKEN="$token" gh api -X POST \
     "repos/$repo/pulls/$pr/reviews" --input - <<< "$payload" 2>&1)" \
-    && { log "  posted review on $repo#$pr"; return 0; }
+    && { log "  posted review on $repo#$pr"
+         label_pr "$repo" "$pr" "$token"; return 0; }
 
   # Inline comments 422 when a line is not in the diff. Rather than lose
   # the review, fold the comments into the body and post that.
@@ -663,6 +681,7 @@ opt this PR out. Ping @seabbs with any questions.</sub>"
   if GH_TOKEN="$token" gh api -X POST "repos/$repo/pulls/$pr/reviews" \
     --input - <<< "$payload" >/dev/null 2>&1; then
     log "  posted plain review on $repo#$pr"
+    label_pr "$repo" "$pr" "$token"
     return 0
   fi
   log "  post failed on $repo#$pr: $http"

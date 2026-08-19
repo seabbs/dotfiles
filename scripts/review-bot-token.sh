@@ -20,7 +20,10 @@
 #          Contents:      Read-only   (so the app can read a repo on its own)
 #          Pull requests: Read & write (submitting the review)
 #          Checks:        Read-only   (CI state on the head commit)
-#        Nothing else. No write access to code, issues, actions or workflows.
+#          Issues:        Read & write (labelling a PR llm-reviewed after
+#                          posting; GitHub's labels API sits under Issues
+#                          even for a pull request)
+#        Nothing else. No write access to code, actions or workflows.
 #      - "Any account": required, not optional. The app is owned by the
 #        seabbs user, and "Only on this account" would then confine it to
 #        seabbs' own repos, leaving out epinowcast, epiforecasts and
@@ -35,6 +38,12 @@
 #        chmod 600 ~/.config/review-bot/private-key.pem
 #        echo <APP_ID> > ~/.config/review-bot/app-id
 #   3. Install the app on seabbs, epinowcast, epiforecasts and EpiAware.
+#
+# If the app already exists from before Issues: write was added, grant it
+# under github.com/settings/apps/seabbs-review-bot/permissions, then accept
+# the updated permissions on each of the 4 installations (GitHub prompts for
+# this on the org/account's installed-apps page; a token mint does not by
+# itself pick up a widened permission).
 #
 # Usage:
 #   review-bot-token.sh owner/repo     print an installation token
