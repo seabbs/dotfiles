@@ -225,9 +225,13 @@ review() {
       tuicr
     fi
   elif [[ "$1" == <-> ]]; then
-    tuicr pr "$1"
+    tuicr pr "$@"
+  elif [[ "$1" == -* ]]; then
+    # Any tuicr flag (-A/--all-files, -p, --theme, ...) passes straight
+    # through, so new tuicr options work here without editing this function.
+    tuicr "$@"
   else
-    tuicr -r "$1"
+    tuicr -r "$@"
   fi
 }
 
