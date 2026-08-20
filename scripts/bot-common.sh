@@ -49,16 +49,9 @@ log() {
   return 0
 }
 
-# One tab-separated record per thing actually done, for later reading by
-# eye or by script. Keep the field order stable.
-audit() {
-  printf '%s\t%s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$(printf '%s\t' "$@" \
-    | sed 's/\t$//')" >> "$STATE_DIR/actions.tsv"
-}
-
 rotate_logs() {
   local size
-  for f in "$AUDIT_LOG" "$STATE_DIR/actions.tsv"; do
+  for f in "$AUDIT_LOG"; do
     [ -f "$f" ] || continue
     size="$(wc -c < "$f" | tr -d ' ')"
     if [ "${size:-0}" -gt "$AUDIT_MAX_BYTES" ]; then

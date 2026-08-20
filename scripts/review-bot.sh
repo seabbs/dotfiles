@@ -224,12 +224,20 @@ ledger_last_review() {
 }
 
 last_bot_review() {
-  local out local_ts
+  local out rc local_ts
   local_ts="$(ledger_last_review "$1" "$2")"
   out="$(gh pr view "$2" -R "$1" --json reviews \
     --jq "[.reviews[] | select((.author.login | sub(\"\\\\[bot\\\\]$\"; \"\"))
            == \"${BOT_LOGIN%\[bot\]}\")] | last | .submittedAt // empty" \
     2>/dev/null)"
+  rc=$?
+  # A network error or rate limit leaves stdout empty too, which would
+  # otherwise read as "never reviewed" and post a duplicate. Trust the
+  # ledger if we have one, and refuse to guess if we do not.
+  if [ $rc -ne 0 ]; then
+    [ -n "$local_ts" ] && { printf '%s' "$local_ts"; return 0; }
+    return 2
+  fi
   # Whichever is later wins; a local record with no API answer still
   # counts as reviewed.
   if [ -n "$local_ts" ] && [[ "$local_ts" > "${out:-}" ]]; then
@@ -738,7 +746,7 @@ with any questions.</sub>"
 
 review_pr() {
   local repo="$1" pr="$2" reason="$3" meta="$4"
-  local sha base author title dir range review count
+  local sha base author title dir range review count token
 
   sha="$(jq -r '.headRefOid' <<< "$meta")"
   base="$(jq -r '.baseRefName' <<< "$meta")"
@@ -749,6 +757,18 @@ review_pr() {
 
   if [ "$count" -gt "$MAX_DIFF" ]; then
     log "  skip $repo#$pr: $count changed lines over the $MAX_DIFF cap"
+    # Asking and hearing nothing back is worse than being told no, so an
+    # explicit request gets a reply. The automatic path stays silent.
+    case "$reason" in
+      *requested*)
+        if ! $DRY_RUN && token="$("$TOKEN_SH" "$repo" 2>/dev/null)"; then
+          GH_TOKEN="$token" gh pr comment "$pr" -R "$repo" --body \
+"Not reviewing this one: $count changed lines is over the \
+$MAX_DIFF line cap, past which an automated pass stops being useful. \
+Ask again on a narrower PR, or split it." >/dev/null 2>&1 \
+            && log "  told $repo#$pr why it was skipped"
+        fi ;;
+    esac
     return 1
   fi
 
