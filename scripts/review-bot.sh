@@ -42,8 +42,11 @@ OWNERS="user:seabbs org:epinowcast org:epiforecasts org:EpiAware"
 OWNERS="$OWNERS org:nfidd org:mfiidd"
 # PR authors whose work gets an automatic first pass.
 AUTHORS="author:seabbs author:seabbs-bot"
-# Only a human can ask for a re-review, so agent chatter cannot loop it.
+# Who may ask. seabbs unconditionally; our own agent only after pushing
+# something new, and only so many times per PR. See bot_may_ask.
 TRIGGER_USER="seabbs"
+BOT_TRIGGER_USER="seabbs-bot"
+MAX_BOT_REREVIEWS="${REVIEW_BOT_MAX_BOT_REREVIEWS:-5}"
 # Asking the reviewer by name, the way you would ask a person. GitHub will
 # not render it as a real mention, because the app's login carries a [bot]
 # suffix, but the text is all this needs. One trigger and not a slash
@@ -239,14 +242,53 @@ last_bot_review() {
   esac
 }
 
-# A human asking again: a mention by TRIGGER_USER newer than the
-# app's last review. Comments by seabbs-bot are ignored on purpose.
-retrigger_after() {
-  local repo="$1" pr="$2" since="$3"
+# Has USER asked, in a comment newer than SINCE?
+asked_by() {
+  local repo="$1" pr="$2" since="$3" who="$4"
   gh api "repos/$repo/issues/$pr/comments" --paginate \
-    --jq ".[] | select(.user.login == \"$TRIGGER_USER\")
+    --jq ".[] | select(.user.login == \"$who\")
           | select(.created_at > \"$since\") | .body" 2>/dev/null \
     | grep -Eq "$TRIGGER_RE"
+}
+
+retrigger_after() { asked_by "$1" "$2" "$3" "$TRIGGER_USER"; }
+
+# What the ledger says about our own past reviews of this PR.
+ledger_last_sha() {
+  awk -F'\t' -v t="$1#$2" '$2 == t {print $3}' "$HISTORY" 2>/dev/null \
+    | tail -1
+}
+
+ledger_bot_requests() {
+  awk -F'\t' -v t="$1#$2" '$2 == t && $4 ~ /seabbs-bot/' "$HISTORY" \
+    2>/dev/null | wc -l | tr -d ' '
+}
+
+# seabbs-bot may ask for a re-review after pushing fixes, which is the
+# whole point of asking, but it is our own agent so it gets guards a
+# human does not need:
+#
+#   - only once the head has moved. It has to do work to earn another
+#     review, which is what makes a fix/review/fix loop impossible
+#     rather than merely unlikely.
+#   - only MAX_BOT_REREVIEWS times per PR, so a pathological cycle
+#     terminates even if every round does push something.
+bot_may_ask() {
+  local repo="$1" pr="$2" sha="$3" last="$4" n
+  asked_by "$repo" "$pr" "${last:-1970-01-01T00:00:00Z}" \
+    "$BOT_TRIGGER_USER" || return 1
+
+  if [ "$sha" = "$(ledger_last_sha "$repo" "$pr")" ]; then
+    log "  skip $repo#$pr: $BOT_TRIGGER_USER asked but the head has not moved"
+    return 1
+  fi
+
+  n="$(ledger_bot_requests "$repo" "$pr")"
+  if [ "${n:-0}" -ge "$MAX_BOT_REREVIEWS" ]; then
+    log "  skip $repo#$pr: $BOT_TRIGGER_USER has had $n re-reviews already"
+    return 1
+  fi
+  return 0
 }
 
 # Decide whether this PR wants a review now. Echoes the reason, or nothing.
@@ -283,6 +325,11 @@ wants_review() {
   # is the point, and only seabbs can ask.
   if retrigger_after "$repo" "$pr" "${last:-1970-01-01T00:00:00Z}"; then
     echo "requested by $TRIGGER_USER"
+    return 0
+  fi
+
+  if bot_may_ask "$repo" "$pr" "$sha" "$last"; then
+    echo "re-review requested by $BOT_TRIGGER_USER"
     return 0
   fi
 
@@ -626,9 +673,10 @@ post_review() {
   body="$body
 
 <sub>Automated first pass by seabbs-review-bot (Claude $MODEL), triggered \
-by: $reason. Not a human review. @seabbs can comment \
-\`@seabbs-review-bot\` to re-run it, or add the \`$SKIP_LABEL\` label to \
-opt this PR out. Ping @seabbs with any questions.</sub>"
+by: $reason. Not a human review. Comment \`@seabbs-review-bot\` to ask for \
+another pass: @seabbs any time, the author's agent once it has pushed \
+changes. Add the \`$SKIP_LABEL\` label to opt this PR out. Ping @seabbs \
+with any questions.</sub>"
 
   payload="$(jq -n --arg body "$body" --arg sha "$sha" \
     --argjson review "$review" '{
@@ -777,7 +825,8 @@ $AUTHORS $OWNERS created:>=$SINCE"
     # widen, since seabbs comments on a handful of PRs a week and
     # retrigger_after makes the real decision.
     search_prs "is:open is:pr $OWNERS \
-commenter:$TRIGGER_USER updated:>=$WINDOW"
+commenter:$TRIGGER_USER commenter:$BOT_TRIGGER_USER \
+updated:>=$WINDOW"
   } | sort -u
 }
 
