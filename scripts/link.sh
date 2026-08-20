@@ -73,6 +73,7 @@ fi
 # Television (stock cable channels managed by tv update-channels)
 link "tv/config.toml"               "$HOME/.config/television/config.toml"
 link "tv/cable/all-files.toml"      "$HOME/.config/television/cable/all-files.toml"
+link "tv/cable/pdf-files.toml"      "$HOME/.config/television/cable/pdf-files.toml"
 
 # Taskwarrior (binary is keg-only; `task` on PATH stays go-task)
 link "task/taskrc"               "$HOME/.config/task/taskrc"

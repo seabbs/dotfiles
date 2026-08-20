@@ -87,3 +87,6 @@ theme = "tokyonight"
 
 # Build
 "make-targets" = ["make"]
+
+# PDFs
+"pdf-files" = ["open", "pdftotext", "qpdf"]
