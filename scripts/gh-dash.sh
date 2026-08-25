@@ -16,11 +16,19 @@ session=$(tmux display-message -p '#{session_name}')
 dir="$HOME"
 
 if [ "$hub" = "1" ]; then
-  remote_path=$(ssh -o ConnectTimeout=3 -o BatchMode=yes "$session" '
-    c=$(tmux list-clients -F "#{client_activity} #{client_name}" 2>/dev/null \
-      | sort -rn | head -1 | cut -d" " -f2-)
-    [ -n "$c" ] && tmux display-message -c "$c" -p "#{pane_current_path}"
-  ' 2>/dev/null)
+  # ConnectTimeout only bounds the SSH handshake, not command execution --
+  # on an overloaded hub the remote tmux query itself can take 30s+ even
+  # once connected. Bound the whole wait with `read -t` (no `timeout`
+  # binary on macOS by default) so a slow hub degrades to the $HOME
+  # fallback quickly and predictably instead of hanging the popup.
+  remote_path=""
+  IFS= read -r -t 5 remote_path < <(
+    ssh -o ConnectTimeout=3 -o BatchMode=yes "$session" '
+      c=$(tmux list-clients -F "#{client_activity} #{client_name}" 2>/dev/null \
+        | sort -rn | head -1 | cut -d" " -f2-)
+      [ -n "$c" ] && tmux display-message -c "$c" -p "#{pane_current_path}"
+    ' 2>/dev/null
+  )
   rel="${remote_path#*/code/}"
   if [ -n "$remote_path" ] && [ "$rel" != "$remote_path" ] \
       && [ -d "$HOME/code/$rel" ]; then

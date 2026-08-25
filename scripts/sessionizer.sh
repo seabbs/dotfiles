@@ -91,9 +91,14 @@ remote_cached() {
     # nested inside a `for` loop after its first iteration — no error, just
     # every repo after the first vanishing from worktree/session listings.
     # %q round-trips $cmd as a single safely-quoted argument to `bash -c`.
+    # -s "$cache.tmp": an overloaded hub can return a zero-exit but EMPTY
+    # result (the remote tmux call itself stalls/returns nothing under load,
+    # while ssh still succeeds) -- without this guard that empty result wins
+    # the mv and clobbers a previously-good cache, hiding every hub session
+    # until the next refresh happens to land clean.
     ( ssh -o ConnectTimeout=8 -o ServerAliveInterval=5 -o ServerAliveCountMax=2 \
         "$host" "bash -c $(printf '%q' "$cmd")" >"$cache.tmp" 2>/dev/null \
-        && mv "$cache.tmp" "$cache"
+        && [ -s "$cache.tmp" ] && mv "$cache.tmp" "$cache"
       rm -f "$cache.tmp"; rmdir "$lock" ) >/dev/null 2>&1 &
   fi
 }
