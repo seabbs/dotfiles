@@ -51,6 +51,10 @@ export EDITOR="nvim"
 export JULIA_NUM_THREADS=auto
 export JULIA_PROJECT=@.
 
+# Fixed port for human-review (default is random), so an SSH LocalForward
+# to archie's Host block in ~/.ssh/config can target it reliably.
+export HUMAN_REVIEW_PORT=47474
+
 # PATH configuration
 export PATH="$PATH:$HOME/.local/bin:$HOME/.lmstudio/bin:$HOME/.cargo/bin:$HOME/.julia/bin:$HOME/Library/TinyTeX/bin/universal-darwin"
 

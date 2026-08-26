@@ -14,7 +14,6 @@ brew install mosh
 # has no usable system node, and system npm would need sudo).
 brew install node
 npm install -g @anthropic-ai/claude-code
-npm install -g happy-coder
 brew install act
 brew install glow
 brew install git-delta
@@ -37,3 +36,11 @@ brew install direnv
 brew install sqlite
 npm install -g @tobilu/qmd \
   --allow-scripts=better-sqlite3,node-llama-cpp,tree-sitter-go,tree-sitter-python,tree-sitter-rust,tree-sitter-typescript,tree-sitter-javascript
+
+# human-review — visual HTML/Markdown/localhost review skill. A global
+# install (not npx) so the skill's SKILL.md records a plain `human-review`
+# invocation instead of a slower npx re-resolve on every call. Binds to
+# 127.0.0.1 only; HUMAN_REVIEW_PORT is fixed in shell/.zshrc so an SSH
+# LocalForward to archie's Host block in ~/.ssh/config can reach it.
+npm install -g human-review
+human-review setup --global
