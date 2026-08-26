@@ -13,8 +13,12 @@ pi/**/trust.json
 pi/**/sessions/
 pi/**/node_modules/
 pi/extensions/
-# Pi project-local scratch dir: ignore its contents but keep the tracked
-# guardrails policy.
+# Pi project-local scratch dir (created wherever `pi -l` runs, including the
+# repo root): ignore its contents but keep the tracked guardrails policy.
+.pi/*
+!.pi/extensions/
+.pi/extensions/*
+!.pi/extensions/guardrails.json
 pi/.pi/*
 !pi/.pi/extensions/
 pi/.pi/extensions/*
@@ -22,3 +26,6 @@ pi/.pi/extensions/*
 
 # Pi subagent run artifacts (transcripts, outputs, session logs) — machine-local.
 .pi-subagents/
+
+# Crash/debug logs dropped by CLI tools run in this repo
+debug.log

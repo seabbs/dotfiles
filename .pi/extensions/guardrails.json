@@ -1,0 +1,20 @@
+{
+  "$schema": "https://unpkg.com/@aliou/pi-guardrails@0.16.2/schema.json",
+  "pathAccess": {
+    "allowedPaths": [
+      {
+        "kind": "file",
+        "path": "~/.pi/agent/settings.json"
+      },
+      {
+        "kind": "file",
+        "path": "~/code/seabbs/skills"
+      },
+      {
+        "kind": "file",
+        "path": "~/code/seabbs/skills/.claude-plugin"
+      }
+    ]
+  },
+  "version": "0.13.0-20260619"
+}

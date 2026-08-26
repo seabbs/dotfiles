@@ -14,6 +14,16 @@ link() {
 
 echo "Linking dotfiles from $DOTFILES"
 
+# Clean filter that pins pi's auto-written lastChangelogVersion so its
+# routine version bumps to pi/settings.json don't show as diffs.
+git -C "$DOTFILES" config filter.pi-settings-noise.clean \
+  "$DOTFILES/scripts/git-filters/strip-pi-changelog-version.sh"
+
+# Clean filter that strips this machine's literal $HOME out of
+# shell/.zshrc before it reaches git (juliaup writes it in literally).
+git -C "$DOTFILES" config filter.zshrc-no-home-path.clean \
+  "$DOTFILES/scripts/git-filters/strip-home-path.sh"
+
 # Shell
 link "shell/.zshrc"              "$HOME/.zshrc"
 link "shell/ai-cli-aliases.zsh"  "$HOME/.config/zsh/ai-cli-aliases.zsh"
