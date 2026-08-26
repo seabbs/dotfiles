@@ -14,7 +14,7 @@ Always respond in UK English
 ## Git/GitHub
 - Never push to main
 - Global git identity is seabbs-bot (all commits default to bot)
-- Never include "🤖 Generated with [Gemini CLI]", "Co-Authored-By: Gemini", "Co-Authored-By: Happy", or "via [Happy]" in commit messages or PR descriptions
+- Never include "🤖 Generated with [Gemini CLI]" or "Co-Authored-By: Gemini" in commit messages, PR descriptions, or issue bodies
 - When creating worktrees do so as a subproject of the current project rather than at a higher dir level
 - Use gh CLI to look up repos, create issues, and manage PRs even when not in the source repo (e.g. gh issue create -R seabbs/repo-name)
 - Avoid `cd /path &&` before commands — gh works from worktrees without cd, use `git -C` for other repos, and `gh -R` for cross-repo operations
