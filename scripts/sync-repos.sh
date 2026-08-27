@@ -9,7 +9,12 @@ CODE_DIR="$HOME/code"
 LOG_DIR="$HOME/.local/share/sync-repos"
 LOG_FILE="$LOG_DIR/last-run.log"
 ERR_FILE="$LOG_DIR/errors.log"
+LOCK_FILE="$LOG_DIR/lock"
 mkdir -p "$LOG_DIR"
+
+# One run at a time -- a hung fetch would otherwise pile up on every repo.
+exec 9>"$LOCK_FILE"
+flock -n 9 || exit 0
 
 INTERACTIVE=false
 [ -t 1 ] && INTERACTIVE=true

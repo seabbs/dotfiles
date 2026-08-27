@@ -17,7 +17,12 @@
 CODE_DIR="$HOME/code"
 LOG_DIR="$HOME/.local/share/org-sync"
 LOG_FILE="$LOG_DIR/last-run.log"
+LOCK_FILE="$LOG_DIR/lock"
 mkdir -p "$LOG_DIR"
+
+# One run at a time -- a stuck gh/git call would otherwise pile up.
+exec 9>"$LOCK_FILE"
+flock -n 9 || exit 0
 
 # Only orgs where every repo is wanted locally. Orgs cloned selectively
 # (epiforecasts, JuliaEpi, ...) must be named explicitly, otherwise a
