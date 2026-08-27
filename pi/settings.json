@@ -51,9 +51,8 @@
     }
   },
   "enabledModels": [
-    "z-ai/glm-5.2",
     "openrouter/~deepseek/deepseek-v4-flash-latest",
-    "anthropic/claude-opus-4.8"
+    "openrouter/moonshotai/kimi-k3"
   ],
   "warnings": {
     "anthropicExtraUsage": true
