@@ -279,6 +279,16 @@ flag_hub() {
   tmux set-option -t "$1" status off
 }
 
+# A stable, uniquely-random-per-boot ID (Linux hub hosts only). Comparing this
+# against what a gateway saw when it connected is how we tell "the remote
+# rebooted" apart from "the network blipped" -- the two look identical from a
+# still-alive local mosh-client. Bounded so a genuinely unreachable host does
+# not stall the picker: empty on failure, never fatal. $1 = hub host.
+remote_boot_id() {
+  ssh -o ConnectTimeout=3 -o BatchMode=yes "$1" \
+    'cat /proc/sys/kernel/random/boot_id' 2>/dev/null
+}
+
 # A hub gateway whose mosh pane has died — or one resurrect restored after a
 # reboot (the session name comes back, but its mosh pane and @hub flag are
 # runtime-only and do not) — still answers has-session, so callers would wrongly
@@ -301,7 +311,23 @@ drop_dead_gateway() {
     # gateway (zsh -> mosh bootstrap) is never mistaken for a husk and killed.
     local dead
     dead=$(tmux list-panes -t "=$1" -F '#{pane_dead}' 2>/dev/null | head -1)
-    [ "$dead" != "1" ] && return 0
+    if [ "$dead" = "1" ]; then
+      tmux kill-session -t "=$1" 2>/dev/null
+      return 0
+    fi
+    # mosh survives a network blip by design, so pane_dead never flags one --
+    # but a REBOOT starts a fresh mosh-server the old client can't reach, and
+    # that also never shows as pane_dead. Only a *positively confirmed*
+    # different boot forces a recreate; an unreachable host (a mere blip)
+    # is left alone so mosh keeps retrying as it's meant to.
+    local seen cur
+    seen=$(tmux show-option -t "$1" -qv @boot_id 2>/dev/null)
+    if [ -n "$seen" ]; then
+      cur=$(remote_boot_id "$1")
+      [ -n "$cur" ] && [ "$cur" != "$seen" ] && \
+        tmux kill-session -t "=$1" 2>/dev/null
+    fi
+    return 0
   fi
   tmux kill-session -t "=$1" 2>/dev/null
 }
@@ -608,6 +634,7 @@ jump_to_hub_session() {
     tmux new-session -d -s "$hub" \
       "/bin/zsh -lc 'mosh --predict=experimental $hub -- tmux attach -t $session'"
     flag_hub "$hub"
+    tmux set-option -t "$hub" @boot_id "$(remote_boot_id "$hub")"
   fi
   tmux switch-client -t "=$hub"
 }
@@ -729,6 +756,7 @@ pick_window() {
         tmux new-session -d -s "$host_tag" \
           "/bin/zsh -lc 'mosh --predict=experimental $host_tag -- tmux attach -t $session'"
         flag_hub "$host_tag"
+        tmux set-option -t "$host_tag" @boot_id "$(remote_boot_id "$host_tag")"
       fi
       tmux switch-client -t "=$host_tag"
     fi
