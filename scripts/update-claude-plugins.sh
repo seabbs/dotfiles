@@ -10,6 +10,13 @@ LOCK_FILE="$LOCK_DIR/lock"
 mkdir -p "$LOCK_DIR"
 
 # One run at a time -- a stuck marketplace fetch would otherwise pile up.
+# flock isn't part of macOS by default (`brew install flock`, done by
+# cli/setup.sh) -- fail loudly rather than let a missing binary make
+# `flock -n 9` exit 127, indistinguishable from "lock held".
+command -v flock >/dev/null 2>&1 || {
+  echo "flock not found -- run 'brew install flock' (see cli/setup.sh)" >&2
+  exit 1
+}
 exec 9>"$LOCK_FILE"
 flock -n 9 || exit 0
 
