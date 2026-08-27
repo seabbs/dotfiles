@@ -66,7 +66,6 @@ path=('$HOME/.juliaup/bin' $path)
 export PATH
 # Tab completion for juliaup and julia channel selection
 [ -f "$HOME/.julia/juliaup/completions/zsh.zsh" ] && source "$HOME/.julia/juliaup/completions/zsh.zsh"
-
 # <<< juliaup initialize <<<
 
 # juliaup, kept portable. Runs after the managed block, and `path=(x $path)`
