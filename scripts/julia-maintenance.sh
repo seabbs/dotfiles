@@ -24,6 +24,13 @@ log() {
 
 # One run at a time. Precompiling several projects can take a while;
 # overlapping runs would double up on CPU/memory for no benefit.
+# flock isn't part of macOS by default (`brew install flock`, done by
+# cli/setup.sh) -- fail loudly rather than let a missing binary make
+# `flock -n 9` exit 127, which reads identically to "lock held" below.
+command -v flock >/dev/null 2>&1 || {
+  echo "flock not found -- run 'brew install flock' (see cli/setup.sh)"
+  exit 1
+}
 exec 9>"$LOCK_FILE"
 if ! flock -n 9; then
   echo "another run holds the lock, exiting"

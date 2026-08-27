@@ -10,6 +10,9 @@ brew install gh
 brew install azure-cli
 brew install pandoc
 brew install mosh
+# flock isn't part of macOS by default (Linux ships it via util-linux); the
+# cron job scripts rely on it for overlap protection.
+brew install flock
 # Ensure brew's node provides npm before global installs (a fresh Linux box
 # has no usable system node, and system npm would need sudo).
 brew install node
