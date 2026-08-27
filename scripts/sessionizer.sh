@@ -85,8 +85,20 @@ remote_cached() {
   if mkdir "$lock" 2>/dev/null; then
     # Bound the refresh: a degraded link must not hang holding the lock and
     # block every later refresh. ServerAlive kills a dead connection quickly.
+    # Force bash for $cmd regardless of the hub's login shell: these commands
+    # are bash syntax, but ssh runs them under the remote user's own shell
+    # (zsh on archie), and zsh silently breaks a `cmd | while read` pipe
+    # nested inside a `for` loop after its first iteration — no error, just
+    # every repo after the first vanishing from worktree/session listings.
+    # %q round-trips $cmd as a single safely-quoted argument to `bash -c`.
+    # -s "$cache.tmp": an overloaded hub can return a zero-exit but EMPTY
+    # result (the remote tmux call itself stalls/returns nothing under load,
+    # while ssh still succeeds) -- without this guard that empty result wins
+    # the mv and clobbers a previously-good cache, hiding every hub session
+    # until the next refresh happens to land clean.
     ( ssh -o ConnectTimeout=8 -o ServerAliveInterval=5 -o ServerAliveCountMax=2 \
-        "$host" "$cmd" >"$cache.tmp" 2>/dev/null && mv "$cache.tmp" "$cache"
+        "$host" "bash -c $(printf '%q' "$cmd")" >"$cache.tmp" 2>/dev/null \
+        && [ -s "$cache.tmp" ] && mv "$cache.tmp" "$cache"
       rm -f "$cache.tmp"; rmdir "$lock" ) >/dev/null 2>&1 &
   fi
 }
@@ -377,14 +389,19 @@ hub_with_project() {
 # Map a (sanitised) session name back to an "org/repo" by scanning a hub's
 # cached project list, so a session scoped to the hub in the window step can be
 # created from its repo. Matches on the sanitised basename so dotted repos
-# (e.g. CensoredDistributions.jl -> CensoredDistributions_jl) resolve. Prints
+# (e.g. CensoredDistributions.jl -> CensoredDistributions_jl) resolve.
+# Case-insensitive: the same repo can be cloned with different casing on home
+# vs a hub (e.g. Juliacon2026 vs JuliaCon2026), which otherwise silently
+# breaks recreation ("no repo for session ... cannot create it"). Prints
 # org/repo, or nothing. $1=hub $2=session.
 hub_repo_for_session() {
   local hub="$1" want="$2" line base
+  want="${want,,}"
   [ -f "$CACHE_DIR/$hub-projects" ] || return 0
   while IFS= read -r line; do
     base="${line##*/}"
-    [ "$(sanitize_session "$base")" = "$want" ] && \
+    base="$(sanitize_session "$base")"
+    [ "${base,,}" = "$want" ] && \
       { printf '%s' "$line"; return 0; }
   done < "$CACHE_DIR/$hub-projects"
 }

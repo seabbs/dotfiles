@@ -1,0 +1,12 @@
+{
+  "$schema": "https://unpkg.com/@aliou/pi-guardrails@0.15.0/schema.json",
+  "pathAccess": {
+    "allowedPaths": [
+      {
+        "kind": "file",
+        "path": "~/.config/tmuxinator/project.yml"
+      }
+    ]
+  },
+  "version": "0.13.0-20260619"
+}

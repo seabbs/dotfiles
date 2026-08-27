@@ -51,14 +51,22 @@ export EDITOR="nvim"
 export JULIA_NUM_THREADS=auto
 export JULIA_PROJECT=@.
 
+# Fixed port for human-review (default is random), so an SSH LocalForward
+# to archie's Host block in ~/.ssh/config can target it reliably.
+export HUMAN_REVIEW_PORT=47474
+
 # PATH configuration
 export PATH="$PATH:$HOME/.local/bin:$HOME/.lmstudio/bin:$HOME/.cargo/bin:$HOME/.julia/bin:$HOME/Library/TinyTeX/bin/universal-darwin"
 
 # >>> juliaup initialize >>>
+
 # !! Contents within this block are managed by juliaup !!
-# Left empty on purpose: juliaup rewrites whatever is between these markers on
-# every update, and it writes absolute /home/seabbs paths that break the mac.
-# The portable equivalent lives below the closing marker, where it survives.
+
+path=('$HOME/.juliaup/bin' $path)
+export PATH
+# Tab completion for juliaup and julia channel selection
+[ -f "$HOME/.julia/juliaup/completions/zsh.zsh" ] && source "$HOME/.julia/juliaup/completions/zsh.zsh"
+
 # <<< juliaup initialize <<<
 
 # juliaup, kept portable. Runs after the managed block, and `path=(x $path)`
@@ -136,6 +144,6 @@ if [[ -o interactive && -z "$TMUX" && -z "$NO_AUTO_TMUX" \
 fi
 
 # Added by LM Studio CLI (lms)
-export PATH="$PATH:/Users/lshsa2/.lmstudio/bin"
+export PATH="$PATH:$HOME/.lmstudio/bin"
 # End of LM Studio CLI section
 

@@ -1,0 +1,21 @@
+[metadata]
+name = "pdf-files"
+description = "Browse PDF files, including gitignored build output (e.g. quarto renders)"
+requirements = ["fd", "pdftotext"]
+
+[source]
+command = "fd -t f -e pdf -H --no-ignore --exclude .git ."
+
+[preview]
+command = "pdftotext -l 2 -layout '{}' - 2>/dev/null | head -100 || file '{}'"
+
+[ui]
+layout = "portrait"
+
+[keybindings]
+enter = "actions:open"
+
+[actions.open]
+description = "Open the selected PDF with default viewer"
+command = "open '{}' 2>/dev/null || xdg-open '{}'"
+mode = "fork"

@@ -1,2 +1,10 @@
 # Auto detect text files and perform LF normalization
 * text=auto
+
+# Pin pi's auto-written changelog marker so its routine version bumps
+# don't show as diffs; filter registered by scripts/link.sh.
+pi/settings.json filter=pi-settings-noise
+
+# juliaup rewrites its managed block with this machine's literal $HOME;
+# strip that back out so a local username never lands in git history.
+shell/.zshrc filter=zshrc-no-home-path
