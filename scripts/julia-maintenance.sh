@@ -3,10 +3,14 @@
 # "Active" means the repo was modified within the last 30 days.
 # Safe to run from cron or interactively.
 
+# cron runs with a minimal PATH that doesn't include juliaup's install dir.
+export PATH="$HOME/.juliaup/bin:$PATH"
+
 CODE_DIR="$HOME/code"
 STALE_DAYS=30
 LOG_DIR="$HOME/.local/share/julia-maintenance"
 LOG_FILE="$LOG_DIR/last-run.log"
+LOCK_FILE="$LOG_DIR/lock"
 mkdir -p "$LOG_DIR"
 
 INTERACTIVE=false
@@ -17,6 +21,14 @@ log() {
   $INTERACTIVE && printf "%-50s %s\n" "$1" "$2"
   return 0
 }
+
+# One run at a time. Precompiling several projects can take a while;
+# overlapping runs would double up on CPU/memory for no benefit.
+exec 9>"$LOCK_FILE"
+if ! flock -n 9; then
+  echo "another run holds the lock, exiting"
+  exit 0
+fi
 
 : > "$LOG_FILE"
 log "julia-maintenance" "$(date '+%Y-%m-%d %H:%M:%S')"

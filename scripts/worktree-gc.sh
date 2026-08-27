@@ -13,7 +13,12 @@
 CODE_DIR="$HOME/code"
 LOG_DIR="$HOME/.local/share/worktree-gc"
 LOG_FILE="$LOG_DIR/last-run.log"
+LOCK_FILE="$LOG_DIR/lock"
 mkdir -p "$LOG_DIR"
+
+# One run at a time -- weekly, but a slow gh call shouldn't ever stack.
+exec 9>"$LOCK_FILE"
+flock -n 9 || exit 0
 
 APPLY=false
 STALE_DAYS=30
