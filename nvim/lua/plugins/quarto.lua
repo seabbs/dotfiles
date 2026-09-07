@@ -40,12 +40,17 @@ return {
       local keymap = vim.keymap.set
       local runner = require("quarto.runner")
       
-      -- Code execution
-      keymap("n", "<localleader>rc", runner.run_cell, { desc = "Run cell" })
-      keymap("n", "<localleader>ra", runner.run_above, { desc = "Run cell and above" })
-      keymap("n", "<localleader>rA", runner.run_all, { desc = "Run all cells" })
-      keymap("n", "<localleader>rl", runner.run_line, { desc = "Run line" })
-      keymap("v", "<localleader>r", runner.run_range, { desc = "Run visual range" })
+      -- Code execution, under <localleader>m alongside molten's own
+      -- kernel maps. R.nvim binds buffer-local \rc \ra \rl \rr and \qp
+      -- from its quarto ftplugin, and buffer-local always beats these
+      -- global maps, so the old \r* keys silently ran R.nvim instead.
+      -- \m* is safe: R.nvim only binds bare \m, and nvim prefers the
+      -- longer match when a global \m<x> exists.
+      keymap("n", "<localleader>mc", runner.run_cell, { desc = "Run cell" })
+      keymap("n", "<localleader>ma", runner.run_above, { desc = "Run cell and above" })
+      keymap("n", "<localleader>mA", runner.run_all, { desc = "Run all cells" })
+      keymap("n", "<localleader>ml", runner.run_line, { desc = "Run line" })
+      keymap("v", "<localleader>mv", runner.run_range, { desc = "Run visual range" })
       
       -- Navigation
       keymap("n", "]c", function() require("quarto.runner").run_cell() end, { desc = "Run cell and move to next" })
@@ -55,8 +60,9 @@ return {
       end, { desc = "Run cell and move to previous" })
       
       -- Quarto preview
-      keymap("n", "<localleader>qp", ":QuartoPreview<CR>", { desc = "Quarto preview" })
-      keymap("n", "<localleader>qq", ":QuartoClosePreview<CR>", { desc = "Close Quarto preview" })
+      -- \qp is R.nvim's quarto::quarto_preview() (buffer-local, wins).
+      keymap("n", "<localleader>mp", ":QuartoPreview<CR>", { desc = "Quarto preview" })
+      keymap("n", "<localleader>mP", ":QuartoClosePreview<CR>", { desc = "Close Quarto preview" })
     end,
   },
   {
