@@ -3,42 +3,15 @@ return {
     "neovim/nvim-lspconfig",
     opts = {
       servers = {
-        -- R Language Server
-        r_language_server = {
-          -- Install with: install.packages("languageserver")
-          cmd = { "R", "--slave", "-e", "languageserver::run()" },
-          filetypes = { "r", "rmd", "quarto" },
-        },
+        -- R Language Server.
+        -- cmd/filetypes live in after/lsp/r_language_server.lua so they
+        -- survive nvim-lspconfig's own lsp/ config in the merge order.
+        r_language_server = {},
 
-        -- Julia Language Server
+        -- Julia Language Server. julia-lsp is installed via Mason and
+        -- bundles LanguageServer.jl in its own depot. Its cmd lives in
+        -- after/lsp/julials.lua for the same merge-order reason.
         julials = {
-          -- julia-lsp is installed via Mason; its wrapper bundles
-          -- LanguageServer.jl in its own depot, so nothing extra to install.
-          -- The wrapper needs the project's env path as a positional arg.
-          -- mason-lspconfig appends it via before_init, but under nvim 0.11+
-          -- that hook fires after the process spawns, so it exits 1. Skip
-          -- mason auto-enable and pass the env path ourselves.
-          mason = false,
-          cmd = function(dispatchers)
-            -- Fall back to the newest default env rather than a
-            -- hardcoded version, which goes stale on each upgrade.
-            -- glob() expands ~ itself; wrapping it in expand() first
-            -- collapses the matches to one newline-joined string that
-            -- then globs to nothing.
-            local envs = vim.fn.glob("~/.julia/environments/v*", false, true)
-            -- Sort on the numeric version, not the string: v1.9 sorts
-            -- after v1.10 lexicographically.
-            local function version(path)
-              local major, minor = path:match("v(%d+)%.(%d+)$")
-              return (tonumber(major) or 0) * 1000 + (tonumber(minor) or 0)
-            end
-            table.sort(envs, function(a, b)
-              return version(a) < version(b)
-            end)
-            local root = vim.fs.root(0, { "Project.toml", "JuliaProject.toml" })
-              or envs[#envs]
-            return vim.lsp.rpc.start({ "julia-lsp", root }, dispatchers)
-          end,
           settings = {
             julia = {
               format = {
@@ -64,6 +37,26 @@ return {
             },
           },
         },
+      },
+      setup = {
+        -- mason-lspconfig's automatic_enable runs
+        --   vim.lsp.config("julials", require("mason-lspconfig.lsp.julials"))
+        -- which pins cmd to a bare { "julia-lsp" } on the highest
+        -- precedence layer, beating opts.servers and after/lsp/ alike.
+        -- It means to repair cmd in before_init, but nvim spawns the
+        -- process in Client.create and only calls before_init later in
+        -- Client:initialize, so the fix never lands and julia-lsp exits
+        -- with "Usage: julia-lsp <julia-env-path>".
+        --
+        -- Returning true adds julials to mason-lspconfig's exclude list
+        -- so after/lsp/julials.lua wins. LazyVim skips its own
+        -- config/enable calls when a setup hook returns true, so do them
+        -- here. Drop this if mason-lspconfig stops setting cmd itself.
+        julials = function(server, sopts)
+          vim.lsp.config(server, sopts)
+          vim.lsp.enable(server)
+          return true
+        end,
       },
     },
   },

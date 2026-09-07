@@ -28,11 +28,24 @@ return {
       
       -- Molten management
       keymap("n", "<localleader>mr", ":MoltenRestart<CR>", { desc = "Restart kernel" })
-      keymap("n", "<localleader>mi", ":MoltenInfo<CR>", { desc = "Molten info" })
+      -- <localleader>mi is MoltenInit above; don't shadow it.
+      keymap("n", "<localleader>mI", ":MoltenInfo<CR>", { desc = "Molten info" })
       keymap("n", "<localleader>md", ":MoltenDelete<CR>", { desc = "Delete kernel" })
       
       -- Language-specific shortcuts
-      keymap("n", "<localleader>jj", ":MoltenInit julia<CR>", { desc = "Start Julia" })
+      -- Jupyter registers Julia as julia-<major>.<minor>, never bare
+      -- "julia", so pick the newest installed kernel at call time.
+      keymap("n", "<localleader>jj", function()
+        local kernels = vim.fn.globpath(
+          vim.fn.expand("~/Library/Jupyter/kernels"), "julia-*", false, true
+        )
+        if #kernels == 0 then
+          vim.notify("No Julia jupyter kernel found", vim.log.levels.WARN)
+          return
+        end
+        table.sort(kernels)
+        vim.cmd("MoltenInit " .. vim.fn.fnamemodify(kernels[#kernels], ":t"))
+      end, { desc = "Start Julia" })
       keymap("n", "<localleader>jr", ":MoltenInit ir<CR>", { desc = "Start R" })
       keymap("n", "<localleader>jp", ":MoltenInit python3<CR>", { desc = "Start Python" })
       
