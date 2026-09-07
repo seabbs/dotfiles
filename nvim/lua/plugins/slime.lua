@@ -360,8 +360,11 @@ return {
     -- then tells the REPL to send plots there.
     -- Requires: MuxDisplay in global Julia env
     --   julia -e 'using Pkg; Pkg.add("MuxDisplay")'
+    -- `quarto` as well as `julia`: .qmd opens as filetype quarto, so a
+    -- julia-only pattern left <leader>Ro undefined in exactly the
+    -- documents that have julia chunks to plot from.
     vim.api.nvim_create_autocmd("FileType", {
-      pattern = { "julia" },
+      pattern = { "julia", "quarto" },
       callback = function()
         vim.keymap.set("n", "<leader>Ro", function()
           local nvim_pane = vim.env.TMUX_PANE
