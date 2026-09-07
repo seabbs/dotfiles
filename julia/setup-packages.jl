@@ -13,6 +13,13 @@ include("startup.jl")
 # belong in the default environment. See issue #76.
 dev_only = [
     "Preferences",
+    # Jupyter kernel behind molten-nvim. Must live in the *default*
+    # environment: the kernel starts with `--project=@.`, so IJulia is
+    # only found via the @v#.# entry in LOAD_PATH. A juliaup upgrade
+    # moves the default env (v1.11 -> v1.12) and silently leaves IJulia
+    # behind in the old one, at which point the kernel dies on startup
+    # with "Package IJulia not found in current path".
+    "IJulia",
 ]
 all_packages = [String.(REPL_PACKAGES); dev_only]
 
@@ -58,6 +65,29 @@ set_preferences!(
 )
 
 Pkg.precompile()
+
+# IJulia writes a kernelspec whose argv[0] is the *version-pinned*
+# juliaup path (…/julia-1.12.1+0…/bin/julia). juliaup deletes old
+# versions on upgrade, so the kernel then fails with ENOENT and molten
+# cannot start Julia. Point it at the juliaup launcher instead, which
+# tracks the default channel and survives upgrades.
+using IJulia
+IJulia.installkernel("Julia")
+let shim = joinpath(homedir(), ".juliaup", "bin", "julia")
+    kernels = joinpath(homedir(), "Library", "Jupyter", "kernels")
+    if isdir(kernels) && isfile(shim)
+        for dir in readdir(kernels; join = true)
+            spec = joinpath(dir, "kernel.json")
+            (startswith(basename(dir), "julia") && isfile(spec)) || continue
+            text = read(spec, String)
+            fixed = replace(
+                text,
+                r"\"[^\"]*/\.julia/juliaup/julia-[^\"]*/bin/julia\"" => "\"$shim\"",
+            )
+            fixed == text || write(spec, fixed)
+        end
+    end
+end
 
 # AgentREPL keeps a warm Julia session for Claude Code agents over MCP
 # (claude/settings.json starts it, claude/skills/julia-repl says how to
