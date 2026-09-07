@@ -39,6 +39,19 @@ return {
         },
       },
       setup = {
+        -- Same mason-lspconfig override problem as julials below, but
+        -- with no before_init to even attempt a repair: mason's
+        -- lsp/r_language_server.lua is just { cmd = { "r-languageserver" } },
+        -- and that wrapper points R at mason's own package library, which
+        -- is missing `collections` and segfaults on startup. Exclude it so
+        -- lspconfig's default `R --no-echo -e "languageserver::run()"` runs
+        -- against the system library instead.
+        r_language_server = function(server, sopts)
+          vim.lsp.config(server, sopts)
+          vim.lsp.enable(server)
+          return true
+        end,
+
         -- mason-lspconfig's automatic_enable runs
         --   vim.lsp.config("julials", require("mason-lspconfig.lsp.julials"))
         -- which pins cmd to a bare { "julia-lsp" } on the highest
