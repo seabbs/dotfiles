@@ -26,6 +26,9 @@ function tv_history_search(s)
         REPL.Terminals.raw!(term, true)
     end
     REPL.LineEdit.refresh_line(s)
+    # The channel joins multi-line entries with a literal \n so a leading
+    # comment cannot swallow the rest of the entry; restore real newlines.
+    selection = replace(selection, "\\n" => "\n")
     isempty(selection) || REPL.LineEdit.edit_insert(s, selection)
     return :done
 end
