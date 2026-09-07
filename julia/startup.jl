@@ -2,7 +2,7 @@ const REPL_PACKAGES = [
     :Revise, :Term, :JET, :Cthulhu,
     :CodeTracking, :PrettyPrinting,
     :BenchmarkTools, :TestEnv, :MuxDisplay,
-    :TestItemRunner, :UnicodePlots,
+    :TestItemRunner,
 ]
 
 # Loaded in the background so the prompt (and Pkg mode) is usable

@@ -23,11 +23,14 @@ all_packages = [String.(REPL_PACKAGES); dev_only]
 # so blocks Revise 3.16; OhMyREPL is unused (startup.jl never loads
 # it) and breaks on 1.13; JuliaFormatter was replaced by Runic (see
 # setup.sh and issue #76) and is removed so it cannot drift out of
-# sync with the pinned pre-commit/CI hook.
+# sync with the pinned pre-commit/CI hook. UnicodePlots is no longer
+# loaded by startup.jl, so list it here as well: dropping it from
+# REPL_PACKAGES stops it being installed on a fresh machine but would
+# otherwise leave it behind in an existing default environment.
 unwanted = [
     "AirspeedVelocity", "DebugAdapter", "Documenter",
     "DocumenterTools", "JuliaSyntax", "JuliaFormatter",
-    "LanguageServer", "OhMyREPL", "Pluto",
+    "LanguageServer", "OhMyREPL", "Pluto", "UnicodePlots",
 ]
 
 installed = keys(Pkg.project().dependencies)
