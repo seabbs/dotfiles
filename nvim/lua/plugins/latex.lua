@@ -1,13 +1,23 @@
 return {
+  -- render-markdown keys its LaTeX handler off the `latex` treesitter
+  -- language, injected into $..$ / $$..$$ by the markdown_inline queries.
+  -- Without this parser the handler never runs and math stays as source.
+  {
+    "nvim-treesitter/nvim-treesitter",
+    opts = { ensure_installed = { "latex" } },
+  },
+
   -- Enable LaTeX rendering in render-markdown.nvim
   -- (already installed via LazyVim markdown extra)
   {
     "MeanderingProgrammer/render-markdown.nvim",
+    -- LazyVim lazy-loads this on markdown/rmd/org only, so .qmd files
+    -- (filetype "quarto") never load it. lazy.nvim unions ft across specs.
+    ft = { "quarto" },
     opts = {
       file_types = {
         "markdown",
         "quarto",
-        "qmd",
       },
       latex = {
         enabled = true,
