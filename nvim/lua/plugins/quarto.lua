@@ -29,11 +29,11 @@ return {
             julia = "molten",
           },
         },
-        keymap = {
-          hover = "K",
-          definition = "gd",
-          references = "gr",
-        },
+        -- No `keymap` option here: quarto-nvim has never had one, so a
+        -- table like { hover = "K", definition = "gd" } is silently
+        -- ignored. K/gd/gr come from LazyVim's LSP keymaps and reach the
+        -- chunk's language server through the otter-ls client attached to
+        -- the .qmd buffer.
       })
       
       -- Quarto-specific keymaps
