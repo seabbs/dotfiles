@@ -3,8 +3,28 @@ name = "julia-history"
 description = "Julia REPL command history"
 requirements = []
 
+# Whole history entries, newest first, de-duplicated.
+#
+# The file stores each entry as `# mode:` / `# time:` headers followed by
+# tab-indented command lines, so a naive `grep '^\t'` splits multi-line
+# entries into separate, individually useless lines and offers pkg/shell
+# mode entries as if they were julia code.
+#
+# Multi-line entries are joined with a literal \n rather than "; ": a
+# joined entry whose first line is a comment would otherwise comment out
+# everything after it. startup.jl turns those back into real newlines
+# when inserting into the REPL.
 [source]
-command = "grep '^\t' ~/.julia/logs/repl_history.jl | sed 's/^\t//' | sed '1!G;h;$!d'"
+command = """awk '
+  function flush() {
+    if (n > 0 && mode == "julia") print buf
+    buf = ""; n = 0
+  }
+  /^# mode: / { flush(); mode = substr($0, 9); next }
+  /^# time: / { next }
+  /^\\t/ { line = substr($0, 2); buf = (n ? buf "\\\\n" line : line); n++; next }
+  END { flush() }
+' ~/.julia/logs/repl_history.jl | sed '1!G;h;$!d' | awk '!seen[$0]++'"""
 display = "{0}"
 output = "{0}"
 no_sort = true

@@ -28,6 +28,10 @@ brew install jj    # Jujutsu — colocated-git VCS for incremental review
 # The tuicr Claude Code skill is not shipped with the binary; fetch it.
 "$(dirname "$0")/../scripts/install-tuicr-skill.sh"
 brew install bat
+# chafa — image viewer used as MuxDisplay's `imgcat` so Julia plots render
+# in a tmux pane (nvim <leader>Ro). Speaks the Kitty graphics protocol that
+# Ghostty supports, and handles tmux passthrough itself.
+brew install chafa
 brew install hyperfine
 brew install direnv
 
