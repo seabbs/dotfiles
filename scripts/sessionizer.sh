@@ -371,8 +371,9 @@ create_hub_session() {
 # it (idempotent — reuses an existing worktree, so it just opens a window with
 # the nvim/ai/repl layout), then jump in. $1=hub $2=session $3=org/repo $4=branch.
 open_hub_worktree() {
-  local hub="$1" session="$2" rel="$3" branch="$4"
-  ensure_hub_session "$hub" "$session" "~/code/$rel" "$rel" || return 1
+  local hub="$1" session="$2" rel="$3" branch="$4" slug
+  slug="$(gh_slug_for "$rel")"
+  ensure_hub_session "$hub" "$session" "~/code/$rel" "${slug:-$rel}" || return 1
   ssh "$hub" \
     "tmux new-window -t '=$session' -n _launcher -c '~/code/$rel' \
        \"zsh -ic 'feat $branch; exit'\"" \
@@ -430,6 +431,36 @@ hub_repo_for_session() {
     [ "${base,,}" = "$want" ] && \
       { printf '%s' "$line"; return 0; }
   done < "$CACHE_DIR/$hub-projects"
+}
+
+# The same lookup against the LOCAL project list, for a repo that is not on the
+# hub yet. hub_repo_for_session can only ever see repos already cloned there,
+# which on its own makes ensure_hub_session's clone-on-demand unreachable: the
+# name cannot resolve until the repo exists on the hub, and it cannot be cloned
+# until the name resolves. Prints org/repo, or nothing. $1=session.
+local_repo_for_session() {
+  local want="${1,,}" line base
+  while IFS= read -r line; do
+    base="$(sanitize_session "${line##*/}")"
+    [ "${base,,}" = "$want" ] && { printf '%s' "$line"; return 0; }
+  done < <(list_projects_local)
+}
+
+# The GitHub "owner/repo" a local clone actually points at, from its origin
+# remote. ~/code/external holds other people's repos, so there the directory
+# path is not the GitHub slug (external/mfiidd is really sbfnk/mfiidd) and
+# cloning by path 404s. Empty for a repo with no local clone or no GitHub
+# remote, so callers fall back to the path. $1=org/repo under $CODE_DIR.
+gh_slug_for() {
+  local url
+  url=$(git -C "$CODE_DIR/$1" remote get-url origin 2>/dev/null) || return 0
+  url="${url%.git}"
+  case "$url" in
+    *github.com*) ;;
+    *) return 0 ;;
+  esac
+  url="${url#*github.com}"
+  printf '%s' "${url#[:/]}"
 }
 
 # Map a GitHub owner to a local org dir name: an existing ~/code/<owner>
@@ -735,14 +766,15 @@ pick_window() {
       # from its repo so the switch lands on it, rather than silently leaving
       # the gateway on whatever session it was showing before.
       if ! ssh "$host_tag" "tmux has-session -t '=$session' 2>/dev/null"; then
-        local rel; rel="$(hub_repo_for_session "$host_tag" "$session")"
+        local rel slug; rel="$(hub_repo_for_session "$host_tag" "$session")"
         if [[ -z "$rel" ]]; then
           slog "session '$session' is gone from $host_tag"
           rm -f "$CACHE_DIR/$host_tag-windows-$session" 2>/dev/null
           return 0
         fi
-        ensure_hub_session "$host_tag" "$session" "~/code/$rel" "$rel" \
-          || return 0
+        slug="$(gh_slug_for "$rel")"
+        ensure_hub_session "$host_tag" "$session" "~/code/$rel" \
+          "${slug:-$rel}" || return 0
       fi
       if tmux has-session -t "=$host_tag" 2>/dev/null; then
         # Existing connection: drive its live client to the chosen window.
@@ -793,7 +825,7 @@ pick_window() {
     # hub's copy of the session) and jump into it, rather than locally.
     hub="$(hub_scope)"
     if [[ -n "$hub" ]]; then
-      local rel
+      local rel slug
       # The picker can be scoped to the hub (C-r) without the project step
       # having created the session there, e.g. opening a repo that also exists
       # locally, then C-r to the hub to branch. Ensure the session exists first,
@@ -801,11 +833,16 @@ pick_window() {
       # (the reported "prefix f closes and does nothing" on a fresh hub repo).
       if ! ssh "$hub" "tmux has-session -t '=$session' 2>/dev/null"; then
         rel="$(hub_repo_for_session "$hub" "$session")"
+        # Not on the hub yet: resolve from the local checkout instead, so the
+        # repo is cloned there on demand rather than the branch step aborting.
+        [[ -z "$rel" ]] && rel="$(local_repo_for_session "$session")"
         if [[ -z "$rel" ]]; then
           slog "no repo for session '$session' on $hub, cannot create it"
           return 0
         fi
-        ensure_hub_session "$hub" "$session" "~/code/$rel" "$rel" || return 0
+        slug="$(gh_slug_for "$rel")"
+        ensure_hub_session "$hub" "$session" "~/code/$rel" "${slug:-$rel}" \
+          || return 0
       fi
       root=$(ssh "$hub" \
         "tmux display-message -t '=$session:1' -p '#{pane_current_path}'" \
@@ -1165,8 +1202,9 @@ else
     # hub) then opens a window or creates a feature branch ON the hub. Bail with
     # a visible message if the hub session could not be created, rather than
     # letting the window step target a missing session and silently no-op.
-    ensure_hub_session "$hub" "$session" "~/code/$selected" "$selected" \
-      || exit 0
+    slug="$(gh_slug_for "$selected")"
+    ensure_hub_session "$hub" "$session" "~/code/$selected" \
+      "${slug:-$selected}" || exit 0
     ssh "$hub" \
       "tmux list-windows -t '=$session' -F '#{window_activity} #{window_index}:#{window_name}'" \
       >"$CACHE_DIR/$hub-windows-$session" 2>/dev/null
