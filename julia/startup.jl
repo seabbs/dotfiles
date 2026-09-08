@@ -66,9 +66,9 @@ atreplinit() do repl
             @eval install_term_stacktrace()
         catch
         end
-        try
-            @eval MuxDisplay.setdisplay!()
-        catch
-        end
+        # MuxDisplay is loaded but not activated here: enabling it needs
+        # a target pane, which only the editor knows. nvim's <leader>Ro
+        # (nvim/lua/plugins/slime.lua) splits the pane and sends the
+        # MuxDisplay.enable call with that pane id.
     end
 end

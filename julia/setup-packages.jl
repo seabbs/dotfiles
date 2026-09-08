@@ -66,6 +66,13 @@ set_preferences!(
 
 Pkg.precompile()
 
+# MuxDisplay (nvim <leader>Ro, plots in a tmux pane) asks the terminal
+# for its cell size. Without a `cellsize` binary on PATH it falls back to
+# a bash-only `read` trick, which fails under zsh and prints two warnings
+# every time a plot pane is started. The package ships the C source.
+using MuxDisplay
+MuxDisplay.install_cellsize(joinpath(homedir(), ".local", "bin"))
+
 # IJulia writes a kernelspec whose argv[0] is the *version-pinned*
 # juliaup path (…/julia-1.12.1+0…/bin/julia). juliaup deletes old
 # versions on upgrade, so the kernel then fails with ENOENT and molten

@@ -360,6 +360,12 @@ return {
     -- then tells the REPL to send plots there.
     -- Requires: MuxDisplay in global Julia env
     --   julia -e 'using Pkg; Pkg.add("MuxDisplay")'
+    -- and chafa (cli/setup.sh) as the image viewer. MuxDisplay's own
+    -- detection only looks for `wezterm` and iTerm's `imgcat`, neither
+    -- of which exists here, so without an explicit `imgcat` it errors
+    -- with "Could not determine an `imgcat` program" and the pane stays
+    -- blank. chafa speaks the Kitty graphics protocol Ghostty renders,
+    -- and does the tmux passthrough itself.
     -- `quarto` as well as `julia`: .qmd opens as filetype quarto, so a
     -- julia-only pattern left <leader>Ro undefined in exactly the
     -- documents that have julia chunks to plot from.
@@ -374,18 +380,31 @@ return {
             )
             return
           end
+          if vim.fn.executable("chafa") == 0 then
+            vim.notify(
+              "chafa not found (brew install chafa)",
+              vim.log.levels.WARN
+            )
+            return
+          end
           local pane_id = vim.fn.system(
             "tmux split-window -t "
               .. nvim_pane
               .. " -v -d -l 30%"
               .. " -P -F '#{pane_id}'"
           ):gsub("%s+", "")
+          -- smart_size=false: it can substitute the literal "auto" for
+          -- {width}, which wezterm/iTerm imgcat accept and chafa does
+          -- not. chafa already fits the image to the box it is given
+          -- while preserving aspect ratio, so nothing is lost.
           send_text(
             "using MuxDisplay; "
               .. "MuxDisplay.enable("
               .. 'target_pane="'
               .. pane_id
-              .. '")'
+              .. '", smart_size=false, '
+              .. 'imgcat="chafa -f kitty --passthrough tmux '
+              .. "--size {width}x{height} '{file}'\")"
           )
         end, {
           buffer = true,
