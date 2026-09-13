@@ -110,6 +110,9 @@ if [ "$(uname -s)" = "Darwin" ]; then
   done
 fi
 
+# Stale REPL reaper, so it can be run by hand as `repl-gc`
+link "scripts/repl-gc.sh"       "$HOME/.local/bin/repl-gc"
+
 # Claude Code (delegates to submodule's own link script)
 "$DOTFILES/claude/link.sh"
 
