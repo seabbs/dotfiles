@@ -62,8 +62,19 @@ MAX_PRS="${REVIEW_BOT_MAX_PRS:-3}"
 # Seconds a new head commit must sit before review, so a run mid-push
 # does not review half a branch.
 SETTLE="${REVIEW_BOT_SETTLE:-180}"
-# Changed lines above which a PR is logged and left for a human.
+# Changed lines above which a PR gets a focused pass (the files carrying
+# the change) rather than a full one, and above which it is left alone.
 MAX_DIFF="${REVIEW_BOT_MAX_DIFF:-3000}"
+HARD_MAX_DIFF="${REVIEW_BOT_HARD_MAX_DIFF:-12000}"
+# Paths whose size says nothing about how much there is to read: lockfiles,
+# roxygen output, pkgdown sites, snapshots, vendored trees, data, binaries.
+# Counting these is how a PR with 300 lines of real change reads as 4000.
+NOISE_RE='(^|/)(renv[.]lock|Manifest[.]toml|package-lock[.]json'
+NOISE_RE="$NOISE_RE"'|yarn[.]lock|pnpm-lock[.]yaml|Cargo[.]lock'
+NOISE_RE="$NOISE_RE"'|poetry[.]lock|uv[.]lock|NAMESPACE)$'
+NOISE_RE="$NOISE_RE"'|(^|/)(man/|docs/|vendor/|node_modules/|_snaps/|_freeze/)'
+NOISE_RE="$NOISE_RE"'|[.](csv|tsv|rds|rda|RData|parquet|png|jpe?g|gif|svg'
+NOISE_RE="$NOISE_RE"'|pdf|html|ipynb)$'
 TIMEOUT="${REVIEW_BOT_TIMEOUT:-900}"
 
 # Shared with the other agent bots: logging, the audit trail, the portable
@@ -250,6 +261,32 @@ last_bot_review() {
   esac
 }
 
+# Changed lines worth a reviewer's time, and the generated paths left out,
+# as "count<TAB>path,path,...". Prints nothing when GitHub could not be
+# asked, so the caller can fall back rather than read a failure as "empty
+# diff" and review nothing.
+reviewable_diff() {
+  local repo="$1" pr="$2"
+  gh api "repos/$repo/pulls/$pr/files" --paginate \
+    --jq '.[] | [.filename, (.additions + .deletions)] | @tsv' 2>/dev/null \
+    | awk -F'\t' -v noise="$NOISE_RE" '
+        $1 ~ noise { skip = skip (skip ? "," : "") $1; next }
+        { n += $2 }
+        END { if (NR) printf "%d\t%s\n", n, skip }'
+}
+
+# When we last told a PR it was too large, and for which head. A notice is
+# an ordinary comment, so it leaves no review for last_bot_review to find:
+# without recording it, the same request comment re-fires on every poll and
+# the PR collects the same refusal over and over.
+notice_file() { printf '%s/notices/%s#%s' "$STATE_DIR" "${1//\//_}" "$2"; }
+notice_at()  { cut -f1 "$(notice_file "$1" "$2")" 2>/dev/null; }
+notice_sha() { cut -f2 "$(notice_file "$1" "$2")" 2>/dev/null; }
+record_notice() {
+  mkdir -p "$STATE_DIR/notices"
+  printf '%s\t%s\n' "$(now_iso)" "$3" > "$(notice_file "$1" "$2")"
+}
+
 # Has USER asked, in a comment newer than SINCE?
 asked_by() {
   local repo="$1" pr="$2" since="$3" who="$4"
@@ -328,21 +365,35 @@ wants_review() {
     return 2
   fi
 
+  # Telling a PR it is too large is an answer, so only an ask newer than
+  # that notice is a new ask.
+  local since notice
+  since="${last:-1970-01-01T00:00:00Z}"
+  notice="$(notice_at "$repo" "$pr")"
+  [ -n "$notice" ] && [[ "$notice" > "$since" ]] && since="$notice"
+
   # An explicit ask beats every gate below, on any PR in the watched
   # owners: someone else's work, a draft, or one from years ago. Asking
   # is the point, and only seabbs can ask.
-  if retrigger_after "$repo" "$pr" "${last:-1970-01-01T00:00:00Z}"; then
+  if retrigger_after "$repo" "$pr" "$since"; then
     echo "requested by $TRIGGER_USER"
     return 0
   fi
 
-  if bot_may_ask "$repo" "$pr" "$sha" "$last"; then
+  if bot_may_ask "$repo" "$pr" "$sha" "$since"; then
     echo "re-review requested by $BOT_TRIGGER_USER"
     return 0
   fi
 
   if [ -n "$last" ]; then
     log "  skip $repo#$pr: reviewed at $last, not asked again since"
+    return 1
+  fi
+
+  # Already declined this exact head as too large. Nothing changes until it
+  # is pushed to again, so the automatic path stops rediscovering it.
+  if [ "$(notice_sha "$repo" "$pr")" = "$sha" ]; then
+    log "  skip $repo#$pr: already declined this head as too large"
     return 1
   fi
 
@@ -513,7 +564,7 @@ prepare_checkout() {
 
 build_prompt() {
   local repo="$1" pr="$2" author="$3" base="$4" range="$5" title="$6"
-  local standards="$7" ci="$8"
+  local standards="$7" ci="$8" scope="${9:-}"
   cat <<PROMPT
 You are seabbs-review-bot, an independent first-pass reviewer on $repo
 pull request #$pr, "$title", opened by $author. Assume it was written by
@@ -523,6 +574,7 @@ tells about it.
 The PR head is checked out here. Read the change first:
   git diff --stat $range
   git diff $range
+$scope
 Then read the surrounding code with Read and Grep before judging
 anything. A line that looks wrong in a diff is often fine in context, and
 a line that looks fine is often wrong in context. Before calling anything
@@ -755,22 +807,51 @@ review_pr() {
   count=$(( $(jq -r '.additions' <<< "$meta")
             + $(jq -r '.deletions' <<< "$meta") ))
 
-  if [ "$count" -gt "$MAX_DIFF" ]; then
-    log "  skip $repo#$pr: $count changed lines over the $MAX_DIFF cap"
+  # Size the PR by what is actually worth reading: a regenerated lockfile
+  # or a directory of roxygen output says nothing about how much change
+  # there is. Fall back to the raw count if GitHub could not be asked.
+  local noise="" reviewable scope=""
+  IFS=$'\t' read -r reviewable noise < <(reviewable_diff "$repo" "$pr")
+  if [ -n "${reviewable:-}" ]; then
+    [ "$reviewable" -ne "$count" ] \
+      && log "  $count changed lines, $reviewable of them reviewable"
+    count="$reviewable"
+  fi
+
+  if [ "$count" -gt "$HARD_MAX_DIFF" ]; then
+    log "  skip $repo#$pr: $count reviewable lines over the $HARD_MAX_DIFF cap"
+    record_notice "$repo" "$pr" "$sha"
     # Asking and hearing nothing back is worse than being told no, so an
-    # explicit request gets a reply. The automatic path stays silent.
+    # explicit request gets a reply. The automatic path stays silent. The
+    # notice above is what stops that reply repeating on every poll.
     case "$reason" in
       *requested*)
         if ! $DRY_RUN && token="$("$TOKEN_SH" "$repo" 2>/dev/null)"; then
           GH_TOKEN="$token" gh pr comment "$pr" -R "$repo" --body \
-"Not reviewing this one: $count changed lines is over the \
-$MAX_DIFF line cap, past which an automated pass stops being useful. \
-Ask again on a narrower PR, or split it." >/dev/null 2>&1 \
+"Not reviewing this one: $count changed lines, excluding generated files, \
+is over the $HARD_MAX_DIFF line cap, past which an automated pass stops \
+being useful. Split it, or ask again after pushing a narrower change." \
+            >/dev/null 2>&1 \
             && log "  told $repo#$pr why it was skipped"
         fi ;;
     esac
     return 1
   fi
+
+  # Between the two caps, read the files that carry the change rather than
+  # refusing. A long PR is usually long in a few files.
+  if [ "$count" -gt "$MAX_DIFF" ]; then
+    scope="
+This is a large change: $count reviewable lines, over the $MAX_DIFF line
+cap for a full pass. Read the files that carry it, largest and most
+substantial first, and name in the summary which files you did not read.
+Findings from the files you did read are worth more than thin coverage of
+all of them."
+    log "  focused pass on $repo#$pr: $count lines over the $MAX_DIFF cap"
+  fi
+  [ -n "$noise" ] && scope="$scope
+These paths are generated, vendored or data. Do not review them and do not
+treat their size as part of the change: $noise"
 
   log "  reviewing $repo#$pr ($reason, $count lines) $title"
   dir="$(prepare_checkout "$repo" "$pr" "$sha")" \
@@ -784,7 +865,8 @@ Ask again on a narrower PR, or split it." >/dev/null 2>&1 \
 
   review="$(run_review "$dir" \
     "$(build_prompt "$repo" "$pr" "$author" "$base" "$range" "$title" \
-      "$(standards_block "$lang")" "$(ci_summary "$repo" "$sha")")")"
+      "$(standards_block "$lang")" "$(ci_summary "$repo" "$sha")" \
+      "$scope")")"
   if [ -z "$review" ]; then
     log "  no usable review returned for $repo#$pr"
     return 1
