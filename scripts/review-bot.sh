@@ -820,7 +820,12 @@ review_pr() {
 
   if [ "$count" -gt "$HARD_MAX_DIFF" ]; then
     log "  skip $repo#$pr: $count reviewable lines over the $HARD_MAX_DIFF cap"
-    record_notice "$repo" "$pr" "$sha"
+    # Record the notice for a real run only. --dry-run is documented as
+    # "find work, print the review, post none", but record_notice() wrote
+    # state regardless of the flag, so a dry run persisted a notice
+    # claiming the PR had been told, and a later real run would then see
+    # notice_sha == sha and silently skip it, having said nothing.
+    $DRY_RUN || record_notice "$repo" "$pr" "$sha"
     # Asking and hearing nothing back is worse than being told no, so an
     # explicit request gets a reply. The automatic path stays silent. The
     # notice above is what stops that reply repeating on every poll.
