@@ -133,15 +133,39 @@ if [ "${1:-}" = "--claim" ]; then
   repo="${2:-}"; comment_id="${3:-}"
   [ -n "$repo" ] && [ -n "$comment_id" ] \
     || die "usage: $0 --claim owner/repo comment_id"
+
+  # Everything the scan checked, checked again here. The caller is an agent
+  # that has just read a pile of issue text, so --claim cannot be a way to
+  # turn any comment into a task by naming it. A confused or steered agent
+  # asking to claim a stranger's comment gets a refusal, not a snapshot
+  # with someone else's words in the instruction field.
+  case " $OWNERS " in
+    *" ${repo%%/*} "*) ;;
+    *) die "$repo is not in an allowed owner" ;;
+  esac
+  # gh prints its error body on stdout, so a 404 comes back as a non-empty
+  # object. Key on the id being there rather than on the output existing.
+  comment="$(gh api "repos/$repo/issues/comments/$comment_id" 2>/dev/null)"
+  jq -e '.id' <<< "$comment" >/dev/null 2>&1 \
+    || die "no such comment: $repo $comment_id"
+  author="$(jq -r '.user.login // ""' <<< "$comment")"
+  [ "$author" = "$OWNER_USER" ] \
+    || die "comment $comment_id is by $author, not $OWNER_USER"
+  jq -e --arg re "$TRIGGER_RE" '.body // "" | test($re)' <<< "$comment" \
+    >/dev/null 2>&1 || die "comment $comment_id does not ask for anything"
+
+  number="$(jq -r '.issue_url | split("/") | last' <<< "$comment")"
+  [ -n "$number" ] || die "could not resolve the thread for $comment_id"
+  gh api "repos/$repo/issues/$number" \
+    --jq "[.labels[].name] | index(\"$SKIP_LABEL\")" 2>/dev/null \
+    | grep -qv '^null$' && die "$repo#$number carries $SKIP_LABEL"
+
   # Claim first, work second. A crash after this leaves a visible eyes with
   # no reply, which is recoverable; working first and crashing before the
   # claim is how a task gets done twice.
   claimed "$repo" "$comment_id" && die "already claimed $repo#$comment_id"
   gh api -X POST "repos/$repo/issues/comments/$comment_id/reactions" \
     -f content=eyes >/dev/null 2>&1 || die "could not react on $repo"
-  number="$(gh api "repos/$repo/issues/comments/$comment_id" \
-    --jq '.issue_url | split("/") | last' 2>/dev/null)"
-  [ -n "$number" ] || die "could not resolve the thread for $comment_id"
   is_pr="$(gh api "repos/$repo/issues/$number" \
     --jq '.pull_request != null' 2>/dev/null)"
   snapshot "$repo" "$number" "$comment_id" \
