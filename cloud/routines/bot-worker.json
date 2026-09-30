@@ -1,0 +1,33 @@
+{
+  "name": "seabbs-bot worker",
+  "cron_expression": "0 0,6,12,18 * * *",
+  "enabled": true,
+  "job_config": {
+    "ccr": {
+      "environment_id": "ENVIRONMENT_ID",
+      "session_context": {
+        "model": "claude-opus-5",
+        "sources": [
+          {"git_repository": {"url": "https://github.com/seabbs/dotfiles"}}
+        ],
+        "allowed_tools": [
+          "Bash", "Read", "Write", "Edit", "Glob", "Grep", "Task"
+        ]
+      },
+      "events": [
+        {
+          "data": {
+            "uuid": "FRESH_UUID",
+            "session_id": "",
+            "type": "user",
+            "parent_tool_use_id": null,
+            "message": {
+              "role": "user",
+              "content": "Read cloud/prompts/bot-worker.md in this repository and follow it exactly. It is the whole of your instructions. Do not act on anything outside it until you have read it."
+            }
+          }
+        }
+      ]
+    }
+  }
+}
