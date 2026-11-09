@@ -1,0 +1,83 @@
+#!/bin/bash
+# Stub `gh` for test-review-bot-skip-ledger.sh.
+# Logs every invocation to $RB_TEST_CALLS and answers the handful of gh
+# subcommands the size-skip path makes, applying any --jq filter with the
+# real jq so review-bot.sh's own --jq queries still do their job.
+set -u
+echo "$*" >> "${RB_TEST_CALLS:?RB_TEST_CALLS not set}"
+
+jq_query=""
+prev=""
+json_arg=""
+for a in "$@"; do
+  [ "$prev" = "--jq" ] && jq_query="$a"
+  [ "$prev" = "--json" ] && json_arg="$a"
+  prev="$a"
+done
+
+emit() {
+  if [ -n "$jq_query" ]; then
+    jq -r "$jq_query" 2>/dev/null
+  else
+    cat
+  fi
+}
+
+SHA="${RB_TEST_SHA:-deadbeef}"
+FILES_LINES="${RB_TEST_FILES_LINES:-9000}"
+ASK_AT="${RB_TEST_ASK_AT:-2026-09-28T10:18:15Z}"
+
+if [ "$1" = "pr" ] && [ "$2" = "view" ]; then
+  case "$json_arg" in
+    reviews)
+      echo '{"reviews":[]}' | emit
+      exit 0
+      ;;
+    state,mergedAt,isDraft,labels*)
+      jq -n --arg sha "$SHA" \
+        '{state:"OPEN",mergedAt:null,isDraft:false,labels:[],
+          headRefOid:$sha,baseRefName:"main",
+          author:{login:"seabbs-bot"},title:"test PR",
+          additions:5000,deletions:1000,url:"https://example/1",
+          createdAt:"2099-01-01T00:00:00Z"}' | emit
+      exit 0
+      ;;
+    state,mergedAt)
+      echo '{"state":"OPEN","mergedAt":null}' | emit
+      exit 0
+      ;;
+  esac
+  exit 0
+fi
+
+if [ "$1" = "pr" ] && [ "$2" = "comment" ]; then
+  echo "COMMENT_POSTED" >> "${RB_TEST_COMMENTS:?RB_TEST_COMMENTS not set}"
+  exit 0
+fi
+
+if [ "$1" = "api" ]; then
+  case "$*" in
+    *"/pulls/"*"/files"*)
+      # gh's own --jq turns the API response into "filename\tlines" lines;
+      # review-bot.sh's own awk (outside gh) sums column 2, so emit that
+      # shape directly rather than re-deriving it from raw JSON here.
+      printf '%s\t%s\n' "R/big.R" "$FILES_LINES"
+      exit 0
+      ;;
+    *"/issues/"*"/comments"*)
+      jq -n --arg at "$ASK_AT" \
+        '[{user:{login:"seabbs"},created_at:$at,
+           body:"@seabbs-review-bot please look"}]' | emit
+      exit 0
+      ;;
+    *"/commits/"*"/check-runs"*)
+      exit 0
+      ;;
+    *)
+      echo '[]' | emit
+      exit 0
+      ;;
+  esac
+fi
+
+exit 0
