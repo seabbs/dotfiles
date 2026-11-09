@@ -4,7 +4,8 @@
 # subcommands the size-skip path makes, applying any --jq filter with the
 # real jq so review-bot.sh's own --jq queries still do their job.
 set -u
-echo "$*" >> "${RB_TEST_CALLS:?RB_TEST_CALLS not set}"
+all="$*"
+echo "${all//$'\n'/ }" >> "${RB_TEST_CALLS:?RB_TEST_CALLS not set}"
 
 jq_query=""
 prev=""

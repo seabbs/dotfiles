@@ -14,7 +14,9 @@
 #     comments @seabbs-review-bot, including drafts, older PRs and other
 #     work, and however many times he asks
 # Everything else is left alone. It never approves, never requests changes,
-# never pushes, and never edits a PR.
+# never pushes, and never edits a PR. It does tidy up after itself: once
+# seabbs-bot has answered a thread, the bot resolves it and hides its own
+# comment, and a review with nothing left open is hidden too. See tidy_pr.
 #
 # Usage:
 #   review-bot.sh                     poll and review (what cron runs)
@@ -22,6 +24,7 @@
 #   review-bot.sh --pr owner/repo#42  review one PR now, skipping discovery
 #   review-bot.sh --force             ignore "already reviewed" state
 #   review-bot.sh --list              show what it would pick up, then stop
+#   review-bot.sh --tidy owner/repo#42  hide this PR's handled bot reviews
 #
 # Interactive runs print to the terminal. Cron runs log only.
 
@@ -99,6 +102,7 @@ LIST_ONLY=false
 STATUS_ONLY=false
 AS_JSON=false
 ONE_PR=""
+TIDY_PR=""
 SANDBOX=true
 [ "${REVIEW_BOT_SANDBOX:-1}" = "0" ] && SANDBOX=false
 
@@ -111,6 +115,7 @@ while [ $# -gt 0 ]; do
     --json) AS_JSON=true; shift ;;
     --no-sandbox) SANDBOX=false; shift ;;
     --pr) ONE_PR="$2"; shift 2 ;;
+    --tidy) TIDY_PR="$2"; shift 2 ;;
     -h|--help) sed -n '2,30p' "$0"; exit 0 ;;
     *) echo "unknown option: $1" >&2; exit 1 ;;
   esac
@@ -887,7 +892,79 @@ updated:>=$WINDOW"
   } | sort -u
 }
 
+# Hide what the author's agent has already dealt with, so seabbs reads
+# only what is still open. A bot thread is handled once seabbs-bot has the
+# last word in it (a "fixed in" or "not changing because" reply) or it is
+# resolved. A human reply leaves it open. A review is hidden once none of
+# its threads is open and, for one with no threads, the head has moved.
+# GraphQL variables ($o, $id, ...) are meant to stay literal here.
+# shellcheck disable=SC2016
+TIDY_QUERY='query($o:String!,$r:String!,$n:Int!){repository(owner:$o,name:$r){
+pullRequest(number:$n){headRefOid
+reviews(last:100){nodes{id author{login} isMinimized commit{oid}}}
+reviewThreads(first:100){nodes{id isResolved comments(first:100){nodes{
+id author{login} isMinimized pullRequestReview{id}}}}}}}}'
+# shellcheck disable=SC2016
+RESOLVE_MUTATION='mutation($id:ID!){resolveReviewThread(input:{threadId:$id}){
+thread{isResolved}}}'
+# shellcheck disable=SC2016
+HIDE_MUTATION='mutation($id:ID!){minimizeComment(input:{subjectId:$id,
+classifier:RESOLVED}){minimizedComment{isMinimized}}}'
+
+# Turn the PR's review state into "resolve ID" and "hide ID" lines.
+tidy_actions() {
+  jq -r --arg bot "${BOT_LOGIN%\[bot\]}" --arg agent "$BOT_TRIGGER_USER" '
+    .data.repository.pullRequest as $p
+    | [$p.reviewThreads.nodes[]
+       | select(.comments.nodes[0].author.login == $bot)
+       | . + {handled: (.isResolved
+           or (.comments.nodes[-1].author.login == $agent))}] as $threads
+    | ($threads[] | select(.handled and (.isResolved | not))
+       | "resolve \(.id)"),
+      ($threads[] | select(.handled) | .comments.nodes[]
+       | select(.author.login == $bot and (.isMinimized | not))
+       | "hide \(.id)"),
+      ($p.reviews.nodes[]
+       | select(.author.login == $bot and (.isMinimized | not))
+       | .id as $rid
+       | [$threads[] | select(.comments.nodes[0].pullRequestReview.id == $rid)]
+         as $mine
+       | select(([$mine[] | select(.handled | not)] | length) == 0)
+       | select(($mine | length) > 0 or .commit.oid != $p.headRefOid)
+       | "hide \(.id)")'
+}
+
+tidy_pr() {
+  local repo="$1" pr="$2" token state action id query
+  token="$("$TOKEN_SH" "$repo" 2>/dev/null)" \
+    || { log "  tidy $repo#$pr: no token"; return 1; }
+  state="$(GH_TOKEN="$token" gh api graphql -f query="$TIDY_QUERY" \
+    -f o="${repo%%/*}" -f r="${repo#*/}" -F n="$pr" 2>/dev/null)" \
+    || { log "  tidy $repo#$pr: could not read reviews"; return 1; }
+  while read -r action id; do
+    [ -n "${id:-}" ] || continue
+    case "$action" in
+      resolve) query="$RESOLVE_MUTATION" ;;
+      hide) query="$HIDE_MUTATION" ;;
+      *) continue ;;
+    esac
+    if $DRY_RUN; then
+      log "  tidy $repo#$pr: would $action $id"
+    elif GH_TOKEN="$token" gh api graphql -f query="$query" \
+        -f id="$id" >/dev/null 2>&1; then
+      log "  tidy $repo#$pr: ${action}d $id"
+    else
+      log "  tidy $repo#$pr: could not $action $id"
+    fi
+  done < <(tidy_actions <<< "$state")
+}
+
 log "review-bot starting"
+
+if [ -n "$TIDY_PR" ]; then
+  tidy_pr "${TIDY_PR%\#*}" "${TIDY_PR#*\#}"
+  exit 0
+fi
 
 if [ ! -f "$SINCE_FILE" ]; then
   date -u +%Y-%m-%dT%H:%M:%SZ > "$SINCE_FILE"
@@ -929,6 +1006,18 @@ while read -r repo pr; do
   [ "$reviewed" -ge "$MAX_PRS" ] && { log "hit the $MAX_PRS per-run cap"
     break; }
 done < <(candidates)
+
+# Tidy every reviewed PR touched recently: the agent's replies land
+# between polls, so this is where their threads get closed and hidden.
+if ! $LIST_ONLY; then
+  if [ -n "$ONE_PR" ]; then
+    echo "${ONE_PR/\#/ }"
+  else
+    search_prs "is:open is:pr label:$REVIEWED_LABEL $OWNERS updated:>=$WINDOW"
+  fi | while read -r repo pr; do
+    [ -n "${pr:-}" ] && tidy_pr "$repo" "$pr"
+  done
+fi
 
 # Only a clean poll moves the window forward. If any PR could not be read,
 # the window stays put, so a request made during a GitHub outage is still
