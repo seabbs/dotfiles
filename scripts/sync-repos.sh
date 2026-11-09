@@ -35,6 +35,30 @@ log() {
   return 0
 }
 
+# A pull moves submodule pointers but not their checkouts (e.g. dotfiles'
+# claude/), so bring each one up to its pointer. Skip any with local
+# changes, so edits made in place are never touched.
+sync_submodules() {
+  local dir=$1 name=$2 sub
+  [ -f "$dir/.gitmodules" ] || return 0
+  git -C "$dir" submodule init --quiet 2>/dev/null
+  for sub in $(git -C "$dir" config --file .gitmodules \
+      --get-regexp 'submodule\..*\.path' | awk '{print $2}'); do
+    if [ -e "$dir/$sub/.git" ] &&
+        [ -n "$(git -C "$dir/$sub" status --porcelain 2>/dev/null)" ]; then
+      log "$name/$sub" "submodule skipped (dirty)"
+      echo "$(date '+%Y-%m-%d %H:%M') $name/$sub: submodule skipped (dirty)" \
+        >> "$ERR_FILE"
+    elif git -C "$dir" submodule update --quiet -- "$sub" 2>/dev/null; then
+      log "$name/$sub" "submodule ok"
+    else
+      log "$name/$sub" "submodule failed"
+      echo "$(date '+%Y-%m-%d %H:%M') $name/$sub: submodule failed" \
+        >> "$ERR_FILE"
+    fi
+  done
+}
+
 : > "$LOG_FILE"
 log "sync-repos" "$(date '+%Y-%m-%d %H:%M:%S')"
 
@@ -55,6 +79,7 @@ for repo in "$CODE_DIR"/*/*/.git; do
     if git -C "$dir" pull --ff-only --quiet 2>/dev/null; then
       log "$name" "ok (pulled)"
       ok_count=$((ok_count + 1))
+      sync_submodules "$dir" "$name"
     else
       log "$name" "skipped (dirty or diverged)"
       echo "$(date '+%Y-%m-%d %H:%M') $name: skipped (dirty or diverged)" \
