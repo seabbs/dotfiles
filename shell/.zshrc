@@ -55,17 +55,31 @@ export JULIA_PROJECT=@.
 # to archie's Host block in ~/.ssh/config can target it reliably.
 export HUMAN_REVIEW_PORT=47474
 
-# PATH configuration
-export PATH="$PATH:$HOME/.local/bin:$HOME/.lmstudio/bin:$HOME/.cargo/bin:$HOME/.julia/bin:$HOME/Library/TinyTeX/bin/universal-darwin"
+# PATH configuration — only append dirs that actually exist, so a path that is
+# absent on this machine (e.g. an app that isn't installed) never pollutes PATH.
+# TinyTeX lives under a different prefix and leaf name per platform; the old
+# unconditional macOS path was being appended on Linux, where it never existed.
+if [[ "$OSTYPE" == darwin* ]]; then
+  _tinyt="$HOME/Library/TinyTeX/bin/universal-darwin"
+else
+  _tinyt="$HOME/.TinyTeX/bin/x86_64-linux"
+fi
+for _d in "$HOME/.local/bin" "$HOME/.lmstudio/bin" "$HOME/.cargo/bin" \
+          "$HOME/.julia/bin" "$_tinyt"; do
+  [[ -d "$_d" && ":$PATH:" != *":$_d:"* ]] && PATH="$PATH:$_d"
+done
+unset _d _tinyt
+export PATH
 
 # >>> juliaup initialize >>>
 
 # !! Contents within this block are managed by juliaup !!
 
-path=('$HOME/.juliaup/bin' $path)
+path=("${HOME}/.juliaup/bin" $path)
 export PATH
 # Tab completion for juliaup and julia channel selection
-[ -f "$HOME/.julia/juliaup/completions/zsh.zsh" ] && source "$HOME/.julia/juliaup/completions/zsh.zsh"
+[ -f "${HOME}/.julia/juliaup/completions/zsh.zsh" ] && source "${HOME}/.julia/juliaup/completions/zsh.zsh"
+
 # <<< juliaup initialize <<<
 
 # juliaup, kept portable. Runs after the managed block, and `path=(x $path)`
@@ -99,6 +113,13 @@ alias sync-repos="$DOTFILES/scripts/sync-repos.sh"
 alias job-status="bash $DOTFILES/scripts/job-status.sh"
 alias cat="bat --paging=never"
 alias catp="bat"
+
+# Brew's btop uses brew's ld.so, which never searches system lib dirs, so it
+# cannot find the NVIDIA driver's libnvidia-ml and shows no GPU box. Point it
+# at a dir holding only that lib (symlinks into /lib/x86_64-linux-gnu) rather
+# than exposing all system libs to brew.
+[[ -e "$HOME/.local/lib/btop-gpu/libnvidia-ml.so.1" ]] &&
+  alias btop='LD_LIBRARY_PATH="$HOME/.local/lib/btop-gpu" btop'
 
 # Benchmark one or two scripts (auto-detects R/Julia/Python)
 bench() {
@@ -143,6 +164,13 @@ if [[ -o interactive && -z "$TMUX" && -z "$NO_AUTO_TMUX" \
 fi
 
 # Added by LM Studio CLI (lms)
-export PATH="$PATH:$HOME/.lmstudio/bin"
+# Guarded: only add when the CLI is actually installed, and never add twice.
+[[ -d "$HOME/.lmstudio/bin" && ":$PATH:" != *":$HOME/.lmstudio/bin:"* ]] &&
+  PATH="$PATH:$HOME/.lmstudio/bin"
 # End of LM Studio CLI section
 
+# Final PATH tidy: de-duplicate entries, keeping first-seen order. Sourcing this
+# file repeatedly (nested shells, tmux, tooling) no longer grows PATH.
+typeset -U path
+path=($path)
+export PATH
