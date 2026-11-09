@@ -43,10 +43,10 @@ OWNERS="$OWNERS org:nfidd org:mfiidd"
 # PR authors whose work gets an automatic first pass.
 AUTHORS="author:seabbs author:seabbs-bot"
 # Who may ask. seabbs unconditionally; our own agent only after pushing
-# something new, and only so many times per PR. See bot_may_ask.
+# something new, and only once per PR. See bot_may_ask.
 TRIGGER_USER="seabbs"
 BOT_TRIGGER_USER="seabbs-bot"
-MAX_BOT_REREVIEWS="${REVIEW_BOT_MAX_BOT_REREVIEWS:-5}"
+MAX_BOT_REREVIEWS="${REVIEW_BOT_MAX_BOT_REREVIEWS:-1}"
 # Asking the reviewer by name, the way you would ask a person. GitHub will
 # not render it as a real mention, because the app's login carries a [bot]
 # suffix, but the text is all this needs. One trigger and not a slash
@@ -63,9 +63,8 @@ MAX_PRS="${REVIEW_BOT_MAX_PRS:-3}"
 # does not review half a branch.
 SETTLE="${REVIEW_BOT_SETTLE:-180}"
 # Changed lines above which a PR gets a focused pass (the files carrying
-# the change) rather than a full one, and above which it is left alone.
+# the change) rather than a full one. No PR is refused for its size.
 MAX_DIFF="${REVIEW_BOT_MAX_DIFF:-3000}"
-HARD_MAX_DIFF="${REVIEW_BOT_HARD_MAX_DIFF:-12000}"
 # Paths whose size says nothing about how much there is to read: lockfiles,
 # roxygen output, pkgdown sites, snapshots, vendored trees, data, binaries.
 # Counting these is how a PR with 300 lines of real change reads as 4000.
@@ -275,18 +274,6 @@ reviewable_diff() {
         END { if (NR) printf "%d\t%s\n", n, skip }'
 }
 
-# When we last told a PR it was too large, and for which head. A notice is
-# an ordinary comment, so it leaves no review for last_bot_review to find:
-# without recording it, the same request comment re-fires on every poll and
-# the PR collects the same refusal over and over.
-notice_file() { printf '%s/notices/%s#%s' "$STATE_DIR" "${1//\//_}" "$2"; }
-notice_at()  { cut -f1 "$(notice_file "$1" "$2")" 2>/dev/null; }
-notice_sha() { cut -f2 "$(notice_file "$1" "$2")" 2>/dev/null; }
-record_notice() {
-  mkdir -p "$STATE_DIR/notices"
-  printf '%s\t%s\n' "$(now_iso)" "$3" > "$(notice_file "$1" "$2")"
-}
-
 # Has USER asked, in a comment newer than SINCE?
 asked_by() {
   local repo="$1" pr="$2" since="$3" who="$4"
@@ -365,12 +352,7 @@ wants_review() {
     return 2
   fi
 
-  # Telling a PR it is too large is an answer, so only an ask newer than
-  # that notice is a new ask.
-  local since notice
-  since="${last:-1970-01-01T00:00:00Z}"
-  notice="$(notice_at "$repo" "$pr")"
-  [ -n "$notice" ] && [[ "$notice" > "$since" ]] && since="$notice"
+  local since="${last:-1970-01-01T00:00:00Z}"
 
   # An explicit ask beats every gate below, on any PR in the watched
   # owners: someone else's work, a draft, or one from years ago. Asking
@@ -387,13 +369,6 @@ wants_review() {
 
   if [ -n "$last" ]; then
     log "  skip $repo#$pr: reviewed at $last, not asked again since"
-    return 1
-  fi
-
-  # Already declined this exact head as too large. Nothing changes until it
-  # is pushed to again, so the automatic path stops rediscovering it.
-  if [ "$(notice_sha "$repo" "$pr")" = "$sha" ]; then
-    log "  skip $repo#$pr: already declined this head as too large"
     return 1
   fi
 
@@ -818,32 +793,7 @@ review_pr() {
     count="$reviewable"
   fi
 
-  if [ "$count" -gt "$HARD_MAX_DIFF" ]; then
-    log "  skip $repo#$pr: $count reviewable lines over the $HARD_MAX_DIFF cap"
-    # Record the notice for a real run only. --dry-run is documented as
-    # "find work, print the review, post none", but record_notice() wrote
-    # state regardless of the flag, so a dry run persisted a notice
-    # claiming the PR had been told, and a later real run would then see
-    # notice_sha == sha and silently skip it, having said nothing.
-    $DRY_RUN || record_notice "$repo" "$pr" "$sha"
-    # Asking and hearing nothing back is worse than being told no, so an
-    # explicit request gets a reply. The automatic path stays silent. The
-    # notice above is what stops that reply repeating on every poll.
-    case "$reason" in
-      *requested*)
-        if ! $DRY_RUN && token="$("$TOKEN_SH" "$repo" 2>/dev/null)"; then
-          GH_TOKEN="$token" gh pr comment "$pr" -R "$repo" --body \
-"Not reviewing this one: $count changed lines, excluding generated files, \
-is over the $HARD_MAX_DIFF line cap, past which an automated pass stops \
-being useful. Split it, or ask again after pushing a narrower change." \
-            >/dev/null 2>&1 \
-            && log "  told $repo#$pr why it was skipped"
-        fi ;;
-    esac
-    return 1
-  fi
-
-  # Between the two caps, read the files that carry the change rather than
+  # Over the cap, read the files that carry the change rather than
   # refusing. A long PR is usually long in a few files.
   if [ "$count" -gt "$MAX_DIFF" ]; then
     scope="
