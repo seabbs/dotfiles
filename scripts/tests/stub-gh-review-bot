@@ -1,5 +1,5 @@
 #!/bin/bash
-# Stub `gh` for test-review-bot-skip-ledger.sh.
+# Stub `gh` for the review-bot tests.
 # Logs every invocation to $RB_TEST_CALLS and answers the handful of gh
 # subcommands the size-skip path makes, applying any --jq filter with the
 # real jq so review-bot.sh's own --jq queries still do their job.
@@ -52,6 +52,16 @@ fi
 
 if [ "$1" = "pr" ] && [ "$2" = "comment" ]; then
   echo "COMMENT_POSTED" >> "${RB_TEST_COMMENTS:?RB_TEST_COMMENTS not set}"
+  exit 0
+fi
+
+# GraphQL: the PR read returns the $RB_TEST_GQL fixture, and mutations
+# (already logged above) succeed.
+if [ "$1" = "api" ] && [ "${2:-}" = "graphql" ]; then
+  case "$*" in
+    *"query=query"*) emit < "${RB_TEST_GQL:?RB_TEST_GQL not set}" ;;
+    *) echo '{"data":{}}' ;;
+  esac
   exit 0
 fi
 
