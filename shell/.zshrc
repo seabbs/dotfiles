@@ -55,17 +55,29 @@ export JULIA_PROJECT=@.
 # to archie's Host block in ~/.ssh/config can target it reliably.
 export HUMAN_REVIEW_PORT=47474
 
-# PATH configuration
-export PATH="$PATH:$HOME/.local/bin:$HOME/.lmstudio/bin:$HOME/.cargo/bin:$HOME/.julia/bin:$HOME/Library/TinyTeX/bin/universal-darwin"
+# PATH configuration. Keep entries unique and append only dirs that exist.
+# The TinyTeX path differs per platform.
+typeset -U path
+if [[ "$OSTYPE" == darwin* ]]; then
+  _tinyt="$HOME/Library/TinyTeX/bin/universal-darwin"
+else
+  _tinyt="$HOME/.TinyTeX/bin/$(uname -m)-linux"
+fi
+for _d in "$HOME/.local/bin" "$HOME/.lmstudio/bin" "$HOME/.cargo/bin" \
+          "$HOME/.julia/bin" "$_tinyt"; do
+  [[ -d "$_d" ]] && path+=("$_d")
+done
+unset _d _tinyt
 
 # >>> juliaup initialize >>>
 
 # !! Contents within this block are managed by juliaup !!
 
-path=('$HOME/.juliaup/bin' $path)
+path=("${HOME}/.juliaup/bin" $path)
 export PATH
 # Tab completion for juliaup and julia channel selection
-[ -f "$HOME/.julia/juliaup/completions/zsh.zsh" ] && source "$HOME/.julia/juliaup/completions/zsh.zsh"
+[ -f "${HOME}/.julia/juliaup/completions/zsh.zsh" ] && source "${HOME}/.julia/juliaup/completions/zsh.zsh"
+
 # <<< juliaup initialize <<<
 
 # juliaup, kept portable. Runs after the managed block, and `path=(x $path)`
@@ -99,6 +111,13 @@ alias sync-repos="$DOTFILES/scripts/sync-repos.sh"
 alias job-status="bash $DOTFILES/scripts/job-status.sh"
 alias cat="bat --paging=never"
 alias catp="bat"
+
+# Brew's btop uses brew's ld.so, which never searches system lib dirs, so it
+# cannot find the NVIDIA driver's libnvidia-ml and shows no GPU box. Point it
+# at a dir holding only that lib (symlinks into /lib/x86_64-linux-gnu) rather
+# than exposing all system libs to brew.
+[[ -e "$HOME/.local/lib/btop-gpu/libnvidia-ml.so.1" ]] &&
+  alias btop='LD_LIBRARY_PATH="$HOME/.local/lib/btop-gpu" btop'
 
 # Benchmark one or two scripts (auto-detects R/Julia/Python)
 bench() {
@@ -143,6 +162,6 @@ if [[ -o interactive && -z "$TMUX" && -z "$NO_AUTO_TMUX" \
 fi
 
 # Added by LM Studio CLI (lms)
-export PATH="$PATH:$HOME/.lmstudio/bin"
+# Guarded: only add when the CLI is installed.
+[[ -d "$HOME/.lmstudio/bin" ]] && path+=("$HOME/.lmstudio/bin")
 # End of LM Studio CLI section
-

@@ -35,6 +35,64 @@ log() {
   return 0
 }
 
+sub_warn() {
+  log "$1" "submodule $2"
+  echo "$(date '+%Y-%m-%d %H:%M') $1: submodule $2" >> "$ERR_FILE"
+}
+
+# A pull moves submodule pointers but not their checkouts (e.g. dotfiles'
+# claude/), so bring each one up to its pointer. Only ever move a checkout
+# forward: skip any with local changes or commits the pointer lacks, so a
+# live checkout ahead of its pointer is never rolled back. A checkout on a
+# branch is fast-forwarded on that branch rather than detached.
+sync_submodules() {
+  local dir=$1 name=$2 entry sub s want have
+  [ -f "$dir/.gitmodules" ] || return 0
+  git -C "$dir" submodule init --quiet 2>/dev/null
+  # -z gives "key\nvalue\0", which survives spaces in names and paths.
+  while IFS= read -r -d '' entry <&3; do
+    sub=${entry#*$'\n'}
+    s="$dir/$sub"
+    want=$(git -C "$dir" rev-parse --verify -q "HEAD:$sub") || continue
+    if [ ! -e "$s/.git" ]; then
+      if git -C "$dir" submodule update --quiet -- "$sub" 2>/dev/null; then
+        log "$name/$sub" "submodule ok (checked out)"
+      else
+        sub_warn "$name/$sub" "failed"
+      fi
+      continue
+    fi
+    have=$(git -C "$s" rev-parse HEAD 2>/dev/null)
+    if [ "$have" = "$want" ]; then
+      log "$name/$sub" "submodule ok"
+      continue
+    fi
+    if [ -n "$(git -C "$s" status --porcelain 2>/dev/null)" ]; then
+      sub_warn "$name/$sub" "skipped (dirty)"
+      continue
+    fi
+    git -C "$s" cat-file -e "$want^{commit}" 2>/dev/null ||
+      git -C "$s" fetch --quiet origin 2>/dev/null
+    if ! git -C "$s" cat-file -e "$want^{commit}" 2>/dev/null; then
+      sub_warn "$name/$sub" "skipped (commit missing)"
+    elif ! git -C "$s" merge-base --is-ancestor "$have" "$want" 2>/dev/null
+    then
+      sub_warn "$name/$sub" "skipped (ahead or diverged)"
+    elif git -C "$s" symbolic-ref -q HEAD >/dev/null; then
+      if git -C "$s" merge --ff-only --quiet "$want" 2>/dev/null; then
+        log "$name/$sub" "submodule ok (fast-forwarded)"
+      else
+        sub_warn "$name/$sub" "failed"
+      fi
+    elif git -C "$dir" submodule update --quiet -- "$sub" 2>/dev/null; then
+      log "$name/$sub" "submodule ok (updated)"
+    else
+      sub_warn "$name/$sub" "failed"
+    fi
+  done 3< <(git -C "$dir" config -z --file .gitmodules \
+    --get-regexp 'submodule\..*\.path')
+}
+
 : > "$LOG_FILE"
 log "sync-repos" "$(date '+%Y-%m-%d %H:%M:%S')"
 
@@ -55,6 +113,7 @@ for repo in "$CODE_DIR"/*/*/.git; do
     if git -C "$dir" pull --ff-only --quiet 2>/dev/null; then
       log "$name" "ok (pulled)"
       ok_count=$((ok_count + 1))
+      sync_submodules "$dir" "$name"
     else
       log "$name" "skipped (dirty or diverged)"
       echo "$(date '+%Y-%m-%d %H:%M') $name: skipped (dirty or diverged)" \

@@ -14,7 +14,9 @@
 #     comments @seabbs-review-bot, including drafts, older PRs and other
 #     work, and however many times he asks
 # Everything else is left alone. It never approves, never requests changes,
-# never pushes, and never edits a PR.
+# never pushes, and never edits a PR. It does tidy up after itself: once
+# seabbs-bot has answered a thread, the bot resolves it and hides its own
+# comment, and a review with nothing left open is hidden too. See tidy_pr.
 #
 # Usage:
 #   review-bot.sh                     poll and review (what cron runs)
@@ -22,6 +24,7 @@
 #   review-bot.sh --pr owner/repo#42  review one PR now, skipping discovery
 #   review-bot.sh --force             ignore "already reviewed" state
 #   review-bot.sh --list              show what it would pick up, then stop
+#   review-bot.sh --tidy owner/repo#42  hide this PR's handled bot reviews
 #
 # Interactive runs print to the terminal. Cron runs log only.
 
@@ -43,10 +46,10 @@ OWNERS="$OWNERS org:nfidd org:mfiidd"
 # PR authors whose work gets an automatic first pass.
 AUTHORS="author:seabbs author:seabbs-bot"
 # Who may ask. seabbs unconditionally; our own agent only after pushing
-# something new, and only so many times per PR. See bot_may_ask.
+# something new, and only once per PR. See bot_may_ask.
 TRIGGER_USER="seabbs"
 BOT_TRIGGER_USER="seabbs-bot"
-MAX_BOT_REREVIEWS="${REVIEW_BOT_MAX_BOT_REREVIEWS:-5}"
+MAX_BOT_REREVIEWS="${REVIEW_BOT_MAX_BOT_REREVIEWS:-1}"
 # Asking the reviewer by name, the way you would ask a person. GitHub will
 # not render it as a real mention, because the app's login carries a [bot]
 # suffix, but the text is all this needs. One trigger and not a slash
@@ -62,8 +65,18 @@ MAX_PRS="${REVIEW_BOT_MAX_PRS:-3}"
 # Seconds a new head commit must sit before review, so a run mid-push
 # does not review half a branch.
 SETTLE="${REVIEW_BOT_SETTLE:-180}"
-# Changed lines above which a PR is logged and left for a human.
+# Changed lines above which a PR gets a focused pass (the files carrying
+# the change) rather than a full one. No PR is refused for its size.
 MAX_DIFF="${REVIEW_BOT_MAX_DIFF:-3000}"
+# Paths whose size says nothing about how much there is to read: lockfiles,
+# roxygen output, pkgdown sites, snapshots, vendored trees, data, binaries.
+# Counting these is how a PR with 300 lines of real change reads as 4000.
+NOISE_RE='(^|/)(renv[.]lock|Manifest[.]toml|package-lock[.]json'
+NOISE_RE="$NOISE_RE"'|yarn[.]lock|pnpm-lock[.]yaml|Cargo[.]lock'
+NOISE_RE="$NOISE_RE"'|poetry[.]lock|uv[.]lock|NAMESPACE)$'
+NOISE_RE="$NOISE_RE"'|(^|/)(man/|docs/|vendor/|node_modules/|_snaps/|_freeze/)'
+NOISE_RE="$NOISE_RE"'|[.](csv|tsv|rds|rda|RData|parquet|png|jpe?g|gif|svg'
+NOISE_RE="$NOISE_RE"'|pdf|html|ipynb)$'
 TIMEOUT="${REVIEW_BOT_TIMEOUT:-900}"
 
 # Shared with the other agent bots: logging, the audit trail, the portable
@@ -89,6 +102,7 @@ LIST_ONLY=false
 STATUS_ONLY=false
 AS_JSON=false
 ONE_PR=""
+TIDY_PR=""
 SANDBOX=true
 [ "${REVIEW_BOT_SANDBOX:-1}" = "0" ] && SANDBOX=false
 
@@ -101,6 +115,7 @@ while [ $# -gt 0 ]; do
     --json) AS_JSON=true; shift ;;
     --no-sandbox) SANDBOX=false; shift ;;
     --pr) ONE_PR="$2"; shift 2 ;;
+    --tidy) TIDY_PR="$2"; shift 2 ;;
     -h|--help) sed -n '2,30p' "$0"; exit 0 ;;
     *) echo "unknown option: $1" >&2; exit 1 ;;
   esac
@@ -250,6 +265,20 @@ last_bot_review() {
   esac
 }
 
+# Changed lines worth a reviewer's time, and the generated paths left out,
+# as "count<TAB>path,path,...". Prints nothing when GitHub could not be
+# asked, so the caller can fall back rather than read a failure as "empty
+# diff" and review nothing.
+reviewable_diff() {
+  local repo="$1" pr="$2"
+  gh api "repos/$repo/pulls/$pr/files" --paginate \
+    --jq '.[] | [.filename, (.additions + .deletions)] | @tsv' 2>/dev/null \
+    | awk -F'\t' -v noise="$NOISE_RE" '
+        $1 ~ noise { skip = skip (skip ? "," : "") $1; next }
+        { n += $2 }
+        END { if (NR) printf "%d\t%s\n", n, skip }'
+}
+
 # Has USER asked, in a comment newer than SINCE?
 asked_by() {
   local repo="$1" pr="$2" since="$3" who="$4"
@@ -328,15 +357,17 @@ wants_review() {
     return 2
   fi
 
+  local since="${last:-1970-01-01T00:00:00Z}"
+
   # An explicit ask beats every gate below, on any PR in the watched
   # owners: someone else's work, a draft, or one from years ago. Asking
   # is the point, and only seabbs can ask.
-  if retrigger_after "$repo" "$pr" "${last:-1970-01-01T00:00:00Z}"; then
+  if retrigger_after "$repo" "$pr" "$since"; then
     echo "requested by $TRIGGER_USER"
     return 0
   fi
 
-  if bot_may_ask "$repo" "$pr" "$sha" "$last"; then
+  if bot_may_ask "$repo" "$pr" "$sha" "$since"; then
     echo "re-review requested by $BOT_TRIGGER_USER"
     return 0
   fi
@@ -513,7 +544,7 @@ prepare_checkout() {
 
 build_prompt() {
   local repo="$1" pr="$2" author="$3" base="$4" range="$5" title="$6"
-  local standards="$7" ci="$8"
+  local standards="$7" ci="$8" scope="${9:-}"
   cat <<PROMPT
 You are seabbs-review-bot, an independent first-pass reviewer on $repo
 pull request #$pr, "$title", opened by $author. Assume it was written by
@@ -523,6 +554,7 @@ tells about it.
 The PR head is checked out here. Read the change first:
   git diff --stat $range
   git diff $range
+$scope
 Then read the surrounding code with Read and Grep before judging
 anything. A line that looks wrong in a diff is often fine in context, and
 a line that looks fine is often wrong in context. Before calling anything
@@ -755,22 +787,31 @@ review_pr() {
   count=$(( $(jq -r '.additions' <<< "$meta")
             + $(jq -r '.deletions' <<< "$meta") ))
 
-  if [ "$count" -gt "$MAX_DIFF" ]; then
-    log "  skip $repo#$pr: $count changed lines over the $MAX_DIFF cap"
-    # Asking and hearing nothing back is worse than being told no, so an
-    # explicit request gets a reply. The automatic path stays silent.
-    case "$reason" in
-      *requested*)
-        if ! $DRY_RUN && token="$("$TOKEN_SH" "$repo" 2>/dev/null)"; then
-          GH_TOKEN="$token" gh pr comment "$pr" -R "$repo" --body \
-"Not reviewing this one: $count changed lines is over the \
-$MAX_DIFF line cap, past which an automated pass stops being useful. \
-Ask again on a narrower PR, or split it." >/dev/null 2>&1 \
-            && log "  told $repo#$pr why it was skipped"
-        fi ;;
-    esac
-    return 1
+  # Size the PR by what is actually worth reading: a regenerated lockfile
+  # or a directory of roxygen output says nothing about how much change
+  # there is. Fall back to the raw count if GitHub could not be asked.
+  local noise="" reviewable scope=""
+  IFS=$'\t' read -r reviewable noise < <(reviewable_diff "$repo" "$pr")
+  if [ -n "${reviewable:-}" ]; then
+    [ "$reviewable" -ne "$count" ] \
+      && log "  $count changed lines, $reviewable of them reviewable"
+    count="$reviewable"
   fi
+
+  # Over the cap, read the files that carry the change rather than
+  # refusing. A long PR is usually long in a few files.
+  if [ "$count" -gt "$MAX_DIFF" ]; then
+    scope="
+This is a large change: $count reviewable lines, over the $MAX_DIFF line
+cap for a full pass. Read the files that carry it, largest and most
+substantial first, and name in the summary which files you did not read.
+Findings from the files you did read are worth more than thin coverage of
+all of them."
+    log "  focused pass on $repo#$pr: $count lines over the $MAX_DIFF cap"
+  fi
+  [ -n "$noise" ] && scope="$scope
+These paths are generated, vendored or data. Do not review them and do not
+treat their size as part of the change: $noise"
 
   log "  reviewing $repo#$pr ($reason, $count lines) $title"
   dir="$(prepare_checkout "$repo" "$pr" "$sha")" \
@@ -784,7 +825,8 @@ Ask again on a narrower PR, or split it." >/dev/null 2>&1 \
 
   review="$(run_review "$dir" \
     "$(build_prompt "$repo" "$pr" "$author" "$base" "$range" "$title" \
-      "$(standards_block "$lang")" "$(ci_summary "$repo" "$sha")")")"
+      "$(standards_block "$lang")" "$(ci_summary "$repo" "$sha")" \
+      "$scope")")"
   if [ -z "$review" ]; then
     log "  no usable review returned for $repo#$pr"
     return 1
@@ -850,7 +892,79 @@ updated:>=$WINDOW"
   } | sort -u
 }
 
+# Hide what the author's agent has already dealt with, so seabbs reads
+# only what is still open. A bot thread is handled once seabbs-bot has the
+# last word in it (a "fixed in" or "not changing because" reply) or it is
+# resolved. A human reply leaves it open. A review is hidden once none of
+# its threads is open and, for one with no threads, the head has moved.
+# GraphQL variables ($o, $id, ...) are meant to stay literal here.
+# shellcheck disable=SC2016
+TIDY_QUERY='query($o:String!,$r:String!,$n:Int!){repository(owner:$o,name:$r){
+pullRequest(number:$n){headRefOid
+reviews(last:100){nodes{id author{login} isMinimized commit{oid}}}
+reviewThreads(first:100){nodes{id isResolved comments(first:100){nodes{
+id author{login} isMinimized pullRequestReview{id}}}}}}}}'
+# shellcheck disable=SC2016
+RESOLVE_MUTATION='mutation($id:ID!){resolveReviewThread(input:{threadId:$id}){
+thread{isResolved}}}'
+# shellcheck disable=SC2016
+HIDE_MUTATION='mutation($id:ID!){minimizeComment(input:{subjectId:$id,
+classifier:RESOLVED}){minimizedComment{isMinimized}}}'
+
+# Turn the PR's review state into "resolve ID" and "hide ID" lines.
+tidy_actions() {
+  jq -r --arg bot "${BOT_LOGIN%\[bot\]}" --arg agent "$BOT_TRIGGER_USER" '
+    .data.repository.pullRequest as $p
+    | [$p.reviewThreads.nodes[]
+       | select(.comments.nodes[0].author.login == $bot)
+       | . + {handled: (.isResolved
+           or (.comments.nodes[-1].author.login == $agent))}] as $threads
+    | ($threads[] | select(.handled and (.isResolved | not))
+       | "resolve \(.id)"),
+      ($threads[] | select(.handled) | .comments.nodes[]
+       | select(.author.login == $bot and (.isMinimized | not))
+       | "hide \(.id)"),
+      ($p.reviews.nodes[]
+       | select(.author.login == $bot and (.isMinimized | not))
+       | .id as $rid
+       | [$threads[] | select(.comments.nodes[0].pullRequestReview.id == $rid)]
+         as $mine
+       | select(([$mine[] | select(.handled | not)] | length) == 0)
+       | select(($mine | length) > 0 or .commit.oid != $p.headRefOid)
+       | "hide \(.id)")'
+}
+
+tidy_pr() {
+  local repo="$1" pr="$2" token state action id query
+  token="$("$TOKEN_SH" "$repo" 2>/dev/null)" \
+    || { log "  tidy $repo#$pr: no token"; return 1; }
+  state="$(GH_TOKEN="$token" gh api graphql -f query="$TIDY_QUERY" \
+    -f o="${repo%%/*}" -f r="${repo#*/}" -F n="$pr" 2>/dev/null)" \
+    || { log "  tidy $repo#$pr: could not read reviews"; return 1; }
+  while read -r action id; do
+    [ -n "${id:-}" ] || continue
+    case "$action" in
+      resolve) query="$RESOLVE_MUTATION" ;;
+      hide) query="$HIDE_MUTATION" ;;
+      *) continue ;;
+    esac
+    if $DRY_RUN; then
+      log "  tidy $repo#$pr: would $action $id"
+    elif GH_TOKEN="$token" gh api graphql -f query="$query" \
+        -f id="$id" >/dev/null 2>&1; then
+      log "  tidy $repo#$pr: ${action}d $id"
+    else
+      log "  tidy $repo#$pr: could not $action $id"
+    fi
+  done < <(tidy_actions <<< "$state")
+}
+
 log "review-bot starting"
+
+if [ -n "$TIDY_PR" ]; then
+  tidy_pr "${TIDY_PR%\#*}" "${TIDY_PR#*\#}"
+  exit 0
+fi
 
 if [ ! -f "$SINCE_FILE" ]; then
   date -u +%Y-%m-%dT%H:%M:%SZ > "$SINCE_FILE"
@@ -892,6 +1006,18 @@ while read -r repo pr; do
   [ "$reviewed" -ge "$MAX_PRS" ] && { log "hit the $MAX_PRS per-run cap"
     break; }
 done < <(candidates)
+
+# Tidy every reviewed PR touched recently: the agent's replies land
+# between polls, so this is where their threads get closed and hidden.
+if ! $LIST_ONLY; then
+  if [ -n "$ONE_PR" ]; then
+    echo "${ONE_PR/\#/ }"
+  else
+    search_prs "is:open is:pr label:$REVIEWED_LABEL $OWNERS updated:>=$WINDOW"
+  fi | while read -r repo pr; do
+    [ -n "${pr:-}" ] && tidy_pr "$repo" "$pr"
+  done
+fi
 
 # Only a clean poll moves the window forward. If any PR could not be read,
 # the window stays put, so a request made during a GitHub outage is still
