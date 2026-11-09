@@ -55,21 +55,19 @@ export JULIA_PROJECT=@.
 # to archie's Host block in ~/.ssh/config can target it reliably.
 export HUMAN_REVIEW_PORT=47474
 
-# PATH configuration — only append dirs that actually exist, so a path that is
-# absent on this machine (e.g. an app that isn't installed) never pollutes PATH.
-# TinyTeX lives under a different prefix and leaf name per platform; the old
-# unconditional macOS path was being appended on Linux, where it never existed.
+# PATH configuration. Keep entries unique and append only dirs that exist.
+# The TinyTeX path differs per platform.
+typeset -U path
 if [[ "$OSTYPE" == darwin* ]]; then
   _tinyt="$HOME/Library/TinyTeX/bin/universal-darwin"
 else
-  _tinyt="$HOME/.TinyTeX/bin/x86_64-linux"
+  _tinyt="$HOME/.TinyTeX/bin/$(uname -m)-linux"
 fi
 for _d in "$HOME/.local/bin" "$HOME/.lmstudio/bin" "$HOME/.cargo/bin" \
           "$HOME/.julia/bin" "$_tinyt"; do
-  [[ -d "$_d" && ":$PATH:" != *":$_d:"* ]] && PATH="$PATH:$_d"
+  [[ -d "$_d" ]] && path+=("$_d")
 done
 unset _d _tinyt
-export PATH
 
 # >>> juliaup initialize >>>
 
@@ -164,13 +162,6 @@ if [[ -o interactive && -z "$TMUX" && -z "$NO_AUTO_TMUX" \
 fi
 
 # Added by LM Studio CLI (lms)
-# Guarded: only add when the CLI is actually installed, and never add twice.
-[[ -d "$HOME/.lmstudio/bin" && ":$PATH:" != *":$HOME/.lmstudio/bin:"* ]] &&
-  PATH="$PATH:$HOME/.lmstudio/bin"
+# Guarded: only add when the CLI is installed.
+[[ -d "$HOME/.lmstudio/bin" ]] && path+=("$HOME/.lmstudio/bin")
 # End of LM Studio CLI section
-
-# Final PATH tidy: de-duplicate entries, keeping first-seen order. Sourcing this
-# file repeatedly (nested shells, tmux, tooling) no longer grows PATH.
-typeset -U path
-path=($path)
-export PATH
