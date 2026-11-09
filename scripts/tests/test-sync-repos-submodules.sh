@@ -15,7 +15,9 @@ export GIT_CONFIG_COUNT=1
 export GIT_CONFIG_KEY_0=protocol.file.allow GIT_CONFIG_VALUE_0=always
 
 # Load the functions only, not the main loop.
+# shellcheck disable=SC2034
 LOG_FILE="$tmp/log" ERR_FILE="$tmp/err" INTERACTIVE=false
+# shellcheck disable=SC2016
 eval "$(sed -n '/^log() {/,/^: > "\$LOG_FILE"/p' "$script" | sed '$d')"
 
 sp="s p"

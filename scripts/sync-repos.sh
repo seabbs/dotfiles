@@ -46,11 +46,12 @@ sub_warn() {
 # live checkout ahead of its pointer is never rolled back. A checkout on a
 # branch is fast-forwarded on that branch rather than detached.
 sync_submodules() {
-  local dir=$1 name=$2 sub s want have
+  local dir=$1 name=$2 entry sub s want have
   [ -f "$dir/.gitmodules" ] || return 0
   git -C "$dir" submodule init --quiet 2>/dev/null
-  for sub in $(git -C "$dir" config --file .gitmodules \
-      --get-regexp 'submodule\..*\.path' | awk '{print $2}'); do
+  # -z gives "key\nvalue\0", which survives spaces in names and paths.
+  while IFS= read -r -d '' entry <&3; do
+    sub=${entry#*$'\n'}
     s="$dir/$sub"
     want=$(git -C "$dir" rev-parse --verify -q "HEAD:$sub") || continue
     if [ ! -e "$s/.git" ]; then
@@ -64,11 +65,17 @@ sync_submodules() {
     have=$(git -C "$s" rev-parse HEAD 2>/dev/null)
     if [ "$have" = "$want" ]; then
       log "$name/$sub" "submodule ok"
-    elif [ -n "$(git -C "$s" status --porcelain 2>/dev/null)" ]; then
+      continue
+    fi
+    if [ -n "$(git -C "$s" status --porcelain 2>/dev/null)" ]; then
       sub_warn "$name/$sub" "skipped (dirty)"
-    elif ! { git -C "$s" cat-file -e "$want^{commit}" 2>/dev/null ||
-        git -C "$s" fetch --quiet origin 2>/dev/null; } ||
-        ! git -C "$s" merge-base --is-ancestor "$have" "$want" 2>/dev/null
+      continue
+    fi
+    git -C "$s" cat-file -e "$want^{commit}" 2>/dev/null ||
+      git -C "$s" fetch --quiet origin 2>/dev/null
+    if ! git -C "$s" cat-file -e "$want^{commit}" 2>/dev/null; then
+      sub_warn "$name/$sub" "skipped (commit missing)"
+    elif ! git -C "$s" merge-base --is-ancestor "$have" "$want" 2>/dev/null
     then
       sub_warn "$name/$sub" "skipped (ahead or diverged)"
     elif git -C "$s" symbolic-ref -q HEAD >/dev/null; then
@@ -82,7 +89,8 @@ sync_submodules() {
     else
       sub_warn "$name/$sub" "failed"
     fi
-  done
+  done 3< <(git -C "$dir" config -z --file .gitmodules \
+    --get-regexp 'submodule\..*\.path')
 }
 
 : > "$LOG_FILE"
