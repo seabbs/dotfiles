@@ -15,7 +15,8 @@ trap 'rm -rf "$WORK"' EXIT
 DF="$WORK/dotfiles"
 mkdir -p "$DF/scripts"
 cp "$SRC_SCRIPTS/review-bot.sh" "$SRC_SCRIPTS/bot-common.sh" \
-  "$SRC_SCRIPTS/review-bot-format.jq" "$DF/scripts/"
+  "$SRC_SCRIPTS/review-bot-format.jq" "$SRC_SCRIPTS/review-bot-rounds.sh" \
+  "$DF/scripts/"
 # shellcheck disable=SC2016  # $1 belongs to the generated script
 printf '#!/bin/bash\necho "test-token-$1"\n' > "$DF/scripts/review-bot-token.sh"
 chmod +x "$DF/scripts/"*.sh

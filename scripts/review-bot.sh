@@ -84,6 +84,8 @@ TIMEOUT="${REVIEW_BOT_TIMEOUT:-900}"
 # date helpers, the bwrap sandbox, and cache pruning.
 BOT_NAME=review-bot
 . "$(dirname "$0")/bot-common.sh"
+# shellcheck source=SCRIPTDIR/review-bot-rounds.sh
+. "$(dirname "$0")/review-bot-rounds.sh"
 
 # PRs opened before this stamp are never picked up automatically, so
 # switching the bot on does not review everything already in flight.
@@ -545,16 +547,18 @@ prepare_checkout() {
 
 build_prompt() {
   local repo="$1" pr="$2" author="$3" base="$4" range="$5" title="$6"
-  local standards="$7" ci="$8" scope="${9:-}"
+  local standards="$7" ci="$8" scope="${9:-}" rounds="${10:-}"
+  local prior="${11:-}"
   cat <<PROMPT
 You are seabbs-review-bot, an independent first-pass reviewer on $repo
 pull request #$pr, "$title", opened by $author. Assume it was written by
 an AI agent. Review the code that is there, not the story the description
 tells about it.
 
-The PR head is checked out here. Read the change first:
+The PR head is checked out here.
+${rounds:-Read the change first:
   git diff --stat $range
-  git diff $range
+  git diff $range}
 $scope
 Then read the surrounding code with Read and Grep before judging
 anything. A line that looks wrong in a diff is often fine in context, and
@@ -596,6 +600,14 @@ return no comments.
 Every comment says what to change, not just what is wrong. Where the fix
 is a few lines, give them.
 
+When a finding is one case of a pattern, name the pattern in the title and
+grep for the other places it occurs. List them in one comment so the
+author fixes every instance, rather than posting one comment per line.
+${prior:+
+You have already posted these findings on this PR. Do not post any of
+them again, even reworded. The author has seen them:
+$prior
+}
 Each inline comment must name a file and a line that appears in the diff
 above as an added or context line. If a point does not attach to such a
 line, put it in the detail instead.
@@ -818,10 +830,20 @@ treat their size as part of the change: $noise"
   lang="$(detect_language "$dir")"
   log "  language: $lang"
 
+  # Later rounds read only what moved since the last pass. A last head
+  # lost to a force-push means a full read.
+  local round last
+  round="$(review_round "$HISTORY" "$repo#$pr")"
+  last="$(ledger_last_sha "$repo" "$pr")"
+  [ -n "$last" ] && ! git -C "$dir" merge-base --is-ancestor \
+    "$last" "$sha" 2>/dev/null && last=""
+  log "  round $round${last:+, last pass at ${last:0:8}}"
+
   review="$(run_review "$dir" \
     "$(build_prompt "$repo" "$pr" "$author" "$base" "$range" "$title" \
       "$(standards_block "$lang")" "$(ci_summary "$repo" "$sha")" \
-      "$scope")")"
+      "$scope" "$(round_scope "$round" "$last" "$range")" \
+      "$(prior_findings "$POSTED_DIR" "$repo" "$pr")")")"
   if [ -z "$review" ]; then
     log "  no usable review returned for $repo#$pr"
     return 1

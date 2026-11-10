@@ -8,7 +8,7 @@ set -euo pipefail
 
 HERE="$(cd "$(dirname "$0")" && pwd)"
 SRC_SCRIPTS="${1:-$(dirname "$HERE")}"
-# shellcheck source=../review-bot-rounds.sh
+# shellcheck source=SCRIPTDIR/../review-bot-rounds.sh
 . "$SRC_SCRIPTS/review-bot-rounds.sh"
 WORK="$(mktemp -d "${TMPDIR:-/tmp}/rb-rounds.XXXXXX")"
 trap 'rm -rf "$WORK"' EXIT
@@ -47,7 +47,7 @@ out="$(round_scope 3 "" "$full")"
 lacks "no last sha falls back to full" "since your last pass" "$out"
 out="$(round_scope 4 aaa "$full")"
 has "round 4 asks to step back" "step back" "$out"
-REVIEW_BOT_STEP_BACK_AFTER=5 out="$(round_scope 4 aaa "$full")"
+out="$(REVIEW_BOT_STEP_BACK_AFTER=5 round_scope 4 aaa "$full")"
 lacks "step back threshold is configurable" "step back" "$out"
 
 echo
