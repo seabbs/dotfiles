@@ -25,6 +25,8 @@ DOTFILES_COPY="$WORK/dotfiles"
 mkdir -p "$DOTFILES_COPY/scripts"
 cp "$SRC_SCRIPTS/review-bot.sh" "$DOTFILES_COPY/scripts/review-bot.sh"
 cp "$SRC_SCRIPTS/bot-common.sh" "$DOTFILES_COPY/scripts/bot-common.sh"
+cp "$SRC_SCRIPTS/review-bot-format.jq" "$SRC_SCRIPTS/review-bot-rounds.sh" \
+  "$DOTFILES_COPY/scripts/"
 chmod +x "$DOTFILES_COPY/scripts/review-bot.sh"
 cat > "$DOTFILES_COPY/scripts/review-bot-token.sh" <<'EOF'
 #!/bin/bash
