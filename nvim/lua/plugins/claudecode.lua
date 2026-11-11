@@ -10,6 +10,18 @@ return {
     { "<leader>aC", "<cmd>ClaudeCode --continue<cr>", desc = "Continue Claude" },
     { "<leader>am", "<cmd>ClaudeCodeSelectModel<cr>", desc = "Select Claude model" },
     { "<leader>ab", "<cmd>ClaudeCodeAdd %<cr>", desc = "Add current buffer" },
+    -- Move between code and Claude: <C-,> focuses Claude (opening it if
+    -- needed); in the Claude pane it jumps back to the code, leaving
+    -- Claude open.
+    { "<C-,>", "<cmd>ClaudeCodeFocus<cr>", desc = "Focus Claude" },
+    { "<C-,>", "<C-\\><C-n><C-w>p", mode = "t", desc = "Back to code" },
+    { "<leader>al", "<cmd>.ClaudeCodeSend<cr>", desc = "Send line to Claude" },
+    {
+      "<leader>aP",
+      "vip<cmd>ClaudeCodeSend<cr>",
+      remap = true,
+      desc = "Send paragraph to Claude",
+    },
     { "<leader>as", "<cmd>ClaudeCodeSend<cr>", mode = "v", desc = "Send to Claude" },
     {
       "<leader>as",

@@ -58,3 +58,14 @@ vim.api.nvim_create_autocmd({ "InsertLeave", "TextChanged" }, {
     end
   end,
 })
+
+-- Spell checking is opt-in (<leader>us). Keep LazyVim's soft wrap for
+-- prose but drop the spell it turns on with it.
+pcall(vim.api.nvim_del_augroup_by_name, "lazyvim_wrap_spell")
+vim.api.nvim_create_autocmd("FileType", {
+  group = vim.api.nvim_create_augroup("prose_wrap", { clear = true }),
+  pattern = { "text", "plaintex", "typst", "gitcommit", "markdown" },
+  callback = function()
+    vim.opt_local.wrap = true
+  end,
+})
