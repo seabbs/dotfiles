@@ -1,6 +1,6 @@
--- Claude Code through sidekick.nvim. Sessions run in tmux (one per
--- project directory), so they outlive nvim and survive restarts.
--- <C-.> moves between code and Claude, leaving Claude open.
+-- Claude Code through sidekick.nvim. Claude runs in a tmux split, one
+-- session per project directory, so it outlives nvim. <C-.> focuses it,
+-- and the usual pane keys move back.
 -- Next edit suggestions stay off: suggestions are opt-in here.
 local function cli()
   return require("sidekick.cli")
@@ -11,17 +11,7 @@ return {
   opts = {
     nes = { enabled = false },
     cli = {
-      mux = { enabled = true, backend = "tmux", create = "terminal" },
-      win = {
-        keys = {
-          hide_ctrl_dot = {
-            "<c-.>",
-            "blur",
-            mode = "nt",
-            desc = "back to the code, leaving Claude open",
-          },
-        },
-      },
+      mux = { enabled = true, backend = "tmux", create = "split" },
     },
   },
   keys = {
@@ -57,9 +47,9 @@ return {
     {
       "<leader>aq",
       function()
-        cli().send({ name = "claude", msg = "{quickfix}" })
+        cli().send({ name = "claude", msg = "Fix these failing tests or errors:\n{quickfix}" })
       end,
-      desc = "Send quickfix list",
+      desc = "Ask Claude to fix the quickfix list",
     },
   },
 }
