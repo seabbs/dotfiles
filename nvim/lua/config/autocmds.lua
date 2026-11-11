@@ -69,3 +69,6 @@ vim.api.nvim_create_autocmd("FileType", {
     vim.opt_local.wrap = true
   end,
 })
+
+-- Autocorrect in prose, with <M-z> to revert (see util/autocorrect.lua).
+require("util.autocorrect").setup()

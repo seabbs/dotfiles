@@ -6,6 +6,9 @@
 -- (see plugins/copilot.lua).
 vim.g.ai_cmp = false
 
+-- UK English for spell checking and autocorrect.
+vim.opt.spelllang = "en_gb"
+
 -- Set localleader to backslash (default, avoids search conflicts)
 vim.g.maplocalleader = "\\"
 
