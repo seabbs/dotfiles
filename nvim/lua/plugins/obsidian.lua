@@ -177,6 +177,20 @@ return {
         desc = "Rename note",
       },
       {
+        "<leader>na",
+        function()
+          require("config.attach_daily")()
+        end,
+        desc = "Attach note to today's daily",
+      },
+      {
+        "<leader>ni",
+        function()
+          require("config.connect_note").pick()
+        end,
+        desc = "Insert link to a note (connect)",
+      },
+      {
         "<leader>nm",
         function()
           local client = require("obsidian").get_client()

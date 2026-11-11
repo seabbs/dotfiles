@@ -23,11 +23,15 @@ local today = vault .. "/dailies/" .. os.date("%Y-%m-%d") .. ".md"
 local fails = 0
 local function check(name, ok)
   print((ok and "ok   " or "FAIL ") .. name)
-  if not ok then fails = fails + 1 end
+  if not ok then
+    fails = fails + 1
+  end
 end
 local function read(p)
   local f = io.open(p)
-  if not f then return "" end
+  if not f then
+    return ""
+  end
   local s = f:read("*a")
   f:close()
   return s
@@ -61,8 +65,7 @@ check("saves the daily buffer", not vim.bo[buf].modified)
 
 vim.cmd("edit " .. vim.fn.fnameescape(today))
 attach()
-check("daily note is not linked to itself",
-  count(read(today), "%[%[" .. os.date("%Y%-%m%-%d")) == 0)
+check("daily note is not linked to itself", count(read(today), "%[%[" .. os.date("%Y%-%m%-%d")) == 0)
 
 local outside = vim.fn.tempname() .. ".md"
 vim.fn.writefile({ "x" }, outside)
@@ -70,6 +73,13 @@ vim.cmd("edit " .. vim.fn.fnameescape(outside))
 local before = read(today)
 attach()
 check("ignores files outside the vault", read(today) == before)
+
+-- connect.insert puts a link to the chosen note at the cursor.
+local connect = require("config.connect_note")
+vim.cmd("edit " .. vim.fn.fnameescape(note))
+vim.api.nvim_win_set_cursor(0, { 3, 4 })
+connect.insert(other)
+check("inserts a link at the cursor", vim.api.nvim_buf_get_lines(0, 2, 3, false)[1] == "Text. [[second]]")
 
 vim.fn.delete(vault, "rf")
 print(fails == 0 and "all passed" or (fails .. " failed"))
