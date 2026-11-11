@@ -1,4 +1,5 @@
 #!/bin/bash
+# shellcheck disable=SC2015  # pass and bad never fail
 # Tests scripts/open-in-nvim.sh with tmux and nvim stubbed on PATH.
 # Usage: test-open-in-nvim.sh [path-to-scripts-dir]
 set -uo pipefail
@@ -63,7 +64,8 @@ logged "tmux split-window" && ! logged "--remote-expr" &&
 : > "$WORK/log"
 (cd "$WORK/proj" && PATH="$WORK/bin:$PATH" TMUX="" OIN_LOG="$WORK/log" \
   bash "$SCRIPT" a.md > "$WORK/out" 2>&1)
-[ $? -ne 0 ] && pass "fails outside tmux" || bad "outside tmux succeeded"
+rc=$?
+[ "$rc" -ne 0 ] && pass "fails outside tmux" || bad "outside tmux succeeded"
 
 OIN_PANES="$pane" run nope.md
 grep -q "no such file" "$WORK/out" && pass "rejects a missing file" ||
