@@ -2,6 +2,13 @@
 -- Default options that are always set: https://github.com/LazyVim/LazyVim/blob/main/lua/lazyvim/config/options.lua
 -- Add any additional options here
 
+-- Copilot as ghost text on request, not as a completion menu source
+-- (see plugins/copilot.lua).
+vim.g.ai_cmp = false
+
+-- UK English for spell checking and autocorrect.
+vim.opt.spelllang = "en_gb"
+
 -- Set localleader to backslash (default, avoids search conflicts)
 vim.g.maplocalleader = "\\"
 
