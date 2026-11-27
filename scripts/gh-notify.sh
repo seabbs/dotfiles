@@ -35,7 +35,11 @@ case "${1:-}" in
   --asks)  mode=asks ;;
   --muted) mode=muted ;;
   --read)  mode=read ;;
-  --help|-h) sed -n '2,25p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+  --help|-h)
+    # The header block, however long it grows: comment lines after the
+    # shebang, stopping at the first line that is not one.
+    awk 'NR > 1 { if (!/^#/) exit; sub(/^# ?/, ""); print }' "$0"
+    exit 0 ;;
   "") ;;
   *) echo "unknown option: $1" >&2; exit 2 ;;
 esac
