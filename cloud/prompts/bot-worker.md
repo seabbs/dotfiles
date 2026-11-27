@@ -146,4 +146,3 @@ report.
 
 Stop and report when you have spent 45 minutes, or done 5 tasks, or 5 PRs,
 whichever comes first.
-more than one that runs long and leaves half-finished branches behind.
