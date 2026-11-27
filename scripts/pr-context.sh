@@ -5,7 +5,7 @@
 #   pr-context.sh seabbs/dotfiles#101
 #   pr-context.sh 101                  (in a checkout of that repo)
 #   pr-context.sh --json  ...          the same, structured
-#   pr-context.sh --diff  ...          add the patch
+#   pr-context.sh --diff  ...          add the patch (PRs only)
 #
 # Paste a link and get the state, the conversation, the review threads and
 # whether each is resolved, the checks and the changed files. Reading that
@@ -70,7 +70,14 @@ esac
 read -r -d '' QUERY <<'GQL'
 query($owner:String!, $repo:String!, $number:Int!) {
   repository(owner:$owner, name:$repo) {
-    pullRequest(number:$number) {
+    issueOrPullRequest(number:$number) {
+      __typename
+      ... on Issue {
+        number title state author { login } createdAt updatedAt url body
+        labels(first:20) { nodes { name } }
+        comments(last:40) { nodes { author { login } createdAt body } }
+      }
+      ... on PullRequest {
       number title state isDraft mergeable reviewDecision
       author { login } createdAt updatedAt url body
       headRefName baseRefName additions deletions changedFiles
@@ -97,6 +104,7 @@ query($owner:String!, $repo:String!, $number:Int!) {
             ... on StatusContext { context state }
           } } } } }
       }
+      }
     }
   }
 }
@@ -104,16 +112,19 @@ GQL
 
 raw="$(gh api graphql -F owner="$owner" -F repo="$repo" \
   -F number="$number" -f query="$QUERY" 2>&1)"
-if ! jq -e '.data.repository.pullRequest' >/dev/null 2>&1 <<< "$raw"; then
+if ! jq -e '.data.repository.issueOrPullRequest' >/dev/null 2>&1 \
+  <<< "$raw"; then
   echo "could not read $owner/$repo#$number" >&2
   jq -r '.errors[]?.message // empty' <<< "$raw" >&2 2>/dev/null
   exit 1
 fi
 
-pr="$(jq '.data.repository.pullRequest' <<< "$raw")"
+pr="$(jq '.data.repository.issueOrPullRequest' <<< "$raw")"
+is_pr=false
+[ "$(jq -r '.__typename' <<< "$pr")" = "PullRequest" ] && is_pr=true
 
 if $JSON; then
-  if $DIFF; then
+  if $DIFF && $is_pr; then
     patch="$(gh pr diff "$number" -R "$owner/$repo" 2>/dev/null)"
     jq --arg d "$patch" '. + {diff: $d}' <<< "$pr"
   else
@@ -128,51 +139,60 @@ jq -r --arg slug "$owner/$repo" '
   def block(s): (s | clean | split("\n")
     | map("  " + .) | .[0:40] | join("\n"));
 
+  (.__typename == "PullRequest") as $pr |
   "\($slug)#\(.number)  \(.state)" +
     (if .isDraft then "  draft" else "" end) +
-    "  mergeable:\(.mergeable // "?")" +
-    "  review:\(.reviewDecision // "none")",
+    (if $pr then "  mergeable:\(.mergeable // "?")" +
+      "  review:\(.reviewDecision // "none")" else "  issue" end),
   .title,
-  "\(.author.login)  \(.headRefName) → \(.baseRefName)" +
-    "  +\(.additions) −\(.deletions)  \(.changedFiles) files" +
+  "\(.author.login)" +
+    (if $pr then "  \(.headRefName) → \(.baseRefName)" +
+      "  +\(.additions) −\(.deletions)  \(.changedFiles) files"
+     else ([.labels.nodes[].name] | if length == 0 then ""
+           else "  [" + join(", ") + "]" end) end) +
     "  updated \(.updatedAt)",
   "",
-  (.commits.nodes[0].commit.statusCheckRollup as $c
+  (if $pr | not then empty else
+   .commits.nodes[0].commit.statusCheckRollup as $c
    | if $c == null then "CHECKS  none reported"
      else "CHECKS  \($c.state)" + ( [$c.contexts.nodes[]
        | select((.conclusion // .state) as $s
                 | $s != "SUCCESS" and $s != null)
        | "  " + (.name // .context) + " " + (.conclusion // .state)]
        | if length == 0 then "" else "\n" + join("\n") end)
-     end),
-  "",
+     end end),
+  (if $pr then "" else empty end),
   "BODY", block(.body),
   "",
   "CONVERSATION (\(.comments.nodes | length))",
   (.comments.nodes[]
    | "  \(.author.login)  \(.createdAt)\n" +
      (block(.body | trim(600)) | split("\n") | map("  " + .) | join("\n"))),
-  "",
-  ((.reviewThreads.nodes | map(select(.isResolved | not)) | length) as $open
+  (if $pr | not then empty else
+  "" end),
+  (if $pr | not then empty else
+   (.reviewThreads.nodes | map(select(.isResolved | not)) | length) as $open
    | (.reviewThreads.nodes | length) as $all
-   | "REVIEW THREADS (\($open) open of \($all))"),
-  (.reviewThreads.nodes[]
+   | "REVIEW THREADS (\($open) open of \($all))" end),
+  (.reviewThreads.nodes[]?
    | "  \(.path):\(.line // 0)  " +
      (if .isResolved then "resolved" else "UNRESOLVED" end) +
      (if .isOutdated then " outdated" else "" end) + "\n" +
      ([.comments.nodes[]
        | "    \(.author.login): " + (.body | clean
          | gsub("\n"; " ") | trim(300))] | join("\n"))),
-  "",
-  "REVIEWS (\(.reviews.nodes | length))",
-  (.reviews.nodes[]
+  (if $pr | not then empty else "" end),
+  (if $pr | not then empty else
+   "REVIEWS (\(.reviews.nodes | length))" end),
+  (.reviews.nodes[]?
    | "  \(.author.login)  \(.state)  \(.submittedAt // "pending")"),
-  "",
-  "FILES (\(.files.nodes | length))",
-  (.files.nodes[] | "  +\(.additions) −\(.deletions)  \(.path)")
+  (if $pr | not then empty else "" end),
+  (if $pr | not then empty else
+   "FILES (\(.files.nodes | length))" end),
+  (.files.nodes[]? | "  +\(.additions) −\(.deletions)  \(.path)")
 ' <<< "$pr"
 
-if $DIFF; then
+if $DIFF && $is_pr; then
   echo
   echo "DIFF"
   gh pr diff "$number" -R "$owner/$repo" 2>/dev/null
