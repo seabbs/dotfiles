@@ -1,0 +1,69 @@
+#!/bin/bash
+# Stub `gh` for the pr-context tests. Answers the one GraphQL query the
+# script makes, choosing a fixture by the number it asks for: 101 is a
+# pull request, 93 an issue, 404 a number that does not resolve.
+set -u
+echo "$*" >> "${PC_TEST_CALLS:?PC_TEST_CALLS not set}"
+
+number=""
+prev=""
+for a in "$@"; do
+  case "$a" in number=*) number="${a#number=}" ;; esac
+  prev="$a"
+done
+
+[ "$1" = "repo" ] && { echo "seabbs/dotfiles"; exit 0; }
+[ "$1" = "pr" ] && { echo "diff --git a/x b/x"; exit 0; }
+
+wrap() { jq -n --argjson o "$1" '{data:{repository:{issueOrPullRequest:$o}}}'; }
+
+case "$number" in
+  101)
+    wrap '{
+      "__typename":"PullRequest","number":101,"title":"A pull request",
+      "state":"OPEN","isDraft":false,"mergeable":"MERGEABLE",
+      "reviewDecision":"REVIEW_REQUIRED","author":{"login":"seabbs-bot"},
+      "createdAt":"2026-11-27T10:00:00Z","updatedAt":"2026-11-27T15:00:00Z",
+      "url":"u","body":"The body.","headRefName":"feat/x","baseRefName":"main",
+      "additions":412,"deletions":0,"changedFiles":5,
+      "comments":{"nodes":[
+        {"author":{"login":"seabbs"},"createdAt":"2026-11-27T12:00:00Z",
+         "body":"A comment."}]},
+      "reviews":{"nodes":[
+        {"author":{"login":"seabbs-review-bot"},"state":"COMMENTED",
+         "submittedAt":"2026-11-27T13:00:00Z","body":"r"}]},
+      "reviewThreads":{"nodes":[
+        {"isResolved":false,"isOutdated":false,"path":"scripts/a.sh",
+         "line":12,"comments":{"nodes":[
+           {"author":{"login":"seabbs-review-bot"},
+            "createdAt":"2026-11-27T13:00:00Z","body":"this looks wrong"}]}},
+        {"isResolved":true,"isOutdated":true,"path":"scripts/b.sh",
+         "line":3,"comments":{"nodes":[
+           {"author":{"login":"seabbs"},
+            "createdAt":"2026-11-27T13:30:00Z","body":"fixed"}]}}]},
+      "files":{"nodes":[{"path":"scripts/a.sh","additions":10,
+                         "deletions":2}]},
+      "commits":{"nodes":[{"commit":{"statusCheckRollup":{
+        "state":"FAILURE","contexts":{"nodes":[
+          {"__typename":"CheckRun","name":"tests","conclusion":"FAILURE"},
+          {"__typename":"CheckRun","name":"lint","conclusion":"SUCCESS"}
+        ]}}}}]}
+    }'
+    exit 0 ;;
+  93)
+    wrap '{
+      "__typename":"Issue","number":93,"title":"An issue","state":"OPEN",
+      "author":{"login":"seabbs"},"createdAt":"2026-09-29T17:00:00Z",
+      "updatedAt":"2026-09-29T17:28:44Z","url":"u","body":"Issue body.",
+      "labels":{"nodes":[{"name":"enhancement"}]},
+      "comments":{"nodes":[]}
+    }'
+    exit 0 ;;
+  404)
+    echo '{"data":{"repository":{"issueOrPullRequest":null}},
+           "errors":[{"message":"Could not resolve to an issue"}]}'
+    exit 0 ;;
+esac
+
+echo "stub-gh-pr-context: unhandled call: $*" >&2
+exit 1

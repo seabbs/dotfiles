@@ -42,14 +42,15 @@ TARGET="${1:-}"
 
 # Accept whatever is to hand: a pasted link, the shorthand, or a bare
 # number in a checkout. A link is the common case because it is what
-# GitHub gives you to copy.
-owner=""; repo=""; number=""; kind="pr"
+# GitHub gives you to copy. Which of the two it is does not need working
+# out here: issueOrPullRequest answers that, so a /issues/ link to a PR
+# renders as the PR it really is.
+owner=""; repo=""; number=""
 case "$TARGET" in
   http*://*/*/*/pull/*|http*://*/*/*/issues/*)
     rest="${TARGET#*://*/}"
     owner="${rest%%/*}"; rest="${rest#*/}"
     repo="${rest%%/*}";  rest="${rest#*/}"
-    case "$rest" in issues/*) kind="issue" ;; esac
     number="${rest#*/}"; number="${number%%[!0-9]*}" ;;
   */*#*)
     owner="${TARGET%%/*}"
@@ -139,57 +140,64 @@ jq -r --arg slug "$owner/$repo" '
   def block(s): (s | clean | split("\n")
     | map("  " + .) | .[0:40] | join("\n"));
 
-  (.__typename == "PullRequest") as $pr |
-  "\($slug)#\(.number)  \(.state)" +
-    (if .isDraft then "  draft" else "" end) +
-    (if $pr then "  mergeable:\(.mergeable // "?")" +
-      "  review:\(.reviewDecision // "none")" else "  issue" end),
-  .title,
-  "\(.author.login)" +
-    (if $pr then "  \(.headRefName) → \(.baseRefName)" +
-      "  +\(.additions) −\(.deletions)  \(.changedFiles) files"
-     else ([.labels.nodes[].name] | if length == 0 then ""
-           else "  [" + join(", ") + "]" end) end) +
-    "  updated \(.updatedAt)",
-  "",
-  (if $pr | not then empty else
-   .commits.nodes[0].commit.statusCheckRollup as $c
-   | if $c == null then "CHECKS  none reported"
-     else "CHECKS  \($c.state)" + ( [$c.contexts.nodes[]
-       | select((.conclusion // .state) as $s
-                | $s != "SUCCESS" and $s != null)
-       | "  " + (.name // .context) + " " + (.conclusion // .state)]
-       | if length == 0 then "" else "\n" + join("\n") end)
-     end end),
-  (if $pr then "" else empty end),
-  "BODY", block(.body),
-  "",
-  "CONVERSATION (\(.comments.nodes | length))",
-  (.comments.nodes[]
-   | "  \(.author.login)  \(.createdAt)\n" +
-     (block(.body | trim(600)) | split("\n") | map("  " + .) | join("\n"))),
-  (if $pr | not then empty else
-  "" end),
-  (if $pr | not then empty else
-   (.reviewThreads.nodes | map(select(.isResolved | not)) | length) as $open
-   | (.reviewThreads.nodes | length) as $all
-   | "REVIEW THREADS (\($open) open of \($all))" end),
-  (.reviewThreads.nodes[]?
-   | "  \(.path):\(.line // 0)  " +
-     (if .isResolved then "resolved" else "UNRESOLVED" end) +
-     (if .isOutdated then " outdated" else "" end) + "\n" +
-     ([.comments.nodes[]
-       | "    \(.author.login): " + (.body | clean
-         | gsub("\n"; " ") | trim(300))] | join("\n"))),
-  (if $pr | not then empty else "" end),
-  (if $pr | not then empty else
-   "REVIEWS (\(.reviews.nodes | length))" end),
-  (.reviews.nodes[]?
-   | "  \(.author.login)  \(.state)  \(.submittedAt // "pending")"),
-  (if $pr | not then empty else "" end),
-  (if $pr | not then empty else
-   "FILES (\(.files.nodes | length))" end),
-  (.files.nodes[]? | "  +\(.additions) −\(.deletions)  \(.path)")
+  (.__typename == "PullRequest") as $pr
+  | ([
+      "\($slug)#\(.number)  \(.state)"
+        + (if .isDraft then "  draft" else "" end)
+        + (if $pr then "  mergeable:\(.mergeable // "?")"
+             + "  review:\(.reviewDecision // "none")"
+           else "  issue" end),
+      .title,
+      "\(.author.login)"
+        + (if $pr then "  \(.headRefName) → \(.baseRefName)"
+             + "  +\(.additions) −\(.deletions)  \(.changedFiles) files"
+           else ([.labels.nodes[].name]
+                 | if length == 0 then "" else "  [" + join(", ") + "]" end)
+           end)
+        + "  updated \(.updatedAt)"
+    ]
+
+    + (if $pr then
+        [.commits.nodes[0].commit.statusCheckRollup as $c
+         | if $c == null then "\nCHECKS  none reported"
+           else "\nCHECKS  \($c.state)"
+             + ([$c.contexts.nodes[]
+                 | select((.conclusion // .state) as $x
+                          | $x != "SUCCESS" and $x != null)
+                 | "  " + (.name // .context) + " " + (.conclusion // .state)]
+                | if length == 0 then "" else "\n" + join("\n") end)
+           end]
+       else [] end)
+
+    + ["", "BODY", block(.body)]
+
+    + ["", "CONVERSATION (\(.comments.nodes | length))"]
+    + [.comments.nodes[]
+       | "  \(.author.login)  \(.createdAt)\n"
+         + (block(.body | trim(600)) | split("\n")
+            | map("  " + .) | join("\n"))]
+
+    + (if $pr then
+        ["",
+         ((.reviewThreads.nodes | map(select(.isResolved | not)) | length)
+          as $open
+          | (.reviewThreads.nodes | length) as $all
+          | "REVIEW THREADS (\($open) open of \($all))")]
+        + [.reviewThreads.nodes[]
+           | "  \(.path):\(.line // 0)  "
+             + (if .isResolved then "resolved" else "UNRESOLVED" end)
+             + (if .isOutdated then " outdated" else "" end) + "\n"
+             + ([.comments.nodes[]
+                 | "    \(.author.login): "
+                   + (.body | clean | gsub("\n"; " ") | trim(300))]
+                | join("\n"))]
+        + ["", "REVIEWS (\(.reviews.nodes | length))"]
+        + [.reviews.nodes[]
+           | "  \(.author.login)  \(.state)  \(.submittedAt // "pending")"]
+        + ["", "FILES (\(.files.nodes | length))"]
+        + [.files.nodes[] | "  +\(.additions) −\(.deletions)  \(.path)"]
+       else [] end)
+    )[]
 ' <<< "$pr"
 
 if $DIFF && $is_pr; then
