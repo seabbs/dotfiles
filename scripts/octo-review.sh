@@ -1,6 +1,12 @@
 #!/usr/bin/env bash
 # Open a GitHub PR in octo.nvim from gh-dash.
-# Usage: octo-review.sh <owner/repo> <pr-number> [repo-path]
+# Usage: octo-review.sh <owner/repo> <pr-number> [repo-path] [review]
+#
+# With "review" as the fourth argument it goes straight into octo's review
+# mode -- the changed-files panel and the diff, ready for inline comments --
+# instead of stopping at the PR buffer. Starting a review creates a PENDING
+# review on GitHub straight away, which only you can see until you submit it
+# or throw it away with `Octo review discard`.
 #
 # Companion to tuicr-review.sh, not a replacement: tuicr (C) is for reading
 # the diff, octo (E) is for editing PR metadata and threading comments.
@@ -19,6 +25,7 @@ set -euo pipefail
 REPO="${1:-}"
 PR="${2:-}"
 REPO_PATH="${3:-}"
+MODE="${4:-edit}"
 CACHE_DIR="$HOME/.cache/tuicr-review"
 
 if [ -z "$REPO" ] || [ -z "$PR" ]; then
@@ -42,10 +49,29 @@ fi
 
 # No -c ":silent": a failing Octo command should say so rather than leave an
 # empty buffer. octo picks up GH_TOKEN itself via the gh_env in its config.
+#
+# OctoReviewWhenReady rather than a second -c 'Octo review start': octo
+# fetches the PR asynchronously, so a review started in the same breath runs
+# against an empty buffer and does nothing. The command waits for the buffer
+# and is defined in nvim/lua/plugins/octo.lua.
+name="octo-$PR"
+cmds=(-c "Octo pr edit $PR")
+if [ "$MODE" = "review" ]; then
+  cmds+=(-c "OctoReviewWhenReady")
+  name="review-$PR"
+fi
+
 if [ -n "${TMUX:-}" ]; then
-  exec tmux new-window -c "$target" -n "octo-$PR" \
-    "nvim -c 'Octo pr edit $PR'"
+  # tmux takes one command string, so the args are quoted back into one.
+  # printf %q rather than ${cmds[*]@Q}: @Q wants bash 4.4, and this file
+  # starts with `env bash`, so a PATH that finds macOS's /bin/bash 3.2
+  # first would turn that into a syntax error.
+  quoted=""
+  for arg in "${cmds[@]}"; do
+    quoted="$quoted $(printf '%q' "$arg")"
+  done
+  exec tmux new-window -c "$target" -n "$name" "nvim$quoted"
 else
   cd "$target"
-  exec nvim -c "Octo pr edit $PR"
+  exec nvim "${cmds[@]}"
 fi
