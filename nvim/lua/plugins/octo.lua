@@ -27,11 +27,24 @@ return {
       left_bubble_delimiter = "",
       snippet_context_lines = 4,
       gh_env = function()
-        return {
-          GH_TOKEN = vim.trim(
-            vim.fn.system("gh auth token --user seabbs")
-          ),
-        }
+        local token = vim.trim(
+          vim.fn.system("gh auth token --user seabbs")
+        )
+        -- Say so rather than carrying on. Returning nothing here does not
+        -- leave octo unauthenticated, it leaves it acting as whoever gh is
+        -- currently logged in as -- usually seabbs-bot on this machine.
+        -- That is the shape of every "octo has permission problems" report:
+        -- reads work, then a review or an approval fails as the bot, which
+        -- cannot review its own PRs and has different scopes.
+        if vim.v.shell_error ~= 0 or not token:match("^gh[pousr]_") then
+          vim.notify(
+            "octo: no seabbs token, so octo would act as whoever gh is "
+              .. "logged in as. Fix with: gh auth login --user seabbs",
+            vim.log.levels.ERROR
+          )
+          return {}
+        end
+        return { GH_TOKEN = token }
       end,
       timeout = 5000,
       ui = {
