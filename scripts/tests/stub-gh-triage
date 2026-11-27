@@ -1,0 +1,50 @@
+#!/bin/bash
+# Stub `gh` for the triage tests. Answers the two search calls triage.sh
+# makes, applying any --jq filter with the real jq so its own query still
+# does the work. Keys on the q value, since the two searches differ only
+# there.
+set -u
+echo "$*" >> "${TR_TEST_CALLS:?TR_TEST_CALLS not set}"
+
+jq_query=""
+q=""
+prev=""
+for a in "$@"; do
+  [ "$prev" = "--jq" ] && jq_query="$a"
+  case "$prev" in q=*) ;; esac
+  case "$a" in q=*) q="${a#q=}" ;; esac
+  prev="$a"
+done
+
+emit() { if [ -n "$jq_query" ]; then jq -r "$jq_query"; else cat; fi; }
+
+[ "$1" = "auth" ] && { echo "gho_stub_token"; exit 0; }
+
+mk() { # repo number title is_pr author
+  jq -n --arg r "$1" --argjson n "$2" --arg t "$3" \
+    --argjson pr "$4" --arg u "$5" \
+    '{repository_url:("https://api.github.com/repos/" + $r), number:$n,
+      title:$t, user:{login:$u},
+      pull_request:(if $pr == 1 then {url:"x"} else null end)}'
+}
+
+case "$q" in
+  *review-requested*)
+    jq -s '{items: .}' \
+      <(mk "epinowcast/baselinenowcast" 505 "A person asks for review" 1 \
+          "kaitejohnson") \
+      <(mk "seabbs/EpiSewer.jl" 42 "bump the actions group" 1 \
+          "dependabot[bot]") \
+      <(mk "seabbs/bdbv-hub-modelling" 1276 "Already an ask" 1 \
+          "seabbs-bot") | emit
+    exit 0 ;;
+  *author:*)
+    jq -s '{items: .}' \
+      <(mk "seabbs/dotfiles" 100 "My own open PR" 1 "seabbs-bot") \
+      <(mk "seabbs/bdbv-hub-modelling" 1276 "Already an ask" 1 \
+          "seabbs-bot") | emit
+    exit 0 ;;
+esac
+
+echo "stub-gh-triage: unhandled call: $*" >&2
+exit 1
