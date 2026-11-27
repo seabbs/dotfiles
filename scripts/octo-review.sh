@@ -62,8 +62,15 @@ if [ "$MODE" = "review" ]; then
 fi
 
 if [ -n "${TMUX:-}" ]; then
-  exec tmux new-window -c "$target" -n "$name" \
-    "nvim ${cmds[*]@Q}"
+  # tmux takes one command string, so the args are quoted back into one.
+  # printf %q rather than ${cmds[*]@Q}: @Q wants bash 4.4, and this file
+  # starts with `env bash`, so a PATH that finds macOS's /bin/bash 3.2
+  # first would turn that into a syntax error.
+  quoted=""
+  for arg in "${cmds[@]}"; do
+    quoted="$quoted $(printf '%q' "$arg")"
+  done
+  exec tmux new-window -c "$target" -n "$name" "nvim$quoted"
 else
   cd "$target"
   exec nvim "${cmds[@]}"
