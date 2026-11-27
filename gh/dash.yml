@@ -4,6 +4,18 @@ prSections:
       sort: updated
     - title: Needs My Review
       filters: is:open review-requested:@me
+    # Tagged by a person. review-requested only catches a formal request,
+    # so an @ in a comment asking you to look never showed up here. The
+    # bot is excluded: its PRs tag you by habit, and they have their own
+    # section above.
+    - title: Tagged
+      filters: is:open mentions:@me -author:@me -author:seabbs-bot
+      sort: updated
+    # Where the worker is stuck and waiting on you. It labels the thread
+    # when it asks, so this stays empty unless it needs an answer.
+    - title: Bot Asking
+      filters: is:open involves:@me label:needs-seabbs
+      sort: updated
     - title: Involved
       filters: is:open involves:@me -author:@me
     - title: All
@@ -13,6 +25,12 @@ issuesSections:
       filters: is:open author:@me
     - title: Assigned
       filters: is:open assignee:@me
+    - title: Tagged
+      filters: is:open mentions:@me -author:@me -author:seabbs-bot
+      sort: updated
+    - title: Bot Asking
+      filters: is:open involves:@me label:needs-seabbs
+      sort: updated
     - title: Involved
       filters: is:open involves:@me -author:@me
     - title: All
