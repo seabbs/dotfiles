@@ -29,6 +29,16 @@ declare -A EXTRA_ROOTS=(
   [notes]="$HOME/Library/CloudStorage/GoogleDrive-s.e.abbott12@gmail.com/My Drive/cloud/apps/obsidian/notes"
 )
 
+# The same roots on a hub, where one exists. A hub mirrors ~/code but not the
+# mac's cloud storage, so home is the only shared root. A root missing here is
+# home-only and is hidden while the picker is scoped to a hub.
+declare -A EXTRA_ROOTS_HUB=(
+  [home]="~"
+)
+
+# Path of extra root $1 on a hub, empty when the root is home-only.
+hub_dir_for_extra() { printf '%s' "${EXTRA_ROOTS_HUB[$1]:-}"; }
+
 # Remote hub hosts to span (space-separated ssh aliases), overridable via env.
 HUB_HOSTS="${HUB_HOSTS:-archie}"
 # This script's path on a hub, for routing kill/create actions there over ssh.
@@ -234,9 +244,17 @@ list_orgs() {
   done | sort
 }
 
+# Scoped to a hub, list the roots that exist THERE (notes lives in the mac's
+# cloud storage and has no hub copy), so picking one cannot silently land you
+# back home. Otherwise list the local roots.
 list_extras() {
+  local hub; hub="$(hub_scope)"
   for name in "${!EXTRA_ROOTS[@]}"; do
-    [[ -d "${EXTRA_ROOTS[$name]}" ]] && echo "[dir] $name"
+    if [[ -n "$hub" ]]; then
+      [[ -n "${EXTRA_ROOTS_HUB[$name]:-}" ]] && echo "[dir] $name"
+    else
+      [[ -d "${EXTRA_ROOTS[$name]}" ]] && echo "[dir] $name"
+    fi
   done | sort
 }
 
@@ -337,13 +355,19 @@ drop_dead_gateway() {
 # then pick/create a window on the hub (the project path) use this and let
 # pick_window do the routing. $1=hub $2=session $3=dir $4=repo (optional).
 ensure_hub_session() {
-  local hub="$1" sname="$2" dir="$3" repo="${4:-}" err
+  local hub="$1" sname="$2" dir="$3" repo="${4:-}" err rdir
   dbg "ensure_hub_session hub=$hub sname=$sname dir=$dir repo=$repo"
+  # Give the hub an absolute path: a leading ~ becomes $HOME for the remote
+  # shell to expand. tmuxinator takes its root through YAML, where a bare ~ is
+  # null, so a "~" root became `cd .` -- whatever cwd the ssh command happened
+  # to start in -- instead of the hub's home.
+  rdir="${dir/#\~/\$HOME}"
   # Clone the repo on demand if it is not on the hub yet (gh credential helper
   # on the hub covers private repos). git clone creates missing parent dirs.
   if [[ -n "$repo" ]]; then
     err=$(ssh "$hub" \
-      "[ -d $dir ] || git clone https://github.com/$repo.git $dir" 2>&1) \
+      "[ -d \"$rdir\" ] || git clone https://github.com/$repo.git \"$rdir\"" \
+      2>&1) \
       || slog "clone $repo on $hub failed: $err"
   fi
   # Start the session detached if missing, then confirm it actually exists —
@@ -351,13 +375,38 @@ ensure_hub_session() {
   # later window/feature step targeting a session that was never created.
   if ! ssh "$hub" "tmux has-session -t '=$sname' 2>/dev/null"; then
     err=$(ssh "$hub" \
-      "tmuxinator start project '$sname' '$dir' --no-attach" 2>&1)
+      "tmuxinator start project '$sname' \"$rdir\" --no-attach" 2>&1)
     if ! ssh "$hub" "tmux has-session -t '=$sname' 2>/dev/null"; then
       slog "could not create session '$sname' on $hub: $err"
       return 1
     fi
   fi
   return 0
+}
+
+# Ensure session $2 exists on hub $1, working out what it should be rooted at:
+# an extra root (home) first, then the repo the session is named after -- on the
+# hub, else the local checkout, cloned there on demand. The extra-root step is
+# why this is not a plain repo lookup: a session such as "home" is not a repo,
+# so resolving by repo alone left it uncreatable on a hub. Logs and returns
+# non-zero when the name resolves to nothing.
+ensure_named_hub_session() {
+  local hub="$1" session="$2" dir rel slug
+  dir="$(hub_dir_for_extra "$session")"
+  if [[ -n "$dir" ]]; then
+    ensure_hub_session "$hub" "$session" "$dir"
+    return
+  fi
+  rel="$(hub_repo_for_session "$hub" "$session")"
+  # Not on the hub yet: resolve from the local checkout instead, so the repo is
+  # cloned there on demand rather than the step aborting.
+  [[ -z "$rel" ]] && rel="$(local_repo_for_session "$session")"
+  if [[ -z "$rel" ]]; then
+    slog "no repo or root for session '$session' on $hub, cannot create it"
+    return 1
+  fi
+  slug="$(gh_slug_for "$rel")"
+  ensure_hub_session "$hub" "$session" "~/code/$rel" "${slug:-$rel}"
 }
 
 # Create a session on a hub host (if missing) and jump into its nested mosh
@@ -766,15 +815,10 @@ pick_window() {
       # from its repo so the switch lands on it, rather than silently leaving
       # the gateway on whatever session it was showing before.
       if ! ssh "$host_tag" "tmux has-session -t '=$session' 2>/dev/null"; then
-        local rel slug; rel="$(hub_repo_for_session "$host_tag" "$session")"
-        if [[ -z "$rel" ]]; then
-          slog "session '$session' is gone from $host_tag"
+        if ! ensure_named_hub_session "$host_tag" "$session"; then
           rm -f "$CACHE_DIR/$host_tag-windows-$session" 2>/dev/null
           return 0
         fi
-        slug="$(gh_slug_for "$rel")"
-        ensure_hub_session "$host_tag" "$session" "~/code/$rel" \
-          "${slug:-$rel}" || return 0
       fi
       if tmux has-session -t "=$host_tag" 2>/dev/null; then
         # Existing connection: drive its live client to the chosen window.
@@ -825,24 +869,13 @@ pick_window() {
     # hub's copy of the session) and jump into it, rather than locally.
     hub="$(hub_scope)"
     if [[ -n "$hub" ]]; then
-      local rel slug
       # The picker can be scoped to the hub (C-r) without the project step
       # having created the session there, e.g. opening a repo that also exists
       # locally, then C-r to the hub to branch. Ensure the session exists first,
       # or the new-window below targets a missing session and silently no-ops
       # (the reported "prefix f closes and does nothing" on a fresh hub repo).
       if ! ssh "$hub" "tmux has-session -t '=$session' 2>/dev/null"; then
-        rel="$(hub_repo_for_session "$hub" "$session")"
-        # Not on the hub yet: resolve from the local checkout instead, so the
-        # repo is cloned there on demand rather than the branch step aborting.
-        [[ -z "$rel" ]] && rel="$(local_repo_for_session "$session")"
-        if [[ -z "$rel" ]]; then
-          slog "no repo for session '$session' on $hub, cannot create it"
-          return 0
-        fi
-        slug="$(gh_slug_for "$rel")"
-        ensure_hub_session "$hub" "$session" "~/code/$rel" "${slug:-$rel}" \
-          || return 0
+        ensure_named_hub_session "$hub" "$session" || return 0
       fi
       root=$(ssh "$hub" \
         "tmux display-message -t '=$session:1' -p '#{pane_current_path}'" \
@@ -1066,6 +1099,21 @@ if [[ "$selected" == "[active] "* ]]; then
 
 elif [[ "$selected" == "[dir] "* ]]; then
   session="${selected#\[dir\] }"
+
+  # Scoped to a hub (C-r): open the root there, as the org path does. This
+  # handler used to be local-only, so picking "home" on archie quietly started
+  # a session on the mac instead.
+  hub="$(hub_scope)"
+  if [[ -n "$hub" ]]; then
+    hub_root="$(hub_dir_for_extra "$session")"
+    if [[ -z "$hub_root" ]]; then
+      slog "'$session' is a home-only root, not on $hub"
+      exit 0
+    fi
+    create_hub_session "$hub" "$session" "$hub_root"
+    exit 0
+  fi
+
   project_root="${EXTRA_ROOTS[$session]}"
   if [[ -z "$project_root" || ! -d "$project_root" ]]; then
     exit 0
