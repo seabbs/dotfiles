@@ -10,6 +10,7 @@
 #   gh-notify.sh --asks    only the questions a muted actor is asking you
 #   gh-notify.sh --muted   only what was dropped, so nothing is lost
 #   gh-notify.sh --read    mark the dropped ones read, never an ask
+#   gh-notify.sh --tsv     the same decisions, for another program to read
 #
 # Muting is by whoever caused the notification, not by reason. The bot's
 # work arrives as reason:mention -- it @s you in its own PRs -- so a rule
@@ -33,6 +34,7 @@ ASK_LABEL="${GH_NOTIFY_ASK_LABEL:-needs-seabbs}"
 mode=list
 case "${1:-}" in
   --asks)  mode=asks ;;
+  --tsv)   mode=tsv ;;
   --muted) mode=muted ;;
   --read)  mode=read ;;
   --help|-h)
@@ -94,9 +96,16 @@ while IFS=$'\t' read -r id reason repo title url suburl; do
     fi
   fi
 
+  # The thread's issue or PR number, from the subject URL. Empty for a
+  # subject that is not one, such as a check suite.
+  number="${suburl##*/}"
+  case "$number" in ''|*[!0-9]*) number="" ;; esac
+
   if muted_actor "$who" && ! $is_ask; then
     hidden=$((hidden + 1))
     case "$mode" in
+      tsv) printf 'muted\t%s\t%s\t%s\t%s\t%s\t%s\n' \
+             "$who" "$reason" "$repo" "$number" "$title" "$id" ;;
       muted) printf '  %-16s %-34s %s\n' "$reason" "$repo" "$title" ;;
       read)
         if gh api -X PATCH "notifications/threads/$id" >/dev/null 2>&1; then
@@ -119,12 +128,17 @@ while IFS=$'\t' read -r id reason repo title url suburl; do
           fi ;;
     asks) $is_ask && \
             printf '  %-14s %-34s %s\n' "$who" "$repo" "$title" ;;
+    tsv) printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\n' \
+           "$($is_ask && echo ask || echo keep)" \
+           "$who" "$reason" "$repo" "$number" "$title" "$id" ;;
   esac
 done < <(gh api "notifications?per_page=100" --paginate \
   --jq '.[] | [.id, .reason, .repository.full_name,
                (.subject.title[0:46]),
                (.subject.latest_comment_url // .subject.url // ""),
                (.subject.url // "")] | @tsv' 2>/dev/null)
+
+[ "$mode" = tsv ] && exit 0
 
 case "$mode" in
   list)  printf '\n%d shown (%d of them asks), %d muted (%s).\n' \
