@@ -634,8 +634,25 @@ run_review() {
     --allowedTools "Read" "Grep" "Glob" "Bash(git diff:*)" \
       "Bash(git log:*)" "Bash(git show:*)" "Bash(git status:*)" \
     --disallowedTools "Write" "Edit" "WebFetch" "WebSearch" "Bash(gh:*)" \
-    2>"$STATE_DIR/last-claude-stderr.log")" || return 1
+    2>"$STATE_DIR/last-claude-stderr.log")"
+  local rc=$?
   printf '%s' "$out" > "$STATE_DIR/last-claude-raw.json"
+
+  # The CLI reports its own failures as JSON on stdout, not on stderr, so
+  # dropping $out on a non-zero exit threw away the only explanation there
+  # was. An expired OAuth session exits 1 in under a second with nothing on
+  # stderr at all, which reached the log as "no usable review returned" --
+  # indistinguishable from a model that answered badly. The bot polled every
+  # five minutes for three days looking healthy and reviewing nothing.
+  if [ "$rc" -ne 0 ] \
+    || [ "$(jq -r '.is_error // false' <<< "$out" 2>/dev/null)" = "true" ]; then
+    local why
+    why="$(jq -r '.result // empty' <<< "$out" 2>/dev/null | head -c 200)"
+    [ -n "$why" ] \
+      || why="$(head -c 200 "$STATE_DIR/last-claude-stderr.log" 2>/dev/null)"
+    log "  claude failed on this review (exit $rc): ${why:-no output}"
+    return 1
+  fi
   # Recorded per review so a run that suddenly costs ten times the usual
   # is visible in the ledger rather than only on a bill.
   LAST_COST="$(jq -r '.total_cost_usd // empty' <<< "$out" 2>/dev/null)"
