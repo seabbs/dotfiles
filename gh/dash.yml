@@ -118,6 +118,14 @@ keybindings:
           command: >
             ~/code/seabbs/dotfiles/scripts/octo-review.sh
             {{.RepoName}} {{.PrNumber}} "{{.RepoPath}}"
+        # Straight into octo's review mode: changed files, the diff, and
+        # inline comments. Starting a review opens a PENDING review on
+        # GitHub, visible only to you until you submit or discard it.
+        - key: D
+          name: review PR (octo)
+          command: >
+            ~/code/seabbs/dotfiles/scripts/octo-review.sh
+            {{.RepoName}} {{.PrNumber}} "{{.RepoPath}}" review
         - key: O
           builtin: checkout
         - key: V

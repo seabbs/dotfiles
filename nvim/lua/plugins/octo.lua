@@ -171,6 +171,36 @@ return {
       }
     })
 
+    -- Start a review once the PR buffer has actually loaded. Octo fetches
+    -- the PR asynchronously, so `Octo review start` issued straight after
+    -- `Octo pr edit` runs against an empty buffer and does nothing. Used by
+    -- scripts/octo-review.sh, which gh-dash binds to D.
+    vim.api.nvim_create_user_command("OctoReviewWhenReady", function()
+      local tries = 0
+      local function attempt()
+        tries = tries + 1
+        -- Ask octo whether the buffer is populated, rather than reading its
+        -- name. The name is set the moment the buffer is created, while the
+        -- PR itself arrives seconds later, so a name test starts the review
+        -- against an empty buffer and octo falls back to the current branch
+        -- ("No pr found for current branch").
+        local ok, buf = pcall(function()
+          return require("octo.utils").get_current_buffer()
+        end)
+        if ok and buf and buf.node then
+          vim.cmd("Octo review start")
+        elseif tries < 60 then
+          vim.defer_fn(attempt, 500)
+        else
+          vim.notify(
+            "octo: PR did not load in 30s, review not started",
+            vim.log.levels.WARN
+          )
+        end
+      end
+      attempt()
+    end, { desc = "Start an Octo review once the PR buffer has loaded" })
+
     vim.treesitter.language.register("markdown", "octo")
   end,
   cmd = "Octo",
