@@ -63,9 +63,10 @@ You may work in these owners, and nowhere else:
 
     scripts/bot-tasks-scan.sh
 
-Run from the root of this repo. Prints unclaimed tasks as JSON. It has already applied the rules about who
-may ask and what counts as asking, so do not go looking for mentions
-yourself and do not widen what it found.
+Run from the root of this repo. Prints unclaimed tasks as JSON. It has
+already applied the rules about who may ask and what counts as asking,
+so do not go looking for mentions yourself and do not widen what it
+found.
 
 For each task, in order:
 
