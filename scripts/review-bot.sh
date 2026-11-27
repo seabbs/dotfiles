@@ -37,6 +37,7 @@ export PATH
 
 DOTFILES="$(cd "$(dirname "$0")/.." && pwd)"
 TOKEN_SH="$DOTFILES/scripts/review-bot-token.sh"
+FORMAT_JQ="$DOTFILES/scripts/review-bot-format.jq"
 BUDGET_SH="$HOME/.claude/hooks/compute-budget.sh"
 
 # Owners to watch. user: for personal repos, org: for organisations; the
@@ -83,6 +84,8 @@ TIMEOUT="${REVIEW_BOT_TIMEOUT:-900}"
 # date helpers, the bwrap sandbox, and cache pruning.
 BOT_NAME=review-bot
 . "$(dirname "$0")/bot-common.sh"
+# shellcheck source=SCRIPTDIR/review-bot-rounds.sh
+. "$(dirname "$0")/review-bot-rounds.sh"
 
 # PRs opened before this stamp are never picked up automatically, so
 # switching the bot on does not review everything already in flight.
@@ -544,16 +547,18 @@ prepare_checkout() {
 
 build_prompt() {
   local repo="$1" pr="$2" author="$3" base="$4" range="$5" title="$6"
-  local standards="$7" ci="$8" scope="${9:-}"
+  local standards="$7" ci="$8" scope="${9:-}" rounds="${10:-}"
+  local prior="${11:-}"
   cat <<PROMPT
 You are seabbs-review-bot, an independent first-pass reviewer on $repo
 pull request #$pr, "$title", opened by $author. Assume it was written by
 an AI agent. Review the code that is there, not the story the description
 tells about it.
 
-The PR head is checked out here. Read the change first:
+The PR head is checked out here.
+${rounds:-Read the change first:
   git diff --stat $range
-  git diff $range
+  git diff $range}
 $scope
 Then read the surrounding code with Read and Grep before judging
 anything. A line that looks wrong in a diff is often fine in context, and
@@ -595,15 +600,29 @@ return no comments.
 Every comment says what to change, not just what is wrong. Where the fix
 is a few lines, give them.
 
+When a finding is one case of a pattern, name the pattern in the title and
+grep for the other places it occurs. List them in one comment so the
+author fixes every instance, rather than posting one comment per line.
+${prior:+
+You have already posted these findings on this PR. Do not post any of
+them again, even reworded. The author has seen them:
+$prior
+}
 Each inline comment must name a file and a line that appears in the diff
 above as an added or context line. If a point does not attach to such a
-line, put it in the summary instead.
+line, put it in the detail instead.
 
 Reply with JSON and nothing else. No prose around it, no code fences:
-{"summary": "...",
- "comments": [{"path": "R/file.R", "line": 42,
-               "severity": "suggestion", "body": "..."}]}
-summary: two or three sentences, what the change does and your verdict.
+{"summary": "...", "detail": "...",
+ "comments": [{"path": "R/file.R", "line": 42, "severity": "suggestion",
+               "title": "...", "body": "..."}]}
+The reader sees summary and each title. The rest sits in collapsed
+dropdowns, so those must make sense on their own.
+summary: one or two sentences, what the change does and your verdict.
+detail: your reasoning and any points that do not attach to a line, or
+"" if there is nothing to add.
+title: one sentence saying what to change.
+body: why, and the fix.
 severity: default to "suggestion". Use "issue" only for a bug you can
 demonstrate or a breach of an explicit project standard. Use "note" for
 a genuine question. Most findings are suggestions.
@@ -667,20 +686,24 @@ sanitise_review() {
   [ -n "$files" ] || files='[]'
 
   # A comment on a file outside the diff cannot be posted inline, so move
-  # it into the summary instead of losing it.
+  # it into the detail instead of losing it.
   clean="$(jq -c --argjson files "$files" '
     (.comments // []) as $all
     | ($all | map(select(.path as $p | $files | index($p)))) as $keep
     | ($all | map(select(.path as $p | ($files | index($p)) | not))) as $moved
     | {
-        summary: ((.summary // "" | .[0:4000])
+        summary: (.summary // "" | .[0:4000]),
+        detail: ((.detail // "" | .[0:4000])
           + (if ($moved | length) > 0 then
                "\n\nPoints that do not attach to a changed line:\n"
-               + ($moved | map("- `" + .path + "` — " + .body) | join("\n"))
-             else "" end)),
+               + ($moved | map("- `" + .path + "` — "
+                   + ((.title // "") + " " + .body | ltrimstr(" ")))
+                 | join("\n"))
+             else "" end) | ltrimstr("\n\n")),
         comments: ($keep[0:8] | map({
           path, line,
           severity: (.severity // "suggestion"),
+          title: (.title // "" | .[0:300]),
           body: (.body | .[0:2000])
         }))
       }' <<< "$review" 2>/dev/null)"
@@ -707,31 +730,20 @@ label_pr() {
 
 post_review() {
   local repo="$1" pr="$2" sha="$3" review="$4" reason="$5"
-  local token payload body http
+  local token payload footer http
 
-  body="$(jq -r '.summary' <<< "$review")"
-  body="$body
+  footer="Automated first pass by seabbs-review-bot (Claude $MODEL), \
+triggered by: $reason. Not a human review. Comment \`@seabbs-review-bot\` \
+to ask for another pass: @seabbs any time, the author's agent once it has \
+pushed changes. Add the \`$SKIP_LABEL\` label to opt this PR out. Ping \
+@seabbs with any questions."
 
-<sub>Automated first pass by seabbs-review-bot (Claude $MODEL), triggered \
-by: $reason. Not a human review. Comment \`@seabbs-review-bot\` to ask for \
-another pass: @seabbs any time, the author's agent once it has pushed \
-changes. Add the \`$SKIP_LABEL\` label to opt this PR out. Ping @seabbs \
-with any questions.</sub>"
-
-  payload="$(jq -n --arg body "$body" --arg sha "$sha" \
-    --argjson review "$review" '{
-      commit_id: $sha,
-      body: $body,
-      event: "COMMENT",
-      comments: [$review.comments[]? | {
-        path: .path,
-        line: .line,
-        side: "RIGHT",
-        body: ((if .severity == "issue" then "**issue** "
-                elif .severity == "suggestion" then "**suggestion** "
-                else "**note** " end) + .body)
-      }]
-    }')"
+  # Short visible lines, detail in dropdowns: see review-bot-format.jq.
+  format_review() {
+    jq -n --argjson review "$review" --arg sha "$sha" \
+      --arg footer "$footer" --arg mode "$1" -f "$FORMAT_JQ"
+  }
+  payload="$(format_review inline)"
 
   if $DRY_RUN; then
     jq . <<< "$payload" > "$STATE_DIR/last-review.json"
@@ -760,12 +772,7 @@ with any questions.</sub>"
   # Inline comments 422 when a line is not in the diff. Rather than lose
   # the review, fold the comments into the body and post that.
   log "  inline post failed, retrying as a plain review"
-  payload="$(jq -n --arg sha "$sha" --argjson p "$payload" '{
-    commit_id: $sha,
-    event: "COMMENT",
-    body: ($p.body + "\n\n" + ([$p.comments[]?
-      | "- `\(.path):\(.line)` — \(.body)"] | join("\n")))
-  }')"
+  payload="$(format_review plain)"
   if GH_TOKEN="$token" gh api -X POST "repos/$repo/pulls/$pr/reviews" \
     --input - <<< "$payload" >/dev/null 2>&1; then
     log "  posted plain review on $repo#$pr"
@@ -823,10 +830,20 @@ treat their size as part of the change: $noise"
   lang="$(detect_language "$dir")"
   log "  language: $lang"
 
+  # Later rounds read only what moved since the last pass. A last head
+  # lost to a force-push means a full read.
+  local round last
+  round="$(review_round "$HISTORY" "$repo#$pr")"
+  last="$(ledger_last_sha "$repo" "$pr")"
+  [ -n "$last" ] && ! git -C "$dir" merge-base --is-ancestor \
+    "$last" "$sha" 2>/dev/null && last=""
+  log "  round $round${last:+, last pass at ${last:0:8}}"
+
   review="$(run_review "$dir" \
     "$(build_prompt "$repo" "$pr" "$author" "$base" "$range" "$title" \
       "$(standards_block "$lang")" "$(ci_summary "$repo" "$sha")" \
-      "$scope")")"
+      "$scope" "$(round_scope "$round" "$last" "$range")" \
+      "$(prior_findings "$POSTED_DIR" "$repo" "$pr")")")"
   if [ -z "$review" ]; then
     log "  no usable review returned for $repo#$pr"
     return 1
