@@ -1,0 +1,83 @@
+#!/bin/bash
+# Stub `gh` for the gh-notify tests.
+# Logs every invocation to $GN_TEST_CALLS and answers the handful of gh
+# calls gh-notify.sh makes, applying any --jq filter with the real jq so
+# the script's own queries still do their job.
+#
+# The fixture is five notifications, one of each case the script has to
+# tell apart: bot noise, a bot question in the text, a human, a bot ask
+# marked only by the label, and a thread with no comment on it at all.
+set -u
+echo "$*" >> "${GN_TEST_CALLS:?GN_TEST_CALLS not set}"
+
+jq_query=""
+prev=""
+for a in "$@"; do
+  [ "$prev" = "--jq" ] && jq_query="$a"
+  prev="$a"
+done
+
+emit() {
+  if [ -n "$jq_query" ]; then jq -r "$jq_query" 2>/dev/null; else cat; fi
+}
+
+[ "$1" = "auth" ] && { echo "gho_stub_token"; exit 0; }
+
+API="https://api.github.com/repos"
+
+# Marking a thread read. Checked before the listing, which also has
+# "notifications" in its URL.
+case " $* " in
+  *" -X PATCH "*) echo '{}'; exit 0 ;;
+esac
+
+case " $* " in
+  *notifications\?per_page*)
+    jq -n --arg a "$API" '[
+      {id:"1", reason:"mention", repository:{full_name:"seabbs/alpha"},
+       subject:{title:"Noise from the worker", type:"PullRequest",
+         latest_comment_url:($a + "/seabbs/alpha/issues/comments/11"),
+         url:($a + "/seabbs/alpha/issues/1")}},
+      {id:"2", reason:"mention", repository:{full_name:"seabbs/beta"},
+       subject:{title:"Question about scoring", type:"Issue",
+         latest_comment_url:($a + "/seabbs/beta/issues/comments/12"),
+         url:($a + "/seabbs/beta/issues/2")}},
+      {id:"3", reason:"subscribed", repository:{full_name:"epi/gamma"},
+       subject:{title:"A person said something", type:"Issue",
+         latest_comment_url:($a + "/epi/gamma/issues/comments/13"),
+         url:($a + "/epi/gamma/issues/3")}},
+      {id:"4", reason:"mention", repository:{full_name:"seabbs/delta"},
+       subject:{title:"Stuck, labelled", type:"Issue",
+         latest_comment_url:($a + "/seabbs/delta/issues/comments/14"),
+         url:($a + "/seabbs/delta/issues/4")}},
+      {id:"5", reason:"ci_activity", repository:{full_name:"seabbs/eps"},
+       subject:{title:"Nothing has been said yet", type:"CheckSuite",
+         latest_comment_url:null,
+         url:($a + "/seabbs/eps/issues/5")}}
+    ]' | emit
+    exit 0 ;;
+  *issues/comments/11*)
+    echo '{"user":{"login":"seabbs-bot"},
+           "body":"Opened a PR. Nothing needed from you."}' | emit
+    exit 0 ;;
+  *issues/comments/12*)
+    echo '{"user":{"login":"seabbs-bot"},
+           "body":"@seabbs which checkpoint should we report?"}' | emit
+    exit 0 ;;
+  *issues/comments/13*)
+    echo '{"user":{"login":"kaitejohnson"},
+           "body":"Looks good to me @seabbs, merging?"}' | emit
+    exit 0 ;;
+  *issues/comments/14*)
+    # No question in the text. Only the label makes this an ask.
+    echo '{"user":{"login":"seabbs-bot"},
+           "body":"I stopped here and cannot go further."}' | emit
+    exit 0 ;;
+  *issues/4*)
+    echo '{"labels":[{"name":"needs-seabbs"}]}' | emit; exit 0 ;;
+  *issues/*)
+    echo '{"labels":[]}' | emit; exit 0 ;;
+esac
+
+echo "stub-gh-notify: unhandled call: $*" >&2
+exit 1
