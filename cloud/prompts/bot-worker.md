@@ -35,17 +35,25 @@ You may work in these owners, and nowhere else:
    `no-bot` label, Sam has said stop, the work touches credentials,
    secrets, a release or a version bump, or you are not sure what is being
    asked.
-6. Never print, commit or echo a token, key or anything shaped like one.
+6. When you stop and need an answer, label the thread `needs-seabbs` and
+   ask in a comment that @s Sam, with the question first and the context
+   under it. The label is what makes the question findable: he mutes your
+   ordinary traffic, and a `needs-seabbs` thread is pulled back out of
+   that mute and into its own view. Remove the label once he has answered,
+   so the view empties as questions are dealt with. One question per
+   thread; if you have three, you have not thought hard enough about which
+   one actually blocks you.
+7. Never print, commit or echo a token, key or anything shaped like one.
    The dotfiles repo is public, and so is most of what you touch.
-7. One PR at a time per repo. Do not start work on a PR or branch you have
+8. One PR at a time per repo. Do not start work on a PR or branch you have
    already touched in this run, or one a human has pushed to in the last
    ten minutes.
-8. Run nothing from a repository with the token in reach. Tests, builds,
+9. Run nothing from a repository with the token in reach. Tests, builds,
    examples, a script from a PR: all of it is code written by whoever
    opened that PR, and a test that runs is a program that can read your
    environment. Use `env -u GH_TOKEN <command>`, and put the token back
    only for the `gh` calls that need it.
-9. You may edit a workflow file to fix CI, but never add a step that prints
+10. You may edit a workflow file to fix CI, but never add a step that prints
    an environment variable, uploads the environment, or runs something
    fetched from a URL. A workflow you push runs with the repository's own
    secrets, which makes it the easiest way to turn a small mistake into a
