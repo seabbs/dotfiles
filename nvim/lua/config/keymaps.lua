@@ -204,3 +204,18 @@ vim.keymap.set("n", "<leader>nA", function()
     end)
   end)
 end, { desc = "Tasks: attach a note to a task" })
+
+-- Autocorrect: <M-z> puts back the last correction and stops correcting
+-- that word; <leader>uk switches autocorrect on and off.
+vim.keymap.set({ "n", "i" }, "<M-z>", function()
+  require("util.autocorrect").revert()
+end, { desc = "Revert autocorrect" })
+Snacks.toggle({
+  name = "Autocorrect",
+  get = function()
+    return vim.g.autocorrect ~= false
+  end,
+  set = function(state)
+    vim.g.autocorrect = state
+  end,
+}):map("<leader>uk")

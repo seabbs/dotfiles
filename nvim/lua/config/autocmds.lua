@@ -58,3 +58,30 @@ vim.api.nvim_create_autocmd({ "InsertLeave", "TextChanged" }, {
     end
   end,
 })
+
+-- Spell checking is opt-in (<leader>us). Keep LazyVim's soft wrap for
+-- prose but drop the spell it turns on with it.
+pcall(vim.api.nvim_del_augroup_by_name, "lazyvim_wrap_spell")
+vim.api.nvim_create_autocmd("FileType", {
+  group = vim.api.nvim_create_augroup("prose_wrap", { clear = true }),
+  pattern = { "text", "plaintex", "typst", "gitcommit", "markdown" },
+  callback = function()
+    vim.opt_local.wrap = true
+  end,
+})
+
+-- Autocorrect in prose, with <M-z> to revert (see util/autocorrect.lua).
+require("util.autocorrect").setup()
+
+-- Publish this nvim's server address on its tmux pane, so agents can open
+-- files here with scripts/open-in-nvim.sh.
+if vim.env.TMUX and vim.env.TMUX_PANE and vim.v.servername ~= "" then
+  local pane = vim.env.TMUX_PANE
+  vim.fn.jobstart({ "tmux", "set-option", "-p", "-t", pane, "@nvim_server", vim.v.servername })
+  vim.api.nvim_create_autocmd("VimLeavePre", {
+    group = vim.api.nvim_create_augroup("nvim_server_pane", { clear = true }),
+    callback = function()
+      vim.fn.system({ "tmux", "set-option", "-p", "-u", "-t", pane, "@nvim_server" })
+    end,
+  })
+end
