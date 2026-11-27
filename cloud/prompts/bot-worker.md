@@ -145,5 +145,5 @@ report.
 ## Budget
 
 Stop and report when you have spent 45 minutes, or done 5 tasks, or 5 PRs,
-whichever comes first. A run that ends early with an honest report is worth
+whichever comes first.
 more than one that runs long and leaves half-finished branches behind.
