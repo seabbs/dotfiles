@@ -5,6 +5,12 @@
 # and lets you do it: Enter opens a PR straight into octo's review mode,
 # so reading and answering are the same keystroke.
 #
+# Two ways to hand a row off rather than do it yourself: C-a opens a
+# Claude session on it (prsesh for a PR, agent for a repo), and C-b asks
+# seabbs-bot to take it, by commenting on the thread the way you would by
+# hand. The bot's scan only claims a comment that starts a line with its
+# name and was written by you, so this is that comment and nothing special.
+#
 #   prefix + i         the popup (tmux)
 #   triage.sh          the same list, printed
 #   triage.sh --list   rows only, for the popup to reload
@@ -146,6 +152,35 @@ open_item() {
   exec "$OCTO" "$repo" "$number" "$path" review
 }
 
+# Hand the thread to seabbs-bot. Nothing clever: the comment is posted as
+# you, and the bot's scan picks it up on its next run because it starts a
+# line with the bot's name. Public repos mean a public comment, so it says
+# what it will post before posting it.
+delegate() {
+  local repo="$1" number="$2" what="$3"
+  [ -n "$repo" ] && [ -n "$number" ] || return 0
+  if [ -z "$what" ]; then
+    echo "nothing asked, so nothing posted" >&2
+    return 1
+  fi
+  gh issue comment "$number" -R "$repo" \
+    --body "@$BOT $what" >/dev/null 2>&1 \
+    && echo "asked $BOT on $repo#$number: $what" \
+    || echo "could not comment on $repo#$number" >&2
+}
+
+# Open a Claude session on it. prsesh for a PR, since it checks the branch
+# out and lays the window out; agent for anything else, which lands in the
+# repo itself.
+dispatch_agent() {
+  local type="$1" repo="$2" number="$3"
+  [ -n "$repo" ] || return 0
+  if [ "$type" = "pr" ] && [ -n "$number" ]; then
+    exec zsh -ic "prsesh $repo $number"
+  fi
+  exec zsh -ic "agent ${repo##*/}"
+}
+
 case "${1:-}" in
   --list) list_rows; exit 0 ;;
   --dismiss)
@@ -174,10 +209,11 @@ fi
 
 sel="$(fzf --ansi --no-sort --delimiter='\t' --with-nth=1 \
   --border-label ' needs you ' --prompt '  ' \
-  --header 'Enter=review in octo  C-t=tuicr  C-d=dismiss  C-r=reload' \
+  --header \
+    'Enter=octo  C-t=tuicr  C-a=agent  C-b=ask bot  C-d=dismiss  C-r=reload' \
   --bind "ctrl-d:execute-silent($0 --dismiss {5})+reload($0 --list)" \
   --bind "ctrl-r:reload($0 --list)" \
-  --expect=ctrl-t <<< "$rows")"
+  --expect=ctrl-t,ctrl-a,ctrl-b <<< "$rows")"
 
 key="$(sed -n '1p' <<< "$sel")"
 line="$(sed -n '2p' <<< "$sel")"
@@ -186,7 +222,15 @@ line="$(sed -n '2p' <<< "$sel")"
 IFS=$'\t' read -r _ type repo number _ <<< "$line"
 [ -n "$repo" ] || exit 0
 
-if [ "$key" = "ctrl-t" ]; then
-  exec "$TUICR" "$repo" "$number" "$(repo_path "$repo")"
-fi
-open_item "$type" "$repo" "$number"
+case "$key" in
+  ctrl-t) exec "$TUICR" "$repo" "$number" "$(repo_path "$repo")" ;;
+  ctrl-a) dispatch_agent "$type" "$repo" "$number" ;;
+  ctrl-b)
+    # Asked outside the popup, which has closed by now, so the prompt is
+    # visible and editable rather than squeezed into a picker.
+    printf 'ask %s to do what on %s#%s?\n> ' "$BOT" "$repo" "$number"
+    IFS= read -r what
+    delegate "$repo" "$number" "$what"
+    ;;
+  *) open_item "$type" "$repo" "$number" ;;
+esac
