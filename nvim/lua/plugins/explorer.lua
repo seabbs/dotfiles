@@ -6,8 +6,13 @@ return {
     "folke/snacks.nvim",
     opts = {
       explorer = {
-        -- Don't auto-open the explorer when nvim launches on a
-        -- directory (`nvim .`). Open it on demand via <leader>e.
+        -- Don't let the explorer claim a directory argument. Open it
+        -- on demand via <leader>e instead.
+        --
+        -- With this off, a directory handed to nvim falls to netrw, so
+        -- the session layouts pass no argument at all and open on the
+        -- dashboard. Turning this back on would change what `nvim .`
+        -- does, but the layouts would still not be doing that.
         replace_netrw = false,
       },
       picker = {
