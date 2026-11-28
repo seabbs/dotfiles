@@ -316,7 +316,7 @@ _build_panes() {
 
   local p1 p2
   tmux select-pane -t "$p0" -T "nvim"
-  tmux send-keys -t "$p0" "nvim ." Enter
+  tmux send-keys -t "$p0" "nvim" Enter
   p1=$(tmux split-window -t "$p0" -h -c "$dir" -P -F '#{pane_id}')
   tmux select-pane -t "$p1" -T "$ai_title"
   tmux send-keys -t "$p1" "${AGENT_CLI_DEV_TOOL}" Enter
@@ -997,7 +997,7 @@ agent-to-proj() {
   nvim_pane=$(tmux split-window -hb -c "$work_dir" \
     -P -F '#{pane_id}')
   tmux select-pane -t "$nvim_pane" -T "nvim"
-  tmux send-keys -t "$nvim_pane" "nvim ." Enter
+  tmux send-keys -t "$nvim_pane" "nvim" Enter
 
   # Add REPL pane below ai
   tmux split-window -t "$ai_pane" -v -c "$work_dir"
