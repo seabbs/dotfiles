@@ -1,0 +1,117 @@
+#!/bin/bash
+# Stub `gh` for the dep-prs-scan tests.
+# Logs every invocation to $DP_TEST_CALLS and answers the two gh calls
+# dep-prs-scan.sh makes, applying any --jq filter with the real jq so the
+# script's own queries still do their job.
+#
+# The fixture is ten PRs, one per case the script has to tell apart. Each
+# lives in its own repo so a repo name identifies the case.
+set -u
+echo "$*" >> "${DP_TEST_CALLS:?DP_TEST_CALLS not set}"
+
+jq_query=""
+prev=""
+for a in "$@"; do
+  [ "$prev" = "--jq" ] && jq_query="$a"
+  prev="$a"
+done
+
+emit() {
+  # gh prints each --jq result compactly, one per line. The script reads
+  # them a line at a time, so the stub must do the same.
+  if [ -n "$jq_query" ]; then jq -c -r "$jq_query" 2>/dev/null; else cat; fi
+}
+
+# Minutes ago, as an ISO timestamp. GNU date takes -d, BSD date does not.
+ago() {
+  date -u -v-"$1"M +%Y-%m-%dT%H:%M:%SZ 2>/dev/null \
+    || date -u -d "$1 minutes ago" +%Y-%m-%dT%H:%M:%SZ
+}
+
+QUIET="$(ago 2880)"    # two days back: nobody is mid-thought
+FRESH="$(ago 5)"       # five minutes back: someone just pushed
+
+DEPBOT="dependabot[bot]"
+ACTIONS="github-actions[bot]"
+
+# ------------------------------------------------------------- the search
+
+if [ "$1" = "api" ] && [[ " $* " == *search/issues* ]]; then
+  jq -n --arg d "$DEPBOT" --arg g "$ACTIONS" '
+    def item($owner; $repo; $n; $title; $author; $labels):
+      {repository_url: ("https://api.github.com/repos/" + $owner + "/"
+                        + $repo),
+       number: $n, title: $title, user: {login: $author},
+       labels: ($labels | map({name: .}))};
+    {items: [
+      item("seabbs"; "alpha";   1; "chore(deps): bump Turing";      $d; []),
+      item("seabbs"; "beta";    2; "chore(deps): bump CSV";         $d; []),
+      item("seabbs"; "gamma";   3; "chore(deps): bump Dists";       $d; []),
+      item("seabbs"; "delta";   4; "Bump the docs theme";           $g; []),
+      item("seabbs"; "epsilon"; 5; "CompatHelper: bump Turing";     $g; []),
+      item("seabbs"; "zeta";    6; "chore(deps): bump Plots";      $d;
+           ["no-bot"]),
+      item("seabbs"; "eta";     7; "chore(deps): bump StatsBase";   $d; []),
+      item("seabbs"; "theta";   8; "chore(deps): bump DataFrames";  $d; []),
+      item("seabbs"; "iota";    9; "chore(deps): bump JSON3";       $d; []),
+      item("outside"; "kappa"; 10; "chore(deps): bump Tables";      $d; [])
+    ]}' | emit
+  exit 0
+fi
+
+# -------------------------------------------------------------- one PR
+
+if [ "$1" = "pr" ] && [ "$2" = "view" ]; then
+  number="$3"
+  repo=""
+  prev=""
+  for a in "$@"; do
+    [ "$prev" = "-R" ] && repo="$a"
+    prev="$a"
+  done
+
+  red='[{"name":"test","status":"COMPLETED","conclusion":"FAILURE",
+         "detailsUrl":"https://ci/1"},
+        {"name":"lint","status":"COMPLETED","conclusion":"SUCCESS",
+         "detailsUrl":"https://ci/2"}]'
+  green='[{"name":"test","status":"COMPLETED","conclusion":"SUCCESS",
+           "detailsUrl":"https://ci/1"}]'
+  running='[{"name":"test","status":"IN_PROGRESS","conclusion":null,
+             "detailsUrl":"https://ci/1"},
+            {"name":"lint","status":"COMPLETED","conclusion":"FAILURE",
+             "detailsUrl":"https://ci/2"}]'
+
+  one_commit="[{\"oid\":\"aaa\",\"committedDate\":\"$QUIET\",
+                \"authors\":[{\"login\":\"dependabot[bot]\"}]}]"
+  fresh_commit="[{\"oid\":\"bbb\",\"committedDate\":\"$FRESH\",
+                  \"authors\":[{\"login\":\"dependabot[bot]\"}]}]"
+  two_tries="[{\"oid\":\"ccc\",\"committedDate\":\"$QUIET\",
+               \"authors\":[{\"login\":\"dependabot[bot]\"}]},
+              {\"oid\":\"ddd\",\"committedDate\":\"$QUIET\",
+               \"authors\":[{\"login\":\"seabbs-bot\"}]},
+              {\"oid\":\"eee\",\"committedDate\":\"$QUIET\",
+               \"authors\":[{\"login\":\"seabbs-bot\"}]}]"
+
+  checks="$red"; commits="$one_commit"; draft=false
+  case "$repo" in
+    */beta)  checks="$green" ;;
+    */gamma) checks="$running" ;;
+    */eta)   commits="$fresh_commit" ;;
+    */theta) commits="$two_tries" ;;
+    */iota)  draft=true ;;
+  esac
+
+  jq -n --argjson n "$number" --arg repo "$repo" \
+    --argjson checks "$checks" --argjson commits "$commits" \
+    --argjson draft "$draft" --arg at "$QUIET" '{
+      number: $n, title: "a bump",
+      url: ("https://github.com/" + $repo + "/pull/" + ($n|tostring)),
+      isDraft: $draft, headRefName: "dependabot/julia/turing-0.49",
+      baseRefName: "main", updatedAt: $at,
+      statusCheckRollup: $checks, commits: $commits
+    }' | emit
+  exit 0
+fi
+
+echo "stub-gh-dep-prs: unhandled call: $*" >&2
+exit 1

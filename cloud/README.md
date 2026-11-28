@@ -8,6 +8,15 @@ through a web form where nobody can see what changed.
     prompts/bot-worker.md    what the worker agent is told to do
     routines/bot-worker.json the routine body, as a template
 
+The worker's two discovery scripts live in `scripts/`, not here, because
+they are useful from a terminal too:
+
+    scripts/bot-tasks-scan.sh  work Sam has tagged the bot into
+    scripts/dep-prs-scan.sh    dependency bumps whose CI is red
+
+Both are read-only and print JSON, so running either shows what the next
+run would pick up without it picking anything up.
+
 The routine's own prompt is one line: read `prompts/bot-worker.md` and
 follow it. So a change here reaches the next run with no routine edit.
 
@@ -58,8 +67,8 @@ to get the agent's attention. That is the reason the trigger rules are
 mechanical rather than a matter of judgement: only Sam's comments are
 instructions, the mention has to start a line, and the checks live in
 `scripts/bot-tasks-scan.sh` where they can be read and tested. Treat a PR
-to this repo that edits the prompt or that script as a change to what the
-bot is allowed to do.
+to this repo that edits the prompt or either scan script as a change to
+what the bot is allowed to do.
 
 ## Schedule
 
