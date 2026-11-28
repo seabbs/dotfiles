@@ -40,6 +40,11 @@
 set -uo pipefail
 
 BOT_USER="${DEP_PRS_BOT:-seabbs-bot}"
+# A commit's author only carries a login when GitHub can resolve the
+# email to an account. Where it cannot, login is null, and counting on it
+# alone would leave the attempt cap never tripping and the same PR
+# retried every run. The name and email on the commit are the fallback.
+BOT_EMAIL="${DEP_PRS_BOT_EMAIL:-signin@samabbott.co.uk}"
 # Where the bot may work. An owner not listed here is ignored even if the
 # bot can see the repo, so read access can never become a work queue.
 OWNERS="${DEP_PRS_OWNERS:-seabbs epinowcast epiforecasts EpiAware nfidd}"
@@ -80,8 +85,7 @@ search_prs() {
     -f q="$q" -f per_page=100 -f sort=updated -f order=desc \
     --jq '.items[] | {repo: (.repository_url | sub("^.*/repos/"; "")),
                       number, title, author: .user.login,
-                      labels: [.labels[].name]}' \
-    2>/dev/null
+                      labels: [.labels[].name]}'
 }
 
 # Is this author allowed to set the bot working? dependabot always;
@@ -96,6 +100,11 @@ is_dep_pr() {
   esac
   return 1
 }
+
+# Run the search before opening the array. A gh that fails on auth, rate
+# limit or network would otherwise print an empty array and exit 0, and
+# the worker would read "no dependency bumps" rather than an error.
+items="$(search_prs)" || die "the search failed, see the error above"
 
 echo "["
 first=true
@@ -143,8 +152,9 @@ while IFS= read -r item; do
 
   # Our own commits are the attempt count. Two failed goes at the same
   # bump is enough; a third is the same hour spent again.
-  attempts="$(jq --arg b "$BOT_USER" \
-    '[.commits[]? | select([.authors[]?.login] | index($b))] | length' \
+  attempts="$(jq --arg b "$BOT_USER" --arg e "$BOT_EMAIL" \
+    '[.commits[]? | select([.authors[]? | (.login, .name, .email)]
+                           | any(. == $b or . == $e))] | length' \
     <<< "$pr")"
   [ "${attempts:-0}" -ge "$MAX_ATTEMPTS" ] && continue
 
@@ -156,5 +166,5 @@ while IFS= read -r item; do
       head_ref: .headRefName, base_ref: .baseRefName,
       updated_at: .updatedAt, attempts: $attempts, failing: $failing
     }' <<< "$pr"
-done < <(search_prs)
+done <<< "$items"
 echo "]"

@@ -20,7 +20,12 @@
 #   8. a draft is not listed.
 #   9. an owner outside the allowlist is not listed, even though the
 #      search returned it.
-#  10. the output is a single JSON array, so the worker can read it.
+#  10. the attempt cap still holds when GitHub cannot resolve the commit
+#      email to a login, which is the case where counting on login alone
+#      would retry the same PR every run.
+#  11. a gh that cannot search fails loudly. An empty array and exit 0
+#      would read as "no dependency bumps" rather than as an error.
+#  12. the output is a single JSON array, so the worker can read it.
 #
 # Usage: test-dep-prs-scan.sh [path-to-scripts-dir]
 set -uo pipefail
@@ -101,6 +106,10 @@ listed seabbs/iota \
   && bad "a draft was listed" \
   || pass "a draft is not listed"
 
+listed seabbs/lambda \
+  && bad "a PR tried twice without a resolvable login was listed" \
+  || pass "the attempt cap holds without a resolvable login"
+
 listed outside/kappa \
   && bad "a PR outside the allowed owners was listed" \
   || pass "an owner outside the allowlist is ignored"
@@ -118,6 +127,14 @@ if grep -q "seabbs/delta" "$DP_TEST_CALLS" \
   bad "a PR ruled out by the listing was fetched anyway"
 else
   pass "PRs ruled out by the listing are not fetched"
+fi
+
+if out2="$(DP_STUB_SEARCH_FAILS=1 $S 2>/dev/null)"; then
+  bad "a failing search exited 0: $out2"
+elif [ -n "$out2" ]; then
+  bad "a failing search still printed something: $out2"
+else
+  pass "a failing search fails loudly rather than printing no work"
 fi
 
 [ "$fail" -eq 0 ] && echo "all dep-prs-scan tests passed"

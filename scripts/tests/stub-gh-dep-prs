@@ -37,6 +37,12 @@ ACTIONS="github-actions[bot]"
 # ------------------------------------------------------------- the search
 
 if [ "$1" = "api" ] && [[ " $* " == *search/issues* ]]; then
+  # A gh that cannot search: auth, rate limit, network. Set
+  # DP_STUB_SEARCH_FAILS to get it.
+  if [ -n "${DP_STUB_SEARCH_FAILS:-}" ]; then
+    echo "gh: HTTP 401: Bad credentials" >&2
+    exit 1
+  fi
   jq -n --arg d "$DEPBOT" --arg g "$ACTIONS" '
     def item($owner; $repo; $n; $title; $author; $labels):
       {repository_url: ("https://api.github.com/repos/" + $owner + "/"
@@ -54,7 +60,8 @@ if [ "$1" = "api" ] && [[ " $* " == *search/issues* ]]; then
       item("seabbs"; "eta";     7; "chore(deps): bump StatsBase";   $d; []),
       item("seabbs"; "theta";   8; "chore(deps): bump DataFrames";  $d; []),
       item("seabbs"; "iota";    9; "chore(deps): bump JSON3";       $d; []),
-      item("outside"; "kappa"; 10; "chore(deps): bump Tables";      $d; [])
+      item("outside"; "kappa"; 10; "chore(deps): bump Tables";      $d; []),
+      item("seabbs"; "lambda"; 11; "chore(deps): bump Random";      $d; [])
     ]}' | emit
   exit 0
 fi
@@ -85,6 +92,15 @@ if [ "$1" = "pr" ] && [ "$2" = "view" ]; then
                 \"authors\":[{\"login\":\"dependabot[bot]\"}]}]"
   fresh_commit="[{\"oid\":\"bbb\",\"committedDate\":\"$FRESH\",
                   \"authors\":[{\"login\":\"dependabot[bot]\"}]}]"
+  # The same two attempts, but GitHub could not resolve the commit email
+  # to an account, so login is null and only the name identifies us.
+  no_login="[{\"oid\":\"fff\",\"committedDate\":\"$QUIET\",
+              \"authors\":[{\"login\":null,\"name\":\"seabbs-bot\",
+                           \"email\":\"signin@samabbott.co.uk\"}]},
+             {\"oid\":\"ggg\",\"committedDate\":\"$QUIET\",
+              \"authors\":[{\"login\":null,\"name\":\"seabbs-bot\",
+                           \"email\":\"signin@samabbott.co.uk\"}]}]"
+
   two_tries="[{\"oid\":\"ccc\",\"committedDate\":\"$QUIET\",
                \"authors\":[{\"login\":\"dependabot[bot]\"}]},
               {\"oid\":\"ddd\",\"committedDate\":\"$QUIET\",
@@ -97,7 +113,8 @@ if [ "$1" = "pr" ] && [ "$2" = "view" ]; then
     */beta)  checks="$green" ;;
     */gamma) checks="$running" ;;
     */eta)   commits="$fresh_commit" ;;
-    */theta) commits="$two_tries" ;;
+    */theta)  commits="$two_tries" ;;
+    */lambda) commits="$no_login" ;;
     */iota)  draft=true ;;
   esac
 
