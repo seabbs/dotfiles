@@ -23,7 +23,11 @@ windows:
   - main:
       layout: main-vertical
       panes:
-        - nvim .
+        # No argument, so nvim opens on the LazyVim dashboard. The pane
+        # already starts in the project root, so `nvim .` only added a
+        # directory for something to handle, and with replace_netrw off
+        # that something is netrw.
+        - nvim
         - ${AGENT_CLI_DEV_TOOL:-claude}
         - >-
           if [ -f Project.toml ]; then

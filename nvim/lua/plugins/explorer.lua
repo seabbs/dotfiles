@@ -8,6 +8,9 @@ return {
       explorer = {
         -- Don't auto-open the explorer when nvim launches on a
         -- directory (`nvim .`). Open it on demand via <leader>e.
+        -- Nothing launches nvim that way any more: a directory still
+        -- has to be opened by something, and with this off that is
+        -- netrw, which is why the session layouts pass no argument.
         replace_netrw = false,
       },
       picker = {

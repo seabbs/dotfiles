@@ -712,7 +712,7 @@ build_dev_window() {
   fi
   tmux new-window -t "=$session" -n "$name" -c "$dir"
   tmux select-pane -T "nvim"
-  tmux send-keys "nvim ." Enter
+  tmux send-keys "nvim" Enter
   tmux split-window -h -c "$dir"
   tmux select-pane -T "ai:$name"
   tmux send-keys "${AGENT_CLI_DEV_TOOL:-claude}" Enter
@@ -1166,7 +1166,7 @@ elif [[ "$selected" == *" :: "* ]]; then
     tmux new-window -t "=$session" -n "$branch" \
       -c "$worktree_path"
     tmux select-pane -T "nvim"
-    tmux send-keys "nvim ." Enter
+    tmux send-keys "nvim" Enter
     tmux split-window -h -c "$worktree_path"
     tmux select-pane -T "ai:$branch"
     tmux send-keys "${AGENT_CLI_DEV_TOOL:-claude}" Enter
