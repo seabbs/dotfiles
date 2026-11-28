@@ -128,7 +128,47 @@ first, at most five per run:
 Push fixes to the PR's own branch. Never force-push, and never rebase a
 branch someone else has pushed to.
 
-## Phase 3 — report
+## Phase 3 — dependency bumps that broke the package
+
+    scripts/dep-prs-scan.sh
+
+Lists open dependency PRs whose CI is red, newest first. dependabot opens
+most of them; the Julia compat ones come from CompatHelper. As with the
+task scan, eligibility is already decided, so do not go looking for bumps
+yourself and do not widen what it found.
+
+At most three per run, and never two in the same repo.
+
+The job is to make the package work with the new version of the
+dependency. It is not to make the PR green by other means. Changing the
+bound back, pinning the old version, loosening a test tolerance or
+skipping a test all turn a real incompatibility into a hidden one.
+
+For each PR:
+
+1. Read the failing job's log before touching anything. Decide which of
+   three it is: the package genuinely needs to change for the new
+   version, the bump is not supportable yet, or the failure has nothing
+   to do with the dependency.
+2. If the package needs to change, change it, and nothing else. A
+   dependency PR that also refactors is one nobody can review.
+3. If the bump is not supportable yet, say so in a comment with the
+   reason and move on. Leave the PR open. That is a useful answer and a
+   much better one than a bound quietly moved back.
+4. If the failure is infrastructure (a coverage upload, a rate limit, a
+   runner timeout), re-run once, then leave it.
+5. Run tests with `env -u GH_TOKEN`, as rule 9 says. A bump is a new
+   version of someone else's code, and running it is the whole point of
+   the exercise.
+6. Push to the PR's own branch. Once anyone other than dependabot commits
+   to one of its branches, dependabot stops rebasing that PR, so the
+   branch is yours from then on. Finish it or say in a comment why you
+   could not.
+7. Comment saying what you changed and what still fails. Never merge and
+   never approve: whether the package should move to that version is
+   Sam's call, and your comment is what he decides from.
+
+## Phase 4 — report
 
 End every run with a single comment on the tracking issue named in
 `cloud/README.md`, or, if there is none, a line per item in the
@@ -136,6 +176,8 @@ run log:
 
 - tasks claimed, and what happened to each
 - PRs tended, and what changed
+- dependency bumps looked at, and whether each one now works, is not
+  supportable yet, or was left
 - anything you refused, and why
 - anything that needs Sam
 
@@ -144,5 +186,7 @@ report.
 
 ## Budget
 
-Stop and report when you have spent 45 minutes, or done 5 tasks, or 5 PRs,
-whichever comes first.
+Stop and report when you have spent 45 minutes, or done 5 tasks, or 5 of
+your own PRs, or 3 dependency PRs, whichever comes first. Phase 1 is the
+work Sam asked for, so it gets the time it needs and the dependency
+bumps get what is left.
